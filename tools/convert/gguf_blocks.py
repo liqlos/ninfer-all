@@ -157,9 +157,14 @@ def validate(gguf: GGUFFile) -> None:
     for name, (shape, kind) in expected.items():
         info = gguf.tensors[name]
         stored = info.type_id in GGUF_FORMATS_BY_TYPE
-        if info.shape != shape or (kind == "blocks") != stored or (
-            kind != "blocks" and info.type_name != kind
-        ):
+        control_q4_k = (
+            kind == "BF16"
+            and info.type_name == "Q4_K"
+            and name.endswith(("ssm_alpha.weight", "ssm_beta.weight"))
+        )
+        if info.shape != shape or (not control_q4_k and (
+            (kind == "blocks") != stored or (kind != "blocks" and info.type_name != kind)
+        )):
             raise ValueError(f"{gguf.path}: {name} is {info.type_name} {info.shape}")
     end = max(info.offset + info.nbytes for info in gguf.tensors.values())
     if gguf.data_bytes_available < end:
@@ -184,6 +189,17 @@ def _dequantize(gguf: GGUFFile, tensor: str, first: int, last: int) -> torch.Ten
     values = dequantize(np.ascontiguousarray(blocks), kind)
     return torch.from_numpy(np.ascontiguousarray(values, dtype=np.float32)).reshape(
         last - first, -1
+    )
+
+
+def _control_projection(gguf: GGUFFile, name: str) -> LogicalSource:
+    if gguf.info(name).type_name == "Q4_K":
+        values = untile(_dequantize(gguf, name, 0, GDN_VALUE_HEADS).numpy(), 1)
+        return array_source(torch.from_numpy(values).to(torch.bfloat16), name)
+    words = untile(gguf.read_bf16_words(name), 1)
+    return array_source(
+        torch.from_numpy(np.ascontiguousarray(words.view(np.int16))).view(torch.bfloat16),
+        name,
     )
 
 
@@ -297,13 +313,7 @@ def text_sources(
             gguf, g + "ssm_out.weight", (HIDDEN, GDN_VALUE_DIM), rows()
         )
         for role, tensor in (("a_projection", "ssm_alpha.weight"), ("b_projection", "ssm_beta.weight")):
-            words = untile(gguf.read_bf16_words(g + tensor), 1)
-            direct[n + role] = array_source(
-                torch.from_numpy(np.ascontiguousarray(words.view(np.int16))).view(
-                    torch.bfloat16
-                ),
-                g + tensor,
-            )
+            direct[n + role] = _control_projection(gguf, g + tensor)
         ssm_a = untile(gguf.read_direct(g + "ssm_a"), 1).astype(np.float64)
         if not np.all(ssm_a < 0):
             raise ValueError(f"{g}ssm_a must be strictly negative (-exp(A_log))")
