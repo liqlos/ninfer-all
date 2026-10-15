@@ -332,7 +332,7 @@ bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* u
     gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(x.data), gate.k, x.ne[1],
                                      gate.input_columns, input, stream);
     gguf::vector_swiglu_q8(gguf_type(gate.qtype), gate.qdata, row_bytes(gate), rows, gate.k,
-                           input, x.ne[1], output, stream);
+                           input, x.ne[1], output, stream, NINFER_GGUF_SWIGLU_Q8_WARPS);
     gguf::VectorOutput destination;
     destination.bf16 = static_cast<__nv_bfloat16*>(residual.data);
     destination.column_stride = residual.ne[0];
