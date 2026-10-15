@@ -461,10 +461,16 @@ public:
 
     void* data() const { return static_cast<std::uint8_t*>(storage_.p) + 256; }
 
-    void poison() {
-        check(cudaMemset(storage_.p, 0xa5, storage_.bytes), "initialize output guards");
-        check(cudaMemset(data(), 0xff, payload_bytes_), "poison output");
-        check(cudaDeviceSynchronize(), "finish output poisoning");
+    void poison(cudaStream_t stream = nullptr) {
+        if (stream == nullptr) {
+            check(cudaMemset(storage_.p, 0xa5, storage_.bytes), "initialize output guards");
+            check(cudaMemset(data(), 0xff, payload_bytes_), "poison output");
+            check(cudaDeviceSynchronize(), "finish output poisoning");
+        } else {
+            check(cudaMemsetAsync(storage_.p, 0xa5, storage_.bytes, stream),
+                  "initialize output guards");
+            check(cudaMemsetAsync(data(), 0xff, payload_bytes_, stream), "poison output");
+        }
     }
 
     std::vector<__nv_bfloat16> read(const char* label) const {
@@ -532,9 +538,15 @@ public:
 
     void* data() const { return static_cast<std::uint8_t*>(storage_.p) + 64; }
 
-    void poison() {
-        check(cudaMemset(storage_.p, 0xa5, storage_.bytes), "initialize raw guards");
-        check(cudaMemset(data(), 0xcd, payload_bytes_), "poison raw output");
+    void poison(cudaStream_t stream = nullptr) {
+        if (stream == nullptr) {
+            check(cudaMemset(storage_.p, 0xa5, storage_.bytes), "initialize raw guards");
+            check(cudaMemset(data(), 0xcd, payload_bytes_), "poison raw output");
+        } else {
+            check(cudaMemsetAsync(storage_.p, 0xa5, storage_.bytes, stream),
+                  "initialize raw guards");
+            check(cudaMemsetAsync(data(), 0xcd, payload_bytes_, stream), "poison raw output");
+        }
     }
 
     std::vector<std::uint8_t> read(const char* label) const {
@@ -646,7 +658,7 @@ void run_rmsnorm_q8_fusion(std::uint32_t seed) {
                 const std::size_t bytes = ops::gguf::vector_activation_bytes(k, t);
                 DeviceBuffer reference(bytes);
                 GuardedRaw actual(bytes);
-                actual.poison();
+                actual.poison(stream);
                 cudaGraph_t reference_graph = nullptr;
                 cudaGraphExec_t reference_exec = nullptr;
                 check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
@@ -767,11 +779,11 @@ void run_rmsnorm_mmq_q8_fusion(std::uint32_t seed) {
             DeviceBuffer reference_q6(bytes);
             GuardedRaw actual(bytes);
             GuardedRaw actual_q6(bytes);
-            actual.poison();
-            actual_q6.poison();
+            actual.poison(stream);
+            actual_q6.poison(stream);
             const bool graph_test = t == 9 || t == 40 || t == 130 || t == 1024;
             for (const bool unit_offset : {false, true}) {
-                check(cudaMemset(reference.p, 0, bytes), "zero MMQ reference slack");
+                check(cudaMemsetAsync(reference.p, 0, bytes, stream), "zero MMQ reference slack");
                 Tensor normalized_view{normalized.p, DType::BF16, {k, t}};
                 if (graph_test) {
                     cudaGraph_t reference_graph = nullptr;
@@ -829,13 +841,35 @@ void run_rmsnorm_mmq_q8_fusion(std::uint32_t seed) {
                         type, actual.data(), stream);
                     check(cudaStreamSynchronize(stream), "wait fused RMSNorm MMQ");
                 }
-                if (actual.read("read fused RMSNorm MMQ graph") != expected) {
+                const auto got = actual.read("read fused RMSNorm MMQ graph");
+                if (got != expected) {
+                    const auto first = std::mismatch(got.begin(), got.end(), expected.begin());
+                    const std::size_t offset = static_cast<std::size_t>(first.first - got.begin());
+                    const std::size_t slack_bytes = 128 * (128 + 16);
+                    const std::size_t block_bytes =
+                        (bytes - slack_bytes) / (std::size_t(k / 128) * t);
+                    const std::size_t active_bytes = std::size_t(k / 128) * t * block_bytes;
+                    std::cerr << "RMSNorm MMQ first mismatch type=" << type_case.name
+                              << " T=" << t << " unit_offset=" << unit_offset
+                              << " byte=" << offset;
+                    if (offset < active_bytes) {
+                        const std::size_t block = offset / block_bytes;
+                        const std::size_t in_block = offset % block_bytes;
+                        std::cerr << " qblock=" << block << " kblock=" << block / t
+                                  << " column=" << block % t << " block_byte=" << in_block
+                                  << (in_block < 16 ? " scale_or_sum" : " q8_code");
+                    } else {
+                        std::cerr << " slack_byte=" << offset - active_bytes;
+                    }
+                    std::cerr << " got=" << unsigned(got[offset])
+                              << " expected=" << unsigned(expected[offset]) << '\n';
                     throw std::runtime_error(std::string(type_case.name) +
                                              " RMSNorm MMQ fusion differs from BF16 RMSNorm plus native packing at T=" +
                                              std::to_string(t));
                 }
                 if (type_case.qtype == QType::GGUF_Q4_K) {
-                    check(cudaMemset(reference_q6.p, 0, bytes), "zero Q6_K MMQ reference slack");
+                    check(cudaMemsetAsync(reference_q6.p, 0, bytes, stream),
+                          "zero Q6_K MMQ reference slack");
                     ops::gguf::quantize_matrix_activation(
                         ops::detail::gguf_type(QType::GGUF_Q6_K),
                         static_cast<const __nv_bfloat16*>(normalized.p), k, t, nullptr,
@@ -886,10 +920,10 @@ void run_rmsnorm_mmq_q8_fusion(std::uint32_t seed) {
                 GuardedOutput reference_q6_output(std::size_t(rows) * t);
                 GuardedOutput fused_output(std::size_t(rows) * t);
                 GuardedOutput fused_q6_output(std::size_t(rows) * t);
-                reference_output.poison();
-                reference_q6_output.poison();
-                fused_output.poison();
-                fused_q6_output.poison();
+                reference_output.poison(stream);
+                reference_q6_output.poison(stream);
+                fused_output.poison(stream);
+                fused_q6_output.poison(stream);
                 Tensor reference_tensor{reference_output.data(), DType::BF16, {rows, t}};
                 Tensor reference_q6_tensor{reference_q6_output.data(), DType::BF16, {rows, t}};
                 Tensor fused_tensor{fused_output.data(), DType::BF16, {rows, t}};
