@@ -159,12 +159,23 @@ struct Decoder<GGML_TYPE_Q4_K> {
         s.f[0]              = dm.x * float(sc);
         s.f[1]              = dm.y * float(m);
         const uint4* qs     = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
+#if defined(NINFER_GGUF_Q4_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
+        const uint4 own     = qs[u & 1];
+        const unsigned mask = __activemask();
+        const uint4 peer    = make_uint4(__shfl_xor_sync(mask, own.x, 1, 8),
+                                         __shfl_xor_sync(mask, own.y, 1, 8),
+                                         __shfl_xor_sync(mask, own.z, 1, 8),
+                                         __shfl_xor_sync(mask, own.w, 1, 8));
+        const uint4 a0      = (u & 1) ? peer : own;
+        const uint4 a1      = (u & 1) ? own : peer;
+#else
 #if defined(NINFER_GGUF_Q4_STREAMING_LOADS) && __CUDA_ARCH__ == 860
         const uint4 a0      = __ldcs(qs);
         const uint4 a1      = __ldcs(qs + 1);
 #else
         const uint4 a0      = qs[0];
         const uint4 a1      = qs[1];
+#endif
 #endif
         const int shift     = 4 * (u & 1);
         const std::uint32_t v[8] = {a0.x, a0.y, a0.z, a0.w, a1.x, a1.y, a1.z, a1.w};
