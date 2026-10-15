@@ -180,9 +180,11 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
         (void)layout.alloc_bytes(rows * t * sizeof(float));
         (void)layout.alloc_bytes(fixup_bound());
 #if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
-        if (t > gguf::kMaxVectorColumns && t <= 1024 && dual_q4_rows >= 2) {
+        if (t > gguf::kMaxVectorColumns && t <= 1024 && dual_q4_rows >= 2 &&
+            gguf::dual_q4_k_matrix_supported(6144, t)) {
             (void)layout.alloc_bytes(rows * t * sizeof(float));
-            (void)layout.alloc_bytes(gguf::dual_q4_k_matrix_fixup_bytes(6144, t));
+            const auto fixup_bytes = gguf::dual_q4_k_matrix_fixup_bytes(6144, t);
+            if (fixup_bytes != 0) { (void)layout.alloc_bytes(fixup_bytes); }
         }
 #endif
         if (dequantized) {
@@ -458,8 +460,8 @@ bool gguf_project_matrix_q8_1_activations(
     if (pair_a != products.size()) {
         dual_plane = static_cast<float*>(
             workspace.alloc_bytes(std::size_t(plane_rows) * columns * sizeof(float)).data);
-        dual_fixup = workspace.alloc_bytes(
-            gguf::dual_q4_k_matrix_fixup_bytes(6144, columns)).data;
+        const auto fixup_bytes = gguf::dual_q4_k_matrix_fixup_bytes(6144, columns);
+        if (fixup_bytes != 0) { dual_fixup = workspace.alloc_bytes(fixup_bytes).data; }
     }
     bool pair_done = false;
 #endif
