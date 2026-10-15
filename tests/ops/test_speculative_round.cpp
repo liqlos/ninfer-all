@@ -1431,6 +1431,67 @@ int batched_select_hidden_case(int width, int batch) {
     return failures;
 }
 
+int fused_select_scatter_shape_case(int rows, int width, int batch, int capacity, bool graph) {
+    std::vector<std::uint16_t> hidden(static_cast<std::size_t>(rows) * width * batch);
+    for (std::size_t i = 0; i < hidden.size(); ++i)
+        hidden[i] = static_cast<std::uint16_t>(i * 257 + i / rows * 6113);
+    std::vector<std::int32_t> selectors(batch), destinations(batch);
+    std::vector<std::uint16_t> expected(static_cast<std::size_t>(rows) * capacity, 0xcdcdu);
+    for (int b = 0; b < batch; ++b) destinations[b] = b + 2;
+    DeviceBuffer input = to_device(hidden), selector_buffer = to_device(selectors),
+                 destination_buffer = to_device(destinations);
+    GuardedDeviceBuffer output(expected.size() * sizeof(std::uint16_t));
+    Tensor h(input.p, DType::BF16, {rows, width, batch});
+    Tensor s(selector_buffer.p, DType::I32, {batch});
+    Tensor d(destination_buffer.p, DType::I32, {batch});
+    Tensor o(output.data(), DType::BF16, {rows, capacity});
+    DeviceContext context;
+    DecodeGraphDefinition definition;
+    DecodeGraphExecutable executable;
+    const auto launch = [&] {
+        ops::speculative_select_accepted_hidden_scatter(h, s, d, o, context.stream);
+    };
+    cuda_synchronize();
+    if (graph) {
+        definition.capture(context.stream, launch);
+        executable.instantiate(definition);
+    }
+    int failures = 0;
+    for (int phase = 0; phase < width; ++phase) {
+        std::fill(expected.begin(), expected.end(), 0xcdcdu);
+        for (int b = 0; b < batch; ++b) {
+            selectors[b] = (phase + 3 * b) % width;
+            std::copy_n(hidden.begin() +
+                            static_cast<std::size_t>(b * width + selectors[b]) * rows,
+                        rows, expected.begin() + static_cast<std::size_t>(destinations[b]) * rows);
+        }
+        output.fill(0xcd);
+        CUDA_CHECK(cudaMemcpyAsync(selector_buffer.p, selectors.data(), selector_buffer.bytes,
+                                   cudaMemcpyHostToDevice, context.stream));
+        if (graph && phase % 2 == 1) executable.launch(context.stream);
+        else launch();
+        context.synchronize();
+        const std::string label = "fused select-scatter D=" + std::to_string(rows) +
+                                  " phase=" + std::to_string(phase);
+        failures += verify_exact((label + " output").c_str(),
+                                 read<std::uint16_t>(output, expected.size()), expected);
+    }
+    failures += verify_exact("fused select-scatter source unchanged",
+                             from_device<std::uint16_t>(input, hidden.size()), hidden);
+    failures += verify_exact("fused select-scatter selectors unchanged",
+                             from_device<std::int32_t>(selector_buffer, batch), selectors);
+    failures += verify_exact("fused select-scatter destinations unchanged",
+                             from_device<std::int32_t>(destination_buffer, batch), destinations);
+    failures += output.verify_guards("fused select-scatter output guards");
+    return failures;
+}
+
+int fused_select_scatter_case() {
+    int failures = fused_select_scatter_shape_case(5120, 16, 8, 11, true);
+    failures += fused_select_scatter_shape_case(7, 4, 3, 6, false);
+    return failures;
+}
+
 int remap_case(int token_count) {
     constexpr int map_size = 131072;
     std::vector<std::int32_t> id_map(map_size);
@@ -1474,6 +1535,7 @@ int transforms_conformance() {
     failures += select_hidden_case(5120, 6, 0);
     failures += select_hidden_case(5120, 6, 5);
     failures += select_hidden_case(2048, 16, 7);
+    failures += fused_select_scatter_case();
     failures += remap_case(1);
     failures += remap_case(15);
     failures += remap_case(120);
