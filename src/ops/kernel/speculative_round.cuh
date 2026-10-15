@@ -923,10 +923,11 @@ __global__ void speculative_select_accepted_hidden_kernel(const __nv_bfloat16* h
 __global__ void speculative_select_accepted_hidden_scatter_scalar_kernel(
     const __nv_bfloat16* hidden, const std::int32_t* selectors,
     const std::int32_t* destinations, __nv_bfloat16* out, std::int32_t rows,
-    std::int32_t cols) {
+    std::int32_t cols, std::int32_t capacity) {
     const int batch = static_cast<int>(blockIdx.x);
     const int col = selectors[batch];
     const int destination = destinations[batch];
+    if (col < 0 || col >= cols || destination < 0 || destination >= capacity) { return; }
     const std::int64_t source_base =
         (static_cast<std::int64_t>(batch) * cols + col) * rows;
     const std::int64_t output_base = static_cast<std::int64_t>(destination) * rows;
@@ -939,10 +940,11 @@ __global__ void speculative_select_accepted_hidden_scatter_scalar_kernel(
 __global__ void speculative_select_accepted_hidden_scatter_vector_kernel(
     const uint4* hidden, const std::int32_t* selectors,
     const std::int32_t* destinations, uint4* out, std::int32_t vectors_per_row,
-    std::int32_t cols) {
+    std::int32_t cols, std::int32_t capacity) {
     const int batch = static_cast<int>(blockIdx.x);
     const int col = selectors[batch];
     const int destination = destinations[batch];
+    if (col < 0 || col >= cols || destination < 0 || destination >= capacity) { return; }
     const std::int64_t source_base =
         (static_cast<std::int64_t>(batch) * cols + col) * vectors_per_row;
     const std::int64_t output_base = static_cast<std::int64_t>(destination) * vectors_per_row;

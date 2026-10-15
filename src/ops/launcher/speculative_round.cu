@@ -183,13 +183,13 @@ void speculative_select_accepted_hidden_scatter_launch(const Tensor& hidden,
             static_cast<const uint4*>(hidden.data),
             static_cast<const std::int32_t*>(selectors.data),
             static_cast<const std::int32_t*>(destinations.data), static_cast<uint4*>(out.data),
-            rows / 8, hidden.ne[1]);
+            rows / 8, hidden.ne[1], out.ne[1]);
     } else {
         speculative_select_accepted_hidden_scatter_scalar_kernel<<<batch, kBlock, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(hidden.data),
             static_cast<const std::int32_t*>(selectors.data),
             static_cast<const std::int32_t*>(destinations.data),
-            static_cast<__nv_bfloat16*>(out.data), rows, hidden.ne[1]);
+            static_cast<__nv_bfloat16*>(out.data), rows, hidden.ne[1], out.ne[1]);
     }
     CUDA_CHECK(cudaGetLastError());
 }
