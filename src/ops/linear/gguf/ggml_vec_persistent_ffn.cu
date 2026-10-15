@@ -25,7 +25,7 @@ __global__ void persistent_q4_q6_ffn_kernel(PersistentFfnArgs p) {
     namespace cg = cooperative_groups;
     using Q4 = detail::vec::Decoder<GGML_TYPE_Q4_K>;
     using Q6 = detail::vec::Decoder<GGML_TYPE_Q6_K>;
-    constexpr int kWarps = detail::vec::kVecWarps;
+    constexpr int kWarps = detail::kVecWarps;
     constexpr int kThreads = kWarps * 32;
     constexpr int kIntermediate = 17408;
     constexpr int kDownRows = 5120;
@@ -97,12 +97,12 @@ __global__ void persistent_q4_q6_ffn_kernel(PersistentFfnArgs p) {
 #pragma unroll
             for (int j = 0; j < T; ++j) {
                 const float xi = rounded[j][lane];
-                const float amax = detail::warp_reduce_max<QK8_1>(fabsf(xi));
-                const float sum = detail::warp_reduce_sum<QK8_1>(xi);
+                const float amax = ::warp_reduce_max<QK8_1>(fabsf(xi));
+                const float sum = ::warp_reduce_sum<QK8_1>(xi);
                 const float d = amax / 127.0f;
                 p.output_qs[std::int64_t(j) * kIntermediate + group * 32 + lane] =
                     amax == 0.0f ? 0 : static_cast<std::int8_t>(roundf(xi / d));
-                if (lane == 0) { p.output_ds[std::int64_t(j) * kOutputGroups + group] = detail::make_half2(d, sum); }
+                if (lane == 0) { p.output_ds[std::int64_t(j) * kOutputGroups + group] = ::make_half2(d, sum); }
             }
         }
         __syncthreads();
@@ -187,7 +187,7 @@ bool persistent_grid(int& blocks) {
     }
     int resident = 0;
     if (cudaOccupancyMaxActiveBlocksPerMultiprocessor(&resident, persistent_q4_q6_ffn_kernel<T>,
-                                                      detail::vec::kVecWarps * 32, 0) != cudaSuccess || resident <= 0) {
+                                                      detail::kVecWarps * 32, 0) != cudaSuccess || resident <= 0) {
         return false;
     }
     blocks = std::min(17408 / 32, resident * sms);
@@ -210,7 +210,7 @@ bool launch_persistent(const PersistentFfnArgs& args, cudaStream_t stream) {
     void* kernel_args[] = {const_cast<PersistentFfnArgs*>(&args)};
     const cudaError_t status = cudaLaunchCooperativeKernel(
         reinterpret_cast<void*>(persistent_q4_q6_ffn_kernel<T>), dim3(blocks),
-        dim3(detail::vec::kVecWarps * 32), kernel_args, 0, stream);
+        dim3(detail::kVecWarps * 32), kernel_args, 0, stream);
     if (status != cudaSuccess) { detail::check(status, "persistent FFN cooperative launch"); }
     return true;
 }
