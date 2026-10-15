@@ -208,6 +208,30 @@ bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
     const auto* xb       = static_cast<const __nv_bfloat16*>(x.data);
     auto scope           = workspace.scope();
 
+#if defined(NINFER_GGUF_MMQ_STORE_FUSION)
+    if (products.size() == 1) {
+        const GgufProduct& p = products.front();
+        const Weight& w = *p.weight;
+        if (p.f32 == nullptr && p.epilogue == GgufEpilogue::Store &&
+            w.input_columns == nullptr &&
+            (w.qtype == QType::GGUF_Q4_K || w.qtype == QType::GGUF_Q6_K) &&
+            t > gguf::kMaxVectorColumns) {
+            gguf::MatrixBf16StorePlan plan;
+            const auto type = gguf_type(w.qtype);
+            if (gguf::matrix_bf16_store_plan(type, w.n, t, plan)) {
+                void* activation = workspace.alloc_bytes(gguf::matrix_activation_bytes(k, t)).data;
+                gguf::quantize_matrix_activation(type, xb, k, t, nullptr, activation, stream);
+                const gguf::VectorOutput destination = output(p, 0);
+                if (gguf::matrix_product_bf16_store(type, w.qdata, row_bytes(w), w.n, k,
+                                                    activation, t, destination.bf16,
+                                                    destination.column_stride, stream)) {
+                    return true;
+                }
+            }
+        }
+    }
+#endif
+
 #if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
     if (k == 5120 && t > gguf::kMaxVectorColumns && t <= 1024) {
         std::size_t eligible_q4 = 0;
@@ -391,6 +415,9 @@ bool gguf_project_matrix_q8_1_activations(
     auto* plane = static_cast<float*>(
         workspace.alloc_bytes(std::size_t(plane_rows) * columns * sizeof(float)).data);
     void* fixup = workspace.alloc_bytes(fixup_bound()).data;
+#if defined(NINFER_GGUF_MMQ_STORE_FUSION)
+    bool bf16_store_done = false;
+#endif
 #if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
     const auto dual_pair_admitted = [&](std::size_t a, std::size_t b) {
         const GgufProduct& first = products[a];
@@ -476,6 +503,21 @@ bool gguf_project_matrix_q8_1_activations(
         const auto activation = std::find_if(activations.begin(), activations.end(), [&](const auto& a) {
             return gguf::matrix_activation_layout(a.type) == product_layout;
         });
+#if defined(NINFER_GGUF_MMQ_STORE_FUSION)
+        if (p.f32 == nullptr && p.epilogue == GgufEpilogue::Store &&
+            (w.qtype == QType::GGUF_Q4_K || w.qtype == QType::GGUF_Q6_K)) {
+            gguf::MatrixBf16StorePlan plan;
+            if (gguf::matrix_bf16_store_plan(type, w.n, columns, plan)) {
+                const gguf::VectorOutput destination = output(p, 0);
+                if (gguf::matrix_product_bf16_store(type, w.qdata, row_bytes(w), w.n, k,
+                                                    activation->data, columns, destination.bf16,
+                                                    destination.column_stride, stream)) {
+                    bf16_store_done = true;
+                    continue;
+                }
+            }
+        }
+#endif
         const bool direct = p.f32 != nullptr && p.epilogue == GgufEpilogue::Store;
         float* out = direct ? p.f32 + p.row : plane;
         const std::int64_t stride = direct ? p.f32_rows : w.n;
@@ -484,7 +526,13 @@ bool gguf_project_matrix_q8_1_activations(
         if (!direct) { gguf::store_plane(plane, w.n, w.n, columns, output(p, 0), stream); }
     }
 #if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
-    return pair_done;
+    return pair_done
+#if defined(NINFER_GGUF_MMQ_STORE_FUSION)
+           || bf16_store_done
+#endif
+        ;
+#elif defined(NINFER_GGUF_MMQ_STORE_FUSION)
+    return bf16_store_done;
 #else
     return false;
 #endif
