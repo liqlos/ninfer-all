@@ -563,7 +563,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     check(cudaDeviceSynchronize(), "real-shape dequantize");
     std::vector<float> exact(std::size_t(rows) * k);
     exact_device.copy_to_host(exact.data(), exact.size() * sizeof(float));
-    failures += compare_dequantized(exact, cpu_exact, c.name + " K=" + std::to_string(k));
+    failures += compare_dequantized(exact, cpu_exact, std::string(c.name) + " K=" + std::to_string(k));
     for (const float value : exact) {
         if (!std::isfinite(value)) {
             std::cerr << c.name << " K=" << k << ": non-finite dequantized weight\n";
@@ -631,7 +631,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                 [&](cudaStream_t stream) {
                     ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
                 },
-                guarded, host, c.name + " K=" + std::to_string(k) + " T=4", output_file);
+                guarded, host, std::string(c.name) + " K=" + std::to_string(k) + " T=4", output_file);
         }
     }
 
@@ -662,7 +662,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
         std::vector<float> swiglu_cpu_exact;
         decode_k_cpu(c.qtype, swiglu_blocks, 2 * rows, k, swiglu_cpu_exact);
         failures += compare_dequantized(swiglu_exact, swiglu_cpu_exact,
-                                        c.name + " K=" + std::to_string(k) + " SwiGLU");
+                                        std::string(c.name) + " K=" + std::to_string(k) + " SwiGLU");
         for (const float value : swiglu_exact) {
             if (!std::isfinite(value)) {
                 std::cerr << c.name << " K=" << k << ": non-finite SwiGLU dequantized weight\n";
@@ -711,7 +711,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                 ops::linear_swiglu(x, swiglu_weight, out, ops::LinearPolicy::A16Only,
                                    swiglu_workspace, stream);
             },
-            guarded, host, c.name + " K=" + std::to_string(k) + " SwiGLU T=4", output_file);
+            guarded, host, std::string(c.name) + " K=" + std::to_string(k) + " SwiGLU T=4", output_file);
         std::cout << "gguf real-shape " << c.name << " K=" << k << " SwiGLU source="
                   << swiglu_source << '\n';
     }
