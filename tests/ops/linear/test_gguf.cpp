@@ -305,8 +305,87 @@ void update_checksum(std::uint64_t& checksum, const std::vector<__nv_bfloat16>& 
     }
 }
 
+class GuardedOutput {
+public:
+    explicit GuardedOutput(std::size_t elements)
+        : payload_bytes_(elements * sizeof(__nv_bfloat16)), storage_(payload_bytes_ + 512) {}
+
+    void* data() const { return static_cast<std::uint8_t*>(storage_.p) + 256; }
+
+    void poison() {
+        check(cudaMemset(storage_.p, 0xa5, storage_.bytes), "initialize output guards");
+        check(cudaMemset(data(), 0xff, payload_bytes_), "poison output");
+        check(cudaDeviceSynchronize(), "finish output poisoning");
+    }
+
+    std::vector<__nv_bfloat16> read(const char* label) const {
+        std::vector<std::uint8_t> bytes(storage_.bytes);
+        check(cudaMemcpy(bytes.data(), storage_.p, storage_.bytes, cudaMemcpyDeviceToHost), label);
+        for (std::size_t i = 0; i < 256; ++i) {
+            if (bytes[i] != 0xa5 || bytes[256 + payload_bytes_ + i] != 0xa5) {
+                throw std::runtime_error(std::string(label) + ": output guard was overwritten");
+            }
+        }
+        std::vector<__nv_bfloat16> values(payload_bytes_ / sizeof(__nv_bfloat16));
+        std::memcpy(values.data(), bytes.data() + 256, payload_bytes_);
+        if (std::any_of(values.begin(), values.end(), [](const __nv_bfloat16 value) {
+                std::uint16_t bits = 0;
+                std::memcpy(&bits, &value, sizeof(bits));
+                return bits == 0xffffU;
+            })) {
+            throw std::runtime_error(std::string(label) + ": output retained poison values");
+        }
+        return values;
+    }
+
+private:
+    std::size_t payload_bytes_;
+    DeviceBuffer storage_;
+};
+
+template <typename Launch>
+void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
+                        const std::vector<__nv_bfloat16>& eager, const std::string& label) {
+    cudaStream_t stream = nullptr;
+    cudaGraph_t graph = nullptr;
+    cudaGraphExec_t executable = nullptr;
+    check(cudaStreamCreate(&stream), "create graph test stream");
+    try {
+        check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal), "begin graph capture");
+        launch(stream);
+        check(cudaStreamEndCapture(stream, &graph), "end graph capture");
+        check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
+              "instantiate graph");
+        guarded.poison();
+        check(cudaGraphLaunch(executable, stream), "launch graph");
+        check(cudaStreamSynchronize(stream), "synchronize graph");
+        const auto replay = guarded.read("read graph output");
+        if (replay.size() != eager.size() ||
+            std::memcmp(replay.data(), eager.data(), replay.size() * sizeof(__nv_bfloat16)) != 0) {
+            throw std::runtime_error(label + ": graph replay differs from eager output");
+        }
+    } catch (...) {
+        if (executable != nullptr) { cudaGraphExecDestroy(executable); }
+        if (graph != nullptr) { cudaGraphDestroy(graph); }
+        cudaStreamDestroy(stream);
+        throw;
+    }
+    check(cudaGraphExecDestroy(executable), "destroy graph executable");
+    check(cudaGraphDestroy(graph), "destroy graph");
+    check(cudaStreamDestroy(stream), "destroy graph test stream");
+}
+
+std::uint64_t checksum_value(std::uint64_t value) {
+    std::uint64_t checksum = 14695981039346656037ULL;
+    for (unsigned shift = 0; shift < 64; shift += 8) {
+        checksum ^= (value >> shift) & 0xffU;
+        checksum *= 1099511628211ULL;
+    }
+    return checksum;
+}
+
 int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
-                   std::uint64_t& checksum) {
+                   std::uint64_t& total_checksum) {
     constexpr std::int32_t rows   = 257;
     constexpr std::int32_t max_t  = 8;
     const std::int32_t widths[]   = {1, 3, 4, 8};
@@ -346,15 +425,17 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     const std::size_t capacity = ops::linear_workspace_capacity_bytes(
         c.qtype, rows, k, ops::LinearPolicy::A16Only, 1, max_t);
     WorkspaceArena workspace(capacity + (1U << 20));
-    DeviceBuffer out_device(std::size_t(rows) * max_t * sizeof(__nv_bfloat16));
+    std::uint64_t checksum = 14695981039346656037ULL;
 
     for (const std::int32_t t : widths) {
+        GuardedOutput guarded(std::size_t(rows) * t);
         Tensor x(x_device.p, DType::BF16, {k, t});
-        Tensor out(out_device.p, DType::BF16, {rows, t});
+        Tensor out(guarded.data(), DType::BF16, {rows, t});
         std::vector<__nv_bfloat16> host(std::size_t(rows) * t);
+        guarded.poison();
         ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, nullptr);
         check(cudaDeviceSynchronize(), "real-shape linear");
-        out_device.copy_to_host(host.data(), host.size() * sizeof(__nv_bfloat16));
+        host = guarded.read("read real-shape linear output");
 
         std::vector<double> want(std::size_t(rows) * t);
         for (std::int32_t col = 0; col < t; ++col) {
@@ -379,10 +460,85 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             ++failures;
         }
         update_checksum(checksum, host);
+        if (t == 4) {
+            check_graph_parity(
+                [&](cudaStream_t stream) {
+                    ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
+                },
+                guarded, host, c.name + " K=" + std::to_string(k) + " T=4");
+        }
+    }
+
+    if (c.qtype == QType::GGUF_Q4_K && k == 5120) {
+        constexpr std::int32_t t = 4;
+        const auto swiglu_blocks = random_blocks(c, 2 * rows, k, rng);
+        DeviceBuffer swiglu_device(swiglu_blocks.size());
+        swiglu_device.copy_from_host(swiglu_blocks.data(), swiglu_blocks.size());
+        const std::int64_t swiglu_row_bytes =
+            std::int64_t(k / block.elements) * block.bytes;
+        const Weight swiglu_weight = gguf_weight(c.qtype, swiglu_device.p, 2 * rows, k);
+        DeviceBuffer swiglu_exact_device(std::size_t(2) * rows * k * sizeof(float));
+        ops::gguf::dequantize_rows(ops::detail::gguf_type(c.qtype), swiglu_device.p,
+                                   swiglu_row_bytes, k, nullptr, 2 * rows,
+                                   static_cast<float*>(swiglu_exact_device.p), k, nullptr);
+        check(cudaDeviceSynchronize(), "real-shape SwiGLU dequantize");
+        std::vector<float> swiglu_exact(std::size_t(2) * rows * k);
+        swiglu_exact_device.copy_to_host(swiglu_exact.data(), swiglu_exact.size() * sizeof(float));
+        for (const float value : swiglu_exact) {
+            if (!std::isfinite(value)) {
+                std::cerr << c.name << " K=" << k << ": non-finite SwiGLU dequantized weight\n";
+                return failures + 1;
+            }
+        }
+        const std::size_t swiglu_capacity = ops::linear_swiglu_workspace_capacity_bytes(
+            c.qtype, 2 * rows, k, ops::LinearPolicy::A16Only, 1, t);
+        WorkspaceArena swiglu_workspace(swiglu_capacity + (1U << 20));
+        GuardedOutput guarded(std::size_t(rows) * t);
+        Tensor x(x_device.p, DType::BF16, {k, t});
+        Tensor out(guarded.data(), DType::BF16, {rows, t});
+        guarded.poison();
+        ops::linear_swiglu(x, swiglu_weight, out, ops::LinearPolicy::A16Only, swiglu_workspace,
+                           nullptr);
+        check(cudaDeviceSynchronize(), "real-shape SwiGLU");
+        const auto host = guarded.read("read real-shape SwiGLU output");
+        std::vector<double> want(std::size_t(rows) * t);
+        for (std::int32_t col = 0; col < t; ++col) {
+            const float* activation = x_float.data() + std::size_t(col) * k;
+            for (std::int32_t row = 0; row < rows; ++row) {
+                double gate = 0.0;
+                double up = 0.0;
+                const float* gate_weights = swiglu_exact.data() + std::size_t(row) * k;
+                const float* up_weights = swiglu_exact.data() + std::size_t(rows + row) * k;
+                for (std::int32_t i = 0; i < k; ++i) {
+                    gate += double(gate_weights[i]) * activation[i];
+                    up += double(up_weights[i]) * activation[i];
+                }
+                want[std::size_t(col) * rows + row] = gate / (1.0 + std::exp(-gate)) * up;
+            }
+        }
+        const auto got = to_float(host);
+        const Error error = compare(got, want);
+        const bool finite = std::all_of(got.begin(), got.end(),
+                                        [](float value) { return std::isfinite(value); });
+        if (!finite || !(error.relative_rms < 4e-2 && error.relative_max < 1.6e-1)) {
+            std::cerr << "FAIL " << c.name << " K=" << k << " SwiGLU T=" << t
+                      << " rms=" << error.relative_rms << " max=" << error.relative_max << '\n';
+            ++failures;
+        }
+        update_checksum(checksum, host);
+        check_graph_parity(
+            [&](cudaStream_t stream) {
+                ops::linear_swiglu(x, swiglu_weight, out, ops::LinearPolicy::A16Only,
+                                   swiglu_workspace, stream);
+            },
+            guarded, host, c.name + " K=" + std::to_string(k) + " SwiGLU T=4");
     }
 
     std::cout << (failures == 0 ? "OK   " : "FAIL ") << "gguf real-shape " << c.name
-              << " K=" << k << " rows=" << rows << '\n';
+              << " K=" << k << " rows=" << rows << " checksum=0x" << std::hex << std::setw(16)
+              << std::setfill('0') << checksum << std::dec << '\n';
+    total_checksum ^= checksum_value(checksum);
+    total_checksum *= 1099511628211ULL;
     return failures;
 }
 
