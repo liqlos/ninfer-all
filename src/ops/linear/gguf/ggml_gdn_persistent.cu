@@ -199,6 +199,60 @@ __device__ __forceinline__ void store_projected(const ProjectionPart& part, int 
     }
 }
 
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+template <int Columns>
+__device__ __forceinline__ void store_projected_convolved_values(
+    int row, const float (&acc)[Columns], __nv_bfloat16* qkv_convolved,
+    const __nv_bfloat16* convolution,
+    const __nv_bfloat16* conv_states, const std::int32_t* source_slots,
+    const std::int32_t* valid_columns, __nv_bfloat16* conv_record, int action) {
+    const int valid = max(0, min(valid_columns[0], Columns));
+    const std::int64_t state_base = static_cast<std::int64_t>(source_slots[0]) * (3LL * kQkv) + row;
+    const __nv_bfloat16 history[3] = {
+        conv_states[state_base], conv_states[state_base + kQkv], conv_states[state_base + 2LL * kQkv]};
+    __nv_bfloat16 projected[Columns];
+#pragma unroll
+    for (int column = 0; column < Columns; ++column) {
+        projected[column] = __float2bfloat16(acc[column]);
+        if (action == 1) {
+            conv_record[static_cast<std::int64_t>(column) * kQkv + row] = projected[column];
+        }
+    }
+#pragma unroll
+    for (int token = 0; token < Columns; ++token) {
+        if (token < valid) {
+            const __nv_bfloat16 x0 = token >= 3 ? projected[token - 3] : history[token];
+            const __nv_bfloat16 x1 = token >= 2 ? projected[token - 2] : history[token + 1];
+            const __nv_bfloat16 x2 = token >= 1 ? projected[token - 1] : history[token + 2];
+            float value = fmaf(__bfloat162float(convolution[row]), __bfloat162float(x0), 0.0f);
+            value = fmaf(__bfloat162float(convolution[kQkv + row]), __bfloat162float(x1), value);
+            value = fmaf(__bfloat162float(convolution[2LL * kQkv + row]), __bfloat162float(x2), value);
+            value = fmaf(__bfloat162float(convolution[3LL * kQkv + row]),
+                         __bfloat162float(projected[token]), value);
+            qkv_convolved[static_cast<std::int64_t>(token) * kQkv + row] =
+                __float2bfloat16_rn(silu(value));
+        } else {
+            qkv_convolved[static_cast<std::int64_t>(token) * kQkv + row] =
+                __float2bfloat16_rn(0.0f);
+        }
+    }
+}
+
+template <int Columns>
+__device__ __forceinline__ void store_projected_convolved(
+    const ProjectionPart& part, int row, const ActivationView& p,
+    __nv_bfloat16* qkv_convolved, const __nv_bfloat16* convolution,
+    const __nv_bfloat16* conv_states, const std::int32_t* source_slots,
+    const std::int32_t* valid_columns, __nv_bfloat16* conv_record, int action) {
+    float acc[Columns];
+    project_dispatch<Columns>(part, row, p, acc);
+    if ((threadIdx.x & 31) == 0) {
+        store_projected_convolved_values<Columns>(row, acc, qkv_convolved, convolution,
+            conv_states, source_slots, valid_columns, conv_record, action);
+    }
+}
+#endif
+
 #if defined(NINFER_GDN_PERSISTENT_ROW_REUSE)
 template <int Columns>
 __device__ __forceinline__ void project_pair_dispatch(const ProjectionPart& part, int row,
@@ -227,6 +281,24 @@ __device__ __forceinline__ void store_projected_pair(const ProjectionPart& part,
         }
     }
 }
+
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+template <int Columns>
+__device__ __forceinline__ void store_projected_convolved_pair(
+    const ProjectionPart& part, int row, const ActivationView& p,
+    __nv_bfloat16* qkv_convolved, const __nv_bfloat16* convolution,
+    const __nv_bfloat16* conv_states, const std::int32_t* source_slots,
+    const std::int32_t* valid_columns, __nv_bfloat16* conv_record, int action) {
+    float acc0[Columns];
+    float acc1[Columns];
+    project_pair_dispatch<Columns>(part, row, p, acc0, acc1);
+    if ((threadIdx.x & 31) != 0) { return; }
+    store_projected_convolved_values<Columns>(row, acc0, qkv_convolved, convolution,
+        conv_states, source_slots, valid_columns, conv_record, action);
+    store_projected_convolved_values<Columns>(row + 1, acc1, qkv_convolved, convolution,
+        conv_states, source_slots, valid_columns, conv_record, action);
+}
+#endif
 #endif
 
 
@@ -376,19 +448,49 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
             ? find_part(projection, output1, output_row1)
             : nullptr;
         if (part0 != nullptr && part0 == part1) {
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+            if (output0 == 0) {
+                store_projected_convolved_pair<Columns>(*part0, output_row0, input_activation,
+                    qkv_convolved, convolution, conv_states, source_slots, valid_columns,
+                    conv_record, action);
+            } else {
+                store_projected_pair<Columns>(*part0, output_row0, input_activation, z, kZ);
+            }
+#else
             __nv_bfloat16* output = output0 == 0 ? qkv_projection : z;
             store_projected_pair<Columns>(*part0, output_row0, input_activation, output,
                                           output0 == 0 ? kQkv : kZ);
+#endif
         } else {
             if (part0 != nullptr) {
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+                if (output0 == 0) {
+                    store_projected_convolved<Columns>(*part0, output_row0, input_activation,
+                        qkv_convolved, convolution, conv_states, source_slots,
+                        valid_columns, conv_record, action);
+                } else {
+                    store_projected<Columns>(*part0, output_row0, input_activation, z, kZ);
+                }
+#else
                 store_projected<Columns>(*part0, output_row0, input_activation,
                                          output0 == 0 ? qkv_projection : z,
                                          output0 == 0 ? kQkv : kZ);
+#endif
             }
             if (part1 != nullptr) {
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+                if (output1 == 0) {
+                    store_projected_convolved<Columns>(*part1, output_row1, input_activation,
+                        qkv_convolved, convolution, conv_states, source_slots,
+                        valid_columns, conv_record, action);
+                } else {
+                    store_projected<Columns>(*part1, output_row1, input_activation, z, kZ);
+                }
+#else
                 store_projected<Columns>(*part1, output_row1, input_activation,
                                          output1 == 0 ? qkv_projection : z,
                                          output1 == 0 ? kQkv : kZ);
+#endif
             }
         }
     }
@@ -400,10 +502,21 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
         const int output_row = output == 0 ? row : row - kQkv;
         const ProjectionPart* part = find_part(projection, output, output_row);
         if (part == nullptr) { continue; }
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+        if (output == 0) {
+            store_projected_convolved<Columns>(*part, output_row, input_activation,
+                qkv_convolved, convolution, conv_states, source_slots,
+                valid_columns, conv_record, action);
+        } else {
+            store_projected<Columns>(*part, output_row, input_activation, z, kZ);
+        }
+#else
         store_projected<Columns>(*part, output_row, input_activation,
                                  output == 0 ? qkv_projection : z, output == 0 ? kQkv : kZ);
+#endif
     }
 #endif
+#if !defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
     grid.sync();
 
     for (int channel = static_cast<int>(blockIdx.x) * kThreads + threadIdx.x;
@@ -444,6 +557,7 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
             }
         }
     }
+#endif
     grid.sync();
 
     const gdn::head_map heads = projection.heads;
@@ -678,8 +792,13 @@ cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs
     auto* q8 = static_cast<__nv_bfloat16*>(args.workspace);
     std::size_t offset = align_workspace(gguf::vector_activation_bytes(kValue, args.columns));
     auto* qkv_projection = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
+#if !defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
     offset += align_workspace(sizeof(__nv_bfloat16) * static_cast<std::size_t>(kQkv) * args.columns);
+#endif
     auto* qkv_convolved = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+    qkv_projection = qkv_convolved;
+#endif
     offset += align_workspace(sizeof(__nv_bfloat16) * static_cast<std::size_t>(kQkv) * args.columns);
     auto* z = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
     offset += align_workspace(sizeof(__nv_bfloat16) * static_cast<std::size_t>(kZ) * args.columns);

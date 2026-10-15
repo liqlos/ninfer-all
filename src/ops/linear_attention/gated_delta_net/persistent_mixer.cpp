@@ -86,9 +86,15 @@ std::size_t gdn_persistent_mixer_workspace_bytes(std::int32_t columns) {
     if (columns < 2 || columns > kMaxColumns) { return 0; }
     const std::size_t t = static_cast<std::size_t>(columns);
     const std::size_t q8 = gguf::vector_activation_bytes(6144, columns);
+#if defined(NINFER_GDN_PERSISTENT_PROJECTION_CONV_FUSION)
+    return align_bytes(q8) + align_bytes(sizeof(__nv_bfloat16) * t * kQkv) +
+           align_bytes(sizeof(__nv_bfloat16) * t * kZ) +
+           align_bytes(sizeof(__nv_bfloat16) * t * 6144) * 2;
+#else
     return align_bytes(q8) + align_bytes(sizeof(__nv_bfloat16) * t * kQkv) * 2 +
            align_bytes(sizeof(__nv_bfloat16) * t * kZ) +
            align_bytes(sizeof(__nv_bfloat16) * t * 6144) * 2;
+#endif
 }
 
 bool gdn_persistent_mixer(const Tensor& hidden, const Tensor& g, const Tensor& beta,
