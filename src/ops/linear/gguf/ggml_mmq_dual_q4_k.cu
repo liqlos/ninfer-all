@@ -25,7 +25,7 @@ static __global__ void dual_q4_k_matrix_product_kernel(
     int stride_row_b, int blocks_per_k, int column_tiles, int row_tiles,
     int x_tile_ints,
     int blocks, bool stream_k, bool fixup) {
-    constexpr int type = GGML_TYPE_Q4_K;
+    constexpr ggml_type type = GGML_TYPE_Q4_K;
     constexpr int warp_size = ggml_cuda_get_physical_warp_size();
     constexpr int nwarps = ggml_cuda_mmq_get_nthreads(type, J, false) / warp_size;
     constexpr int I = ggml_cuda_mmq_get_I(type, J, false);

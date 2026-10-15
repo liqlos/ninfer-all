@@ -407,7 +407,9 @@ void gguf_project_matrix_q8_1_activations(
             gguf::dual_q4_k_matrix_fixup_bytes(6144, columns)).data;
     }
     bool pair_done = false;
+#endif
     for (std::size_t i = 0; i < products.size(); ++i) {
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
         if (pair_a != products.size() && !pair_done && i == pair_a) {
             const GgufProduct& a = products[pair_a];
             const GgufProduct& b = products[pair_b];
@@ -433,6 +435,7 @@ void gguf_project_matrix_q8_1_activations(
             }
         }
         if (pair_done && i == pair_b) { continue; }
+#endif
         const GgufProduct& p = products[i];
         const Weight& w = *p.weight;
         const auto type = gguf_type(w.qtype);
