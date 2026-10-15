@@ -72,3 +72,9 @@ if(NINFER_GGUF_PERSISTENT_FFN OR NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
       PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_FFN_RMSNORM_Q8_FUSION=1)
   endif()
 endif()
+
+if(NINFER_GGUF_MMQ_STORE_FUSION)
+  ninfer_add_op_test(ninfer_linear_gguf_mmq_store_test
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
+    LIBRARIES ninfer_ops)
+endif()
