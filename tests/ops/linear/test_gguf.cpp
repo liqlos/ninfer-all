@@ -75,7 +75,7 @@ std::uint16_t half_bits(float value) {
 // Random blocks with every binary16 multiplier finite; IQ1_M spreads its multiplier over the top
 // nibbles of its four scale words.
 std::vector<std::uint8_t> random_blocks(const TypeCase& c, std::int32_t rows, std::int32_t k,
-                                        std::mt19937& rng) {
+                                        std::mt19937& rng, bool mixed_global_scale_signs = false) {
     const auto block = gguf_block_shape(c.qtype);
     const std::int64_t count = std::int64_t(rows) * (k / block.elements);
     std::vector<std::uint8_t> bytes(count * block.bytes);
@@ -85,7 +85,9 @@ std::vector<std::uint8_t> random_blocks(const TypeCase& c, std::int32_t rows, st
     for (std::int64_t i = 0; i < count; ++i) {
         std::uint8_t* base = bytes.data() + i * block.bytes;
         for (const int offset : c.half_fields) {
-            const std::uint16_t bits = half_bits(scale(rng));
+            float value = scale(rng);
+            if (mixed_global_scale_signs && (i & 1) != 0) { value = -value; }
+            const std::uint16_t bits = half_bits(value);
             std::memcpy(base + offset, &bits, sizeof(bits));
         }
         if (c.qtype == QType::GGUF_IQ1_M) {
@@ -475,11 +477,11 @@ void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
         check(cudaGraphLaunch(executable, stream), "launch graph");
         check(cudaStreamSynchronize(stream), "synchronize graph");
         const auto replay = guarded.read("read graph output");
+        write_outputs(output_file, replay);
         if (replay.size() != eager.size() ||
             std::memcmp(replay.data(), eager.data(), replay.size() * sizeof(__nv_bfloat16)) != 0) {
             throw std::runtime_error(label + ": graph replay differs from eager output");
         }
-        write_outputs(output_file, replay);
     } catch (...) {
         if (executable != nullptr) { cudaGraphExecDestroy(executable); }
         if (graph != nullptr) { cudaGraphDestroy(graph); }
@@ -508,7 +510,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     std::mt19937 rng(seed);
     int failures = 0;
 
-    const auto host_blocks = random_blocks(c, rows, k, rng);
+    const auto host_blocks = random_blocks(c, rows, k, rng, true);
     std::vector<float> cpu_exact;
     decode_k_cpu(c.qtype, host_blocks, rows, k, cpu_exact);
     DeviceBuffer blocks(host_blocks.size());
@@ -533,7 +535,13 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 
     std::normal_distribution<float> normal(0.0f, 1.0f);
     std::vector<__nv_bfloat16> x_host(std::size_t(k) * max_t);
-    for (auto& value : x_host) { value = __float2bfloat16(normal(rng)); }
+    for (std::int32_t col = 0; col < max_t; ++col) {
+        for (std::int32_t i = 0; i < k; ++i) {
+            const float value = i % 32 == 0 ? (((i / 32 + col) & 1) == 0 ? 8192.0f : -8192.0f)
+                                             : normal(rng);
+            x_host[std::size_t(col) * k + i] = __float2bfloat16(value);
+        }
+    }
     std::vector<float> x_float(x_host.size());
     for (std::size_t i = 0; i < x_host.size(); ++i) {
         x_float[i] = __bfloat162float(x_host[i]);
@@ -591,7 +599,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 
     if (c.qtype == QType::GGUF_Q4_K && k == 5120) {
         constexpr std::int32_t t = 4;
-        const auto swiglu_blocks = random_blocks(c, 2 * rows, k, rng);
+        const auto swiglu_blocks = random_blocks(c, 2 * rows, k, rng, true);
         DeviceBuffer swiglu_device(swiglu_blocks.size());
         swiglu_device.copy_from_host(swiglu_blocks.data(), swiglu_blocks.size());
         const std::int64_t swiglu_row_bytes =
