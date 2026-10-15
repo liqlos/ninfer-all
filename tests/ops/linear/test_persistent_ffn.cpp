@@ -81,7 +81,7 @@ int run_persistent_ffn() {
     down_data.copy_from(down_host.data(), down_host.size());
     const Weight gate = weight(QType::GGUF_Q4_K, gate_data.p, intermediate * 2, k);
     const Weight down = weight(QType::GGUF_Q6_K, down_data.p, down_rows, intermediate);
-    for (const int t : {1, 4}) {
+    for (const int t : {1, 3, 4, 8}) {
         std::vector<__nv_bfloat16> x_host(std::size_t(k) * t), residual_host(std::size_t(down_rows) * t);
         for (std::size_t i = 0; i < x_host.size(); ++i) { x_host[i] = __float2bfloat16(float(int(i % 31) - 15) / 32.0f); }
         for (std::size_t i = 0; i < residual_host.size(); ++i) { residual_host[i] = __float2bfloat16(float(int(i % 17) - 8) / 16.0f); }
