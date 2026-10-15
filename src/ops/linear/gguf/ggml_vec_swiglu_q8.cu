@@ -54,13 +54,16 @@ __launch_bounds__(kWarps * 32) __global__ void swiglu_q8_kernel(const detail::Ve
                 a[j][0] = v0.x; a[j][1] = v0.y; a[j][2] = v0.z; a[j][3] = v0.w;
                 a[j][4] = v1.x; a[j][5] = v1.y; a[j][6] = v1.z; a[j][7] = v1.w;
             }
-            detail::vec::Slice gate_slice, up_slice;
-            D::decode(gate + std::int64_t(32 / kPerBlock) * it * kBlockBytes, sub, table, gate_slice);
-            D::decode(up + std::int64_t(32 / kPerBlock) * it * kBlockBytes, sub, table, up_slice);
+            detail::vec::Slice decoded;
+            D::decode(gate + std::int64_t(32 / kPerBlock) * it * kBlockBytes, sub, table, decoded);
 #pragma unroll
             for (int j = 0; j < T; ++j) {
-                gate_acc[j] += D::dot(gate_slice, a[j], d[j], sum[j]);
-                up_acc[j] += D::dot(up_slice, a[j], d[j], sum[j]);
+                gate_acc[j] += D::dot(decoded, a[j], d[j], sum[j]);
+            }
+            D::decode(up + std::int64_t(32 / kPerBlock) * it * kBlockBytes, sub, table, decoded);
+#pragma unroll
+            for (int j = 0; j < T; ++j) {
+                up_acc[j] += D::dot(decoded, a[j], d[j], sum[j]);
             }
         };
         if constexpr (KS != 0) {
