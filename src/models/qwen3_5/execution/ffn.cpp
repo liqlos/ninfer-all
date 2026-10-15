@@ -10,6 +10,7 @@
 #include "ninfer/ops/silu_mul.h"
 #include "ops/linear/gguf/gguf_linear.h"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace ninfer::models::qwen3_5::execution {
@@ -75,11 +76,10 @@ std::size_t ffn_workspace_bytes(const FfnParameters& parameters, std::int32_t fi
     const auto& gu   = p.gate_up.weight;
     const auto& down = p.down.weight;
     if (is_gguf(gu.qtype)) {
-        if (!p.up) {
-            const auto fused = ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
-                gu, nullptr, down, first, last);
-            if (fused != 0) { return fused; }
-        }
+        const auto fused = !p.up
+            ? ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
+                  gu, nullptr, down, first, last)
+            : 0;
         WorkspaceLayoutBuilder layout;
         const std::int32_t rows = p.up ? gu.n : gu.n / 2;
         (void)layout.alloc(DType::BF16, {rows, last});
@@ -96,7 +96,7 @@ std::size_t ffn_workspace_bytes(const FfnParameters& parameters, std::int32_t fi
             (void)layout.alloc_bytes(ops::linear_add_workspace_capacity_bytes(
                 down.qtype, down.n, down.k, p.down.policy, first, last));
         }
-        return layout.peak_bytes(1);
+        return std::max(fused, layout.peak_bytes(1));
     }
     WorkspaceLayoutBuilder layout;
     if (mtp || gu.qtype == QType::Q6_G64_FP16) {

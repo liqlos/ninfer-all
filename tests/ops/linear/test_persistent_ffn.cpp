@@ -131,7 +131,7 @@ int run_persistent_ffn() {
         if (std::memcmp(expected_host.data(), actual_host.data(), expected.bytes) != 0) {
             throw std::runtime_error("candidate changed exact BF16 residual values");
         }
-        if (t == 1 && route == ops::detail::GgufSwiGluRoute::PersistentFfn) {
+        if (route == ops::detail::GgufSwiGluRoute::PersistentFfn) {
             actual.copy_from(residual_host.data(), actual.bytes);
             cudaStream_t stream = nullptr;
             cudaGraph_t graph = nullptr;
