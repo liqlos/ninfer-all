@@ -20,4 +20,12 @@ if(NINFER_GDN_PERSISTENT_MIXER)
     "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu")
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
     APPEND PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
+  if(NINFER_GGUF_Q4_COOPERATIVE_DECODE)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
+      APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_COOPERATIVE_DECODE=1)
+  endif()
+  if(NINFER_GGUF_Q6_COOPERATIVE_DECODE)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
+      APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_COOPERATIVE_DECODE=1)
+  endif()
 endif()
