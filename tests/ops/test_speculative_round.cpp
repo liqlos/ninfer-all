@@ -1457,10 +1457,10 @@ int fused_select_scatter_shape_case(int rows, int width, int batch, int capacity
         executable.instantiate(definition);
     }
     int failures = 0;
-    for (int phase = -2; phase < width; ++phase) {
+    for (int phase = -3; phase < width; ++phase) {
         std::fill(expected.begin(), expected.end(), 0xcdcdu);
         for (int b = 0; b < batch; ++b) {
-            selectors[b] = phase == -2 ? (b % 2 == 0 ? -1 : width) : (phase + 3 * b + width) % width;
+            selectors[b] = phase <= -2 ? (b % 2 == 0 ? -1 : width) : (phase + 3 * b + width) % width;
             destinations[b] = phase == -1 ? (b % 2 == 0 ? -1 : capacity) : b + 2;
             if (selectors[b] < 0 || selectors[b] >= width || destinations[b] < 0 || destinations[b] >= capacity) { continue; }
             std::copy_n(hidden.begin() +
@@ -1472,7 +1472,7 @@ int fused_select_scatter_shape_case(int rows, int width, int batch, int capacity
                                    cudaMemcpyHostToDevice, context.stream));
         CUDA_CHECK(cudaMemcpyAsync(destination_buffer.p, destinations.data(), destination_buffer.bytes,
                                    cudaMemcpyHostToDevice, context.stream));
-        if (graph && phase % 2 == 1) executable.launch(context.stream);
+        if (graph && phase % 2 != 0) executable.launch(context.stream);
         else launch();
         context.synchronize();
         const std::string label = "fused select-scatter D=" + std::to_string(rows) +
