@@ -524,6 +524,224 @@ void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
     check(cudaStreamDestroy(stream), "destroy graph test stream");
 }
 
+class GuardedRaw {
+public:
+    explicit GuardedRaw(std::size_t bytes) : payload_bytes_(bytes), storage_(bytes + 128) {}
+
+    void* data() const { return static_cast<std::uint8_t*>(storage_.p) + 64; }
+
+    void poison() {
+        check(cudaMemset(storage_.p, 0xa5, storage_.bytes), "initialize raw guards");
+        check(cudaMemset(data(), 0xcd, payload_bytes_), "poison raw output");
+    }
+
+    std::vector<std::uint8_t> read(const char* label) const {
+        std::vector<std::uint8_t> bytes(storage_.bytes);
+        check(cudaMemcpy(bytes.data(), storage_.p, bytes.size(), cudaMemcpyDeviceToHost), label);
+        for (std::size_t i = 0; i < 64; ++i) {
+            if (bytes[i] != 0xa5 || bytes[64 + payload_bytes_ + i] != 0xa5) {
+                throw std::runtime_error(std::string(label) + ": raw output guard was overwritten");
+            }
+        }
+        return {bytes.begin() + 64, bytes.begin() + 64 + payload_bytes_};
+    }
+
+private:
+    std::size_t payload_bytes_;
+    DeviceBuffer storage_;
+};
+
+std::vector<std::uint8_t> cpu_quantize_vector_activation(
+    const std::vector<__nv_bfloat16>& values, std::int32_t rows, std::int32_t columns) {
+    const std::size_t scales = (std::size_t(rows) * columns + 15) / 16 * 16;
+    std::vector<std::uint8_t> output(ops::gguf::vector_activation_bytes(rows, columns));
+    for (std::int32_t column = 0; column < columns; ++column) {
+        for (std::int32_t group = 0; group < rows / 32; ++group) {
+            float x[32], sums[32], maxima[32];
+            for (int lane = 0; lane < 32; ++lane) {
+                const float v = __bfloat162float(values[std::size_t(column) * rows + group * 32 + lane]);
+                x[lane] = v;
+                sums[lane] = v;
+                maxima[lane] = std::fabs(v);
+            }
+            for (int offset = 16; offset > 0; offset >>= 1) {
+                float prior_sum[32], prior_max[32];
+                for (int lane = 0; lane < 32; ++lane) {
+                    prior_sum[lane] = sums[lane];
+                    prior_max[lane] = maxima[lane];
+                }
+                for (int lane = 0; lane < 32; ++lane) {
+                    sums[lane] = prior_sum[lane] + prior_sum[lane ^ offset];
+                    maxima[lane] = std::max(prior_max[lane], prior_max[lane ^ offset]);
+                }
+            }
+            const float d = maxima[0] / 127.0f;
+            for (int lane = 0; lane < 32; ++lane) {
+                const std::int8_t q = maxima[0] == 0.0f
+                                          ? 0
+                                          : static_cast<std::int8_t>(std::round(x[lane] / d));
+                output[std::size_t(column) * rows + group * 32 + lane] =
+                    static_cast<std::uint8_t>(q);
+            }
+            const std::uint16_t d_bits = half_bits(d);
+            const std::uint16_t sum_bits = half_bits(sums[0]);
+            const std::size_t at = scales +
+                                   (std::size_t(column) * (rows / 32) + group) * sizeof(__half2);
+            std::memcpy(output.data() + at, &d_bits, sizeof(d_bits));
+            std::memcpy(output.data() + at + sizeof(d_bits), &sum_bits, sizeof(sum_bits));
+        }
+    }
+    return output;
+}
+
+int run_swiglu_q8_fusion(std::uint32_t seed) {
+    constexpr std::int32_t k = 5120;
+    constexpr std::int32_t rows[] = {32, 64, 17408};
+    constexpr std::int32_t widths[] = {1, 3, 4, 8};
+    const TypeCase types[] = {{QType::GGUF_Q4_K, "q4_k", {0, 2}},
+                              {QType::GGUF_Q6_K, "q6_k", {208}}};
+    std::mt19937 rng(seed);
+    std::normal_distribution<float> normal(0.0f, 0.3f);
+    for (const auto& c : types) {
+        for (const std::int32_t n : rows) {
+            const auto host_weights = random_blocks(c, 2 * n, k, rng);
+            DeviceBuffer weights(host_weights.size());
+            weights.copy_from_host(host_weights.data(), host_weights.size());
+            const Weight gate = gguf_weight(c.qtype, weights.p, 2 * n, k);
+            const auto block = gguf_block_shape(c.qtype);
+            const std::int64_t row_bytes = std::int64_t(k / block.elements) * block.bytes;
+            for (const std::int32_t t : widths) {
+                std::vector<__nv_bfloat16> host_x(std::size_t(k) * t);
+                for (auto& value : host_x) { value = __float2bfloat16(normal(rng)); }
+                DeviceBuffer x(std::size_t(k) * t * sizeof(__nv_bfloat16));
+                x.copy_from_host(host_x.data(), std::size_t(k) * t * sizeof(__nv_bfloat16));
+                const std::size_t input_bytes = ops::gguf::vector_activation_bytes(k, t);
+                DeviceBuffer input(input_bytes);
+                ops::gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(x.p), k, t,
+                                                      gate.input_columns, input.p, nullptr);
+                DeviceBuffer reference(std::size_t(n) * t * sizeof(__nv_bfloat16));
+                ops::gguf::vector_swiglu(ops::detail::gguf_type(c.qtype), gate.qdata, row_bytes, n,
+                                         k, input.p, t,
+                                         static_cast<__nv_bfloat16*>(reference.p), n, nullptr);
+                const std::size_t output_bytes = ops::gguf::vector_activation_bytes(n, t);
+                std::vector<std::uint8_t> want;
+                DeviceBuffer expected(output_bytes);
+                if (n % 256 == 0) {
+                    ops::gguf::quantize_vector_activation(
+                        static_cast<const __nv_bfloat16*>(reference.p), n, t, nullptr, expected.p,
+                        nullptr);
+                    want.resize(output_bytes);
+                    expected.copy_to_host(want.data(), want.size());
+                } else {
+                    std::vector<__nv_bfloat16> reference_host(std::size_t(n) * t);
+                    reference.copy_to_host(reference_host.data(), reference_host.size() * sizeof(__nv_bfloat16));
+                    want = cpu_quantize_vector_activation(reference_host, n, t);
+                }
+                GuardedRaw actual(output_bytes);
+                actual.poison();
+                ops::gguf::vector_swiglu_q8(ops::detail::gguf_type(c.qtype), gate.qdata, row_bytes,
+                                            n, k, input.p, t, actual.data(), nullptr);
+                check(cudaDeviceSynchronize(), "fused SwiGLU q8 parity");
+                const auto got = actual.read("read fused q8 output");
+                if (got != want) {
+                    throw std::runtime_error(std::string(c.name) + " fused q8 pack differs at N=" +
+                                             std::to_string(n) + " T=" + std::to_string(t));
+                }
+                if (n == 17408 &&
+                    ((c.qtype == QType::GGUF_Q4_K && t == 4) ||
+                     (c.qtype == QType::GGUF_Q6_K && t == 3))) {
+                    const std::int32_t down_rows = 32;
+                    const auto host_down = random_blocks(c, down_rows, n, rng);
+                    DeviceBuffer down_storage(host_down.size());
+                    down_storage.copy_from_host(host_down.data(), host_down.size());
+                    const Weight down = gguf_weight(c.qtype, down_storage.p, down_rows, n);
+                    const std::size_t workspace_bytes = std::max(
+                        {ops::linear_swiglu_workspace_capacity_bytes(
+                             c.qtype, 2 * n, k, ops::LinearPolicy::A16Only, t, t),
+                         ops::linear_add_workspace_capacity_bytes(
+                             c.qtype, down_rows, n, ops::LinearPolicy::A16Only, t, t),
+                         ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
+                             gate, nullptr, down, t, t)});
+                    WorkspaceArena workspace(workspace_bytes + (1U << 20));
+                    DeviceBuffer activation(std::size_t(n) * t * sizeof(__nv_bfloat16));
+                    Tensor x_tensor(x.p, DType::BF16, {k, t});
+                    Tensor activation_tensor(activation.p, DType::BF16, {n, t});
+                    DeviceBuffer baseline(std::size_t(down_rows) * t * sizeof(__nv_bfloat16));
+                    DeviceBuffer fused(baseline.bytes);
+                    std::vector<__nv_bfloat16> initial(std::size_t(down_rows) * t);
+                    for (auto& value : initial) { value = __float2bfloat16(normal(rng)); }
+                    baseline.copy_from_host(initial.data(), initial.size() * sizeof(__nv_bfloat16));
+                    fused.copy_from_host(initial.data(), initial.size() * sizeof(__nv_bfloat16));
+                    Tensor baseline_tensor(baseline.p, DType::BF16, {down_rows, t});
+                    Tensor fused_tensor(fused.p, DType::BF16, {down_rows, t});
+                    ops::linear_swiglu(x_tensor, gate, activation_tensor,
+                                       ops::LinearPolicy::A16Only, workspace, nullptr);
+                    ops::linear_add(activation_tensor, down, baseline_tensor,
+                                    ops::LinearPolicy::A16Only, workspace, nullptr);
+                    check(cudaDeviceSynchronize(), "baseline fused q8 residual");
+                    const bool used = ops::detail::gguf_swiglu_linear_add(
+                        x_tensor, gate, nullptr, down, fused_tensor, workspace, nullptr);
+                    check(cudaDeviceSynchronize(), "fused q8 residual");
+                    std::vector<__nv_bfloat16> baseline_host(initial.size());
+                    std::vector<__nv_bfloat16> fused_host(initial.size());
+                    baseline.copy_to_host(baseline_host.data(), baseline_host.size() * sizeof(__nv_bfloat16));
+                    fused.copy_to_host(fused_host.data(), fused_host.size() * sizeof(__nv_bfloat16));
+                    if (used && std::memcmp(baseline_host.data(), fused_host.data(),
+                                            fused_host.size() * sizeof(__nv_bfloat16)) != 0) {
+                        throw std::runtime_error("fused q8 down projection differs from GGUF fallback");
+                    }
+                    if (used) {
+                        std::vector<std::int32_t> down_columns(n);
+                        for (std::int32_t i = 0; i < n; ++i) { down_columns[i] = i; }
+                        DeviceBuffer down_columns_device(down_columns.size() * sizeof(std::int32_t));
+                        down_columns_device.copy_from_host(down_columns.data(),
+                                                           down_columns.size() * sizeof(std::int32_t));
+                        Weight gathered_down = down;
+                        gathered_down.input_columns =
+                            static_cast<const std::int32_t*>(down_columns_device.p);
+                        if (ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
+                                gate, nullptr, gathered_down, t, t) != 0 ||
+                            ops::detail::gguf_swiglu_linear_add(x_tensor, gate, nullptr,
+                                                                gathered_down, fused_tensor,
+                                                                workspace, nullptr)) {
+                            throw std::runtime_error("fused q8 route admitted a gathered down weight");
+                        }
+                        if (ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
+                                gate, &gate, down, t, t) != 0 ||
+                            ops::detail::gguf_swiglu_linear_add(x_tensor, gate, &gate, down,
+                                                                fused_tensor, workspace, nullptr)) {
+                            throw std::runtime_error("fused q8 route admitted a separate up weight");
+                        }
+                    }
+                }
+                if ((n == 17408 && t == 4) || (n == 64 && t == 3)) {
+                    cudaStream_t stream = nullptr;
+                    cudaGraph_t graph = nullptr;
+                    cudaGraphExec_t executable = nullptr;
+                    check(cudaStreamCreate(&stream), "create fused q8 graph stream");
+                    check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
+                          "begin fused q8 graph capture");
+                    ops::gguf::vector_swiglu_q8(ops::detail::gguf_type(c.qtype), gate.qdata,
+                                                row_bytes, n, k, input.p, t, actual.data(), stream);
+                    check(cudaStreamEndCapture(stream, &graph), "end fused q8 graph capture");
+                    check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
+                          "instantiate fused q8 graph");
+                    actual.poison();
+                    check(cudaGraphLaunch(executable, stream), "launch fused q8 graph");
+                    check(cudaStreamSynchronize(stream), "synchronize fused q8 graph");
+                    if (actual.read("read fused q8 graph output") != want) {
+                        throw std::runtime_error("fused q8 graph replay differs from eager output");
+                    }
+                    check(cudaGraphExecDestroy(executable), "destroy fused q8 graph executable");
+                    check(cudaGraphDestroy(graph), "destroy fused q8 graph");
+                    check(cudaStreamDestroy(stream), "destroy fused q8 graph stream");
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 std::uint64_t checksum_value(std::uint64_t value) {
     std::uint64_t checksum = 14695981039346656037ULL;
     for (unsigned shift = 0; shift < 64; shift += 8) {
@@ -744,6 +962,7 @@ int main(int argc, char** argv) {
         return 77;
     }
     bool real_shapes = false;
+    bool swiglu_q8_fusion = false;
     bool output_specified = false;
     bool weight_directory_specified = false;
     std::string output_path;
@@ -752,6 +971,8 @@ int main(int argc, char** argv) {
         const std::string argument(argv[i]);
         if (argument == "--real-shapes" && !real_shapes) {
             real_shapes = true;
+        } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
+            swiglu_q8_fusion = true;
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
             output_path = argv[++i];
@@ -759,18 +980,24 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
     if ((output_specified && (!real_shapes || output_path.empty())) ||
-        (weight_directory_specified && (!real_shapes || weight_directory.empty()))) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>] "
+        (weight_directory_specified && (!real_shapes || weight_directory.empty())) ||
+        (real_shapes && swiglu_q8_fusion)) {
+        std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
     try {
+        if (swiglu_q8_fusion) {
+            const int failures = run_swiglu_q8_fusion(28001);
+            std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF SwiGLU q8 fusion\n";
+            return failures == 0 ? 0 : 1;
+        }
         if (real_shapes) {
             std::ofstream output_file;
             std::ofstream* output = nullptr;

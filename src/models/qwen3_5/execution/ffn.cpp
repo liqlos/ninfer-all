@@ -8,6 +8,7 @@
 #include "ninfer/ops/linear_swiglu.h"
 #include "ninfer/ops/residual_add.h"
 #include "ninfer/ops/silu_mul.h"
+#include "ops/linear/gguf/gguf_linear.h"
 
 #include <stdexcept>
 
@@ -74,6 +75,11 @@ std::size_t ffn_workspace_bytes(const FfnParameters& parameters, std::int32_t fi
     const auto& gu   = p.gate_up.weight;
     const auto& down = p.down.weight;
     if (is_gguf(gu.qtype)) {
+        if (!p.up) {
+            const auto fused = ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
+                gu, nullptr, down, first, last);
+            if (fused != 0) { return fused; }
+        }
         WorkspaceLayoutBuilder layout;
         const std::int32_t rows = p.up ? gu.n : gu.n / 2;
         (void)layout.alloc(DType::BF16, {rows, last});
@@ -155,6 +161,10 @@ void ffn(const Tensor& hidden, const FfnParameters& parameters, Tensor& residual
     const auto& gu   = p.gate_up.weight;
     const auto& down = p.down.weight;
     if (is_gguf(gu.qtype)) {
+        if (ops::detail::gguf_swiglu_linear_add(hidden, gu, p.up ? &p.up->weight : nullptr, down,
+                                                residual, workspace, stream)) {
+            return;
+        }
         Tensor activation = workspace.alloc(DType::BF16, {p.up ? gu.n : gu.n / 2, columns});
         {
             auto call = workspace.scope();

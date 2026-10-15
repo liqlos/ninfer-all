@@ -65,6 +65,13 @@ void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& 
 void gguf_linear_add(const Tensor& x, const Weight& w, Tensor& residual,
                      WorkspaceArena& workspace, cudaStream_t stream);
 
+[[nodiscard]] std::size_t gguf_swiglu_linear_add_workspace_capacity_bytes(
+    const Weight& gate, const Weight* up, const Weight& down, std::int32_t min_tokens,
+    std::int32_t max_tokens);
+bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* up,
+                            const Weight& down, Tensor& residual, WorkspaceArena& workspace,
+                            cudaStream_t stream);
+
 // out = silu(gate x) * (up x). `up` null means `gate` is one [gate; up] parent of 2 * out rows.
 void gguf_swiglu(const Tensor& x, const Weight& gate, const Weight* up, Tensor& out,
                  WorkspaceArena& workspace, cudaStream_t stream);

@@ -82,6 +82,19 @@ std::size_t fixup_bound() {
     return std::size_t(gguf::multiprocessor_count()) * kFixupTileBytes;
 }
 
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+bool fused_swiglu_q8_weights_admit(const Weight& gate, const Weight* up, const Weight& down,
+                                   std::int32_t min_tokens, std::int32_t max_tokens) {
+    return up == nullptr &&
+           (gate.qtype == QType::GGUF_Q4_K || gate.qtype == QType::GGUF_Q6_K) &&
+           is_gguf(down.qtype) && gate.layout == QuantLayout::GgufBlocks &&
+           down.layout == QuantLayout::GgufBlocks && gate.qdata != nullptr && down.qdata != nullptr &&
+           down.input_columns == nullptr && gate.n > 0 && gate.n % 512 == 0 && gate.k > 0 &&
+           gate.k % 256 == 0 && down.k == gate.n / 2 && down.n > 0 && min_tokens > 0 &&
+           max_tokens >= min_tokens && max_tokens <= 8;
+}
+#endif
+
 } // namespace
 
 gguf::GgmlType gguf_type(QType format) {
@@ -278,6 +291,65 @@ void gguf_linear_add(const Tensor& x, const Weight& w, Tensor& residual,
                      WorkspaceArena& workspace, cudaStream_t stream) {
     const GgufProduct product{&w, &residual, 0, GgufEpilogue::Accumulate};
     gguf_project(x, {&product, 1}, workspace, stream);
+}
+
+std::size_t gguf_swiglu_linear_add_workspace_capacity_bytes(const Weight& gate, const Weight* up,
+                                                            const Weight& down,
+                                                            std::int32_t min_tokens,
+                                                            std::int32_t max_tokens) {
+    if (min_tokens <= 0 || max_tokens < min_tokens) {
+        throw std::invalid_argument("gguf fused swiglu q8: invalid token interval");
+    }
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+    if (!fused_swiglu_q8_weights_admit(gate, up, down, min_tokens, max_tokens)) {
+        return 0;
+    }
+    WorkspaceLayoutBuilder layout;
+    (void)layout.alloc_bytes(gguf::vector_activation_bytes(gate.k, max_tokens));
+    (void)layout.alloc_bytes(gguf::vector_activation_bytes(gate.n / 2, max_tokens));
+    return layout.peak_bytes(1);
+#else
+    (void)gate;
+    (void)down;
+    return 0;
+#endif
+}
+
+bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* up,
+                            const Weight& down, Tensor& residual, WorkspaceArena& workspace,
+                            cudaStream_t stream) {
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+    if (!fused_swiglu_q8_weights_admit(gate, up, down, x.ne[1], x.ne[1]) ||
+        down.n <= 0 || down.n != residual.ne[0] || x.ne[1] < 1 || x.ne[1] > 8 ||
+        residual.ne[1] != x.ne[1] || residual.dtype != DType::BF16 || !residual.is_contiguous() ||
+        x.ne[0] != gate.k || x.dtype != DType::BF16 || !x.is_contiguous()) {
+        return false;
+    }
+    auto scope = workspace.scope();
+    const std::int32_t rows = gate.n / 2;
+    void* input = workspace.alloc_bytes(gguf::vector_activation_bytes(gate.k, x.ne[1])).data;
+    void* output = workspace.alloc_bytes(gguf::vector_activation_bytes(rows, x.ne[1])).data;
+    gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(x.data), gate.k, x.ne[1],
+                                     gate.input_columns, input, stream);
+    gguf::vector_swiglu_q8(gguf_type(gate.qtype), gate.qdata, row_bytes(gate), rows, gate.k,
+                           input, x.ne[1], output, stream);
+    gguf::VectorOutput destination;
+    destination.bf16 = static_cast<__nv_bfloat16*>(residual.data);
+    destination.column_stride = residual.ne[0];
+    destination.epilogue = gguf::Epilogue::Accumulate;
+    gguf::vector_product(gguf_type(down.qtype), down.qdata, row_bytes(down), down.n, down.k,
+                         output, x.ne[1], destination, stream);
+    return true;
+#else
+    (void)x;
+    (void)gate;
+    (void)up;
+    (void)down;
+    (void)residual;
+    (void)workspace;
+    (void)stream;
+    return false;
+#endif
 }
 
 std::size_t gguf_swiglu_workspace_bytes(const GgufShape& gate, const GgufShape* up,
