@@ -113,6 +113,7 @@ static __global__ void dual_q4_k_matrix_product_kernel(
         compute_tile(tile / column_tiles, tile % column_tiles,
                      kb0_start, kb0_stop, false);
         kbc += blocks_per_k;
+        kbc -= kbc % blocks_per_k;
         kb0_start = 0;
         kb0_stop = min(blocks_per_k, kbc_stop - kbc);
     }

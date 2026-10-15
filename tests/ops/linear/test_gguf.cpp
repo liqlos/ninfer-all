@@ -1074,8 +1074,38 @@ void run_dual_mmq_fusion() {
         check(cudaStreamSynchronize(stream), "wait dual MMQ projection graph");
         const auto got_a = paired_a.read("read paired dual MMQ Q4_K output");
         const auto got_b = paired_b.read("read paired dual MMQ second Q4_K output");
-        if (std::memcmp(got_a.data(), expected_a.data(), got_a.size() * sizeof(__nv_bfloat16)) != 0 ||
-            std::memcmp(got_b.data(), expected_b.data(), got_b.size() * sizeof(__nv_bfloat16)) != 0) {
+        const auto report_mismatch = [&](const std::vector<__nv_bfloat16>& got,
+                                         const std::vector<__nv_bfloat16>& expected,
+                                         const char* label) {
+            const std::size_t count = std::min(got.size(), expected.size());
+            std::size_t first = count;
+            for (std::size_t i = 0; i < count; ++i) {
+                std::uint16_t actual_bits = 0;
+                std::uint16_t expected_bits = 0;
+                std::memcpy(&actual_bits, &got[i], sizeof(actual_bits));
+                std::memcpy(&expected_bits, &expected[i], sizeof(expected_bits));
+                if (actual_bits != expected_bits) {
+                    first = i;
+                    break;
+                }
+            }
+            if (got.size() != expected.size() || first != count) {
+                std::uint16_t actual_bits = 0;
+                std::uint16_t expected_bits = 0;
+                if (first < count) {
+                    std::memcpy(&actual_bits, &got[first], sizeof(actual_bits));
+                    std::memcpy(&expected_bits, &expected[first], sizeof(expected_bits));
+                }
+                std::cerr << "dual Q4_K MMQ mismatch T=" << columns << " output=" << label
+                          << " first=" << first << " got_size=" << got.size()
+                          << " expected_size=" << expected.size() << " got=0x" << std::hex
+                          << actual_bits << " expected=0x" << expected_bits << std::dec << '\n';
+                return false;
+            }
+            return true;
+        };
+        if (!report_mismatch(got_a, expected_a, "A") ||
+            !report_mismatch(got_b, expected_b, "B")) {
             throw std::runtime_error("dual Q4_K MMQ changed native single-product outputs");
         }
         check(cudaGraphExecDestroy(executable), "destroy dual MMQ projection executable");
