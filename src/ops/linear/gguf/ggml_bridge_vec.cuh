@@ -207,6 +207,14 @@ template <>
 struct Decoder<GGML_TYPE_Q6_K> {
     static constexpr int kBlockElems = 256, kBlockBytes = 210, kTableWords = 0;
     __device__ static const std::uint32_t* table() { return nullptr; }
+    __device__ __forceinline__ static std::uint32_t load32(const std::uint8_t* p) {
+#if defined(NINFER_GGUF_Q6_STREAMING_LOADS) && __CUDA_ARCH__ == 860
+        const auto* h = reinterpret_cast<const std::uint16_t*>(p);
+        return std::uint32_t(__ldcs(h)) | (std::uint32_t(__ldcs(h + 1)) << 16);
+#else
+        return u32_a2(p);
+#endif
+    }
     __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
                                                   const std::uint32_t*, Slice& s) {
         const int h = u / 4, q = u % 4;
@@ -218,8 +226,8 @@ struct Decoder<GGML_TYPE_Q6_K> {
         const std::uint8_t* qh = b + 128 + 32 * h;
 #pragma unroll
         for (int i = 0; i < 8; ++i) {
-            const std::uint32_t v = ((u32_a2(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
-                                    (((u32_a2(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
+            const std::uint32_t v = ((load32(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                    (((load32(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
             // v - 32 per byte, v in [0, 64): flip the high bits by whether v is below 32.
             s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
         }

@@ -2,6 +2,14 @@
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
 option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K vector weights" OFF)
+option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
+if(NINFER_GGUF_Q6_STREAMING_LOADS)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF streaming weight experiments require sm_86")
+  endif()
+  set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
+    PROPERTIES COMPILE_DEFINITIONS NINFER_GGUF_Q6_STREAMING_LOADS=1)
+endif()
 if(NINFER_GGUF_Q4_STREAMING_LOADS)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF streaming weight experiments require sm_86")
