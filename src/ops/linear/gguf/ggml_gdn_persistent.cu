@@ -1,11 +1,12 @@
 #include "ops/linear/gguf/ggml_gdn_persistent.h"
 
 #include "core/dtype.h"
+#include "core/weight.h"
 #include "ops/gdn_input_proj/gdn_conv.cuh"
 #include "ops/kernel/rmsnorm.cuh"
+#include "ops/linear_attention/gated_delta_net/recurrent.cuh"
 #include "ops/linear/gguf/ggml_bridge_internal.cuh"
 #include "ops/linear/gguf/ggml_bridge_vec.cuh"
-#include "ops/linear_attention/gated_delta_net/recurrent.cuh"
 
 #include <cooperative_groups.h>
 
@@ -57,6 +58,7 @@ struct ProjectionArgs {
     ProjectionPart parts[kMaxParts];
     int part_count;
     int columns;
+    gdn::head_map heads;
     const std::int8_t* q8;
     const half2* ds;
     __nv_bfloat16* qkv;
@@ -203,7 +205,7 @@ struct PersistentRecordAccess {
         if (coord.state_tile == 0 && coord.warp == 0 && coord.value_head % heads.group_size() == 0) {
             __nv_bfloat16* destination =
                 key_record + (static_cast<std::int64_t>(token) * kQkHeads + coord.qk_head) * kDim;
-            gdn::store_vec(destination + coord.dqk_base, raw.bits);
+            store_vec(destination + coord.dqk_base, raw.bits);
         }
     }
 
@@ -251,7 +253,7 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
     const int warp = threadIdx.x >> 5;
     const int valid = max(0, min(valid_columns[0], columns));
     auto* q8_bytes = reinterpret_cast<std::uint8_t*>(q8);
-    const std::size_t q8_scale_offset = gguf::detail::vec_scales_offset(kHidden, columns);
+    const std::size_t q8_scale_offset = static_cast<std::size_t>(kHidden) * columns;
     const auto* hidden_bf16 = hidden;
     for (int group = static_cast<int>(blockIdx.x) * kWarps + warp;
          group < columns * (kHidden / 32); group += static_cast<int>(gridDim.x) * kWarps) {
@@ -325,7 +327,7 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
     }
     grid.sync();
 
-    const gdn::head_map heads = gdn::head_map::of(kQkHeads, kValueHeads);
+    const gdn::head_map heads = projection.heads;
     for (int task = static_cast<int>(blockIdx.x); task < kRecurrentTasks;
          task += static_cast<int>(gridDim.x)) {
         const int value_head = task / 8;
@@ -381,7 +383,7 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
     }
     grid.sync();
 
-    const std::size_t output_scale_offset = gguf::detail::vec_scales_offset(kValue, columns);
+    const std::size_t output_scale_offset = static_cast<std::size_t>(kValue) * columns;
     auto* output_q8 = reinterpret_cast<std::uint8_t*>(q8);
     for (int group = static_cast<int>(blockIdx.x) * kWarps + warp;
          group < columns * (kValue / 32); group += static_cast<int>(gridDim.x) * kWarps) {
@@ -523,7 +525,7 @@ cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs
     auto* recurrent_out = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
     offset += align_workspace(sizeof(__nv_bfloat16) * static_cast<std::size_t>(kValue) * args.columns);
     auto* normalized = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
-    const int columns = args.columns;
+    int columns = args.columns;
     const auto* hidden = static_cast<const __nv_bfloat16*>(args.hidden);
     const auto* g = args.g;
     const auto* beta = args.beta;
@@ -531,7 +533,7 @@ cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs
     const auto* norm_weight = static_cast<const __nv_bfloat16*>(args.norm_weight);
     const auto* output_columns = args.output_columns;
     const auto* output_weight = args.output_weight;
-    const auto output_row_bytes = args.output_row_bytes;
+    auto output_row_bytes = args.output_row_bytes;
     const auto* residual = static_cast<const __nv_bfloat16*>(args.residual);
     auto* residual_out = static_cast<__nv_bfloat16*>(args.residual_out);
     const auto* conv_states = static_cast<const __nv_bfloat16*>(args.conv_states);
@@ -542,14 +544,14 @@ cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs
     auto* key_record = static_cast<__nv_bfloat16*>(args.key_record);
     auto* value_record = static_cast<__nv_bfloat16*>(args.value_record);
     auto* gate_record = static_cast<float*>(args.gate_record);
-    const int action = args.action;
-    const float eps = args.eps;
+    int action = args.action;
+    float eps = args.eps;
     void* launch_args[] = {&projection, &columns, &hidden, &g, &beta, &convolution,
                            &norm_weight, &output_columns, &output_weight, &output_row_bytes,
                            &residual, &residual_out, &conv_states, &recurrent_states,
                            &source_slots, &valid_columns, &conv_record, &key_record,
                            &value_record, &gate_record, &q8, &qkv_projection, &qkv_convolved,
-                           &z, &recurrent_out, &normalized, &action, const_cast<float*>(&eps)};
+                           &z, &recurrent_out, &normalized, &action, &eps};
     return cudaLaunchCooperativeKernel(
         reinterpret_cast<void*>(persistent_gdn_kernel<StateT>), blocks, kThreads, launch_args, 0, stream);
 }
@@ -563,6 +565,7 @@ bool gguf::detail::gdn_persistent_mixer_launch(
     ProjectionArgs projection{};
     projection.part_count = args.part_count;
     projection.columns = args.columns;
+    projection.heads = gdn::head_map::of(kQkHeads, kValueHeads);
     for (int i = 0; i < args.part_count; ++i) {
         const auto& part = args.parts[i];
         projection.parts[i] = {part.weight, part.row_bytes, part.type, part.rows, part.row, part.output};
