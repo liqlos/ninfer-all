@@ -20,6 +20,9 @@ namespace {
 
 using namespace ninfer;
 using namespace ninfer::ops;
+using ninfer::ops::detail::GgufProduct;
+using ninfer::ops::detail::GgufShape;
+using ninfer::ops::detail::GgufEpilogue;
 
 void check(cudaError_t status, const char* label) {
     if (status != cudaSuccess) { throw std::runtime_error(std::string(label) + ": " + cudaGetErrorString(status)); }
@@ -267,6 +270,7 @@ int main() {
         if (properties.major != 8 || properties.minor != 6) { return 77; }
         if (!run_case(q4_case(), 1024, false, true) ||
             !run_case(q4_case(), 1024, true, true) ||
+            !run_case(q4_case(), 1000, false, true) ||
             !run_case(q6_case(), 1024, false, true) ||
             !run_case(q4_case(), 130, false, false) ||
             !run_accumulate_graph_case()) {
