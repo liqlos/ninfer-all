@@ -877,6 +877,18 @@ static constexpr __device__ ggml_cuda_mmq_write_back_t ggml_cuda_mmq_get_write_b
 
 // ---------------------------------------------------------------------------------------------
 
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+template <int J, int nthreads>
+static __device__ __forceinline__ void ggml_cuda_mmq_copy_y_async(int * dst, const int * src) {
+    static_assert(J % 8 == 0);
+    constexpr int ncopy = J * MMQ_TILE_Y_K / 4;
+    const int tid = threadIdx.y*ggml_cuda_get_physical_warp_size() + threadIdx.x;
+    for (int i = tid; i < ncopy; i += nthreads) {
+        ninfer::ops::cp_async<16, ninfer::ops::Cache::cg>(dst + 4*i, src + 4*i);
+    }
+}
+#endif
+
 template <ggml_type type, int J, bool fallback, bool fixup, ggml_prec prec_src1 = GGML_PREC_Q8>
 static __device__ __forceinline__ void mul_mat_q_process_tile(
         const char * __restrict__ x, const int offset_x, const int * __restrict__ y,
@@ -895,7 +907,14 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 
     extern __shared__ int data_mul_mat_q[];
     int * tile_y = data_mul_mat_q + J;
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+    int * tile_y_next = tile_y + GGML_PAD(J*MMQ_TILE_Y_K, nwarps*warp_size);
+    int * tile_x = type == GGML_TYPE_Q4_K
+        ? tile_y_next + GGML_PAD(J*MMQ_TILE_Y_K, nwarps*warp_size)
+        : tile_y_next;
+#else
     int * tile_x = tile_y + GGML_PAD(J*MMQ_TILE_Y_K, nwarps*warp_size);
+#endif
 
 #if defined(BLACKWELL_MMA_AVAILABLE)
     // FP4 tile stores 8 blocks. src1 above Q4 uses the generic
@@ -913,6 +932,35 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 
     constexpr int sz = sizeof(block_q8_1_mmq) / sizeof(int);
 
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+    if constexpr (type == GGML_TYPE_Q4_K) {
+        if (kb0_start < kb0_stop) {
+            const int * by0 = y + ncols_y * (kb0_start * qk / ne_block) * sz;
+            ggml_cuda_mmq_copy_y_async<J, nwarps*warp_size>(tile_y, by0);
+            ninfer::ops::cp_commit();
+            for (int kb0 = kb0_start; kb0 < kb0_stop; kb0 += blocks_per_iter) {
+                load_tiles(x, tile_x, offset_x + kb0, tile_x_max_i, stride_row_x);
+                ninfer::ops::cp_wait<0>();
+                __syncthreads();
+
+                const int * by1 = y + ncols_y * ((kb0 * qk / ne_block) * sz + sz);
+                ggml_cuda_mmq_copy_y_async<J, nwarps*warp_size>(tile_y_next, by1);
+                ninfer::ops::cp_commit();
+                vec_dot(tile_x, tile_y, sum, 0);
+                ninfer::ops::cp_wait<0>();
+                __syncthreads();
+
+                if (kb0 + blocks_per_iter < kb0_stop) {
+                    const int * by_next = y + ncols_y * ((kb0 + blocks_per_iter) * qk / ne_block) * sz;
+                    ggml_cuda_mmq_copy_y_async<J, nwarps*warp_size>(tile_y, by_next);
+                    ninfer::ops::cp_commit();
+                }
+                vec_dot(tile_x, tile_y_next, sum, MMQ_TILE_NE_K);
+                __syncthreads();
+            }
+        }
+    } else
+#endif
     for (int kb0 = kb0_start; kb0 < kb0_stop; kb0 += blocks_per_iter) {
         load_tiles(x, tile_x, offset_x + kb0, tile_x_max_i, stride_row_x);
         {
@@ -1397,7 +1445,13 @@ static size_t mmq_get_nbytes_shared(const ggml_cuda_mmq_config & config, const i
     const size_t nbs_ids = config.J*sizeof(int);
     const size_t nbs_x = ggml_cuda_mmq_get_nbytes_shared_x(config, cc);
     const size_t nbs_y = config.J * (sizeof(block_q8_1_mmq));
-    return nbs_ids + nbs_x + GGML_PAD(nbs_y, config.nthreads*sizeof(int));
+    const size_t nbs_y_padded = GGML_PAD(nbs_y, config.nthreads*sizeof(int));
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+    if (config.type == GGML_TYPE_Q4_K) {
+        return nbs_ids + nbs_x + 2*nbs_y_padded;
+    }
+#endif
+    return nbs_ids + nbs_x + nbs_y_padded;
 }
 
 template <ggml_type type, int J, bool fallback, ggml_prec prec_src1 = GGML_PREC_Q8>
