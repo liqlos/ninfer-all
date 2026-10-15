@@ -1017,6 +1017,115 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     return failures;
 }
 
+int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
+                       std::ofstream* output_file, const std::string& weight_directory,
+                       std::size_t& files_used) {
+    constexpr std::int32_t rows = 257;
+    constexpr std::int32_t widths[] = {17, 127, 130, 1024};
+    const auto type = ops::detail::gguf_type(c.qtype);
+    if (c.qtype != QType::GGUF_Q4_K || !ops::gguf::has_matrix_kernel(type)) {
+        throw std::runtime_error("MMQ real-shapes requires the Q4_K matrix route");
+    }
+
+    const auto block = gguf_block_shape(c.qtype);
+    const std::size_t bytes = std::size_t(rows) * (k / block.elements) * block.bytes;
+    const std::string filename = fixture_prefix(c.qtype) + "-k" + std::to_string(k) + ".bin";
+    std::vector<std::uint8_t> host_blocks;
+    const bool loaded = !weight_directory.empty() &&
+                        load_blocks(weight_directory, filename, bytes, host_blocks);
+    if (loaded) {
+        ++files_used;
+    } else {
+        std::mt19937 weight_rng(seed);
+        host_blocks = random_blocks(c, rows, k, weight_rng, true);
+    }
+    const std::string source = loaded ? filename : "synthetic";
+    std::vector<float> cpu_weights;
+    decode_k_cpu(c.qtype, host_blocks, rows, k, cpu_weights);
+    DeviceBuffer weight_device(host_blocks.size());
+    weight_device.copy_from_host(host_blocks.data(), host_blocks.size());
+    const Weight weight = gguf_weight(c.qtype, weight_device.p, rows, k);
+
+    constexpr std::int32_t max_t = 1024;
+    std::mt19937 activation_rng(seed + 1907);
+    std::normal_distribution<float> normal(0.0f, 0.35f);
+    std::vector<__nv_bfloat16> x_host(std::size_t(k) * max_t);
+    for (std::int32_t col = 0; col < max_t; ++col) {
+        for (std::int32_t i = 0; i < k; ++i) {
+            float value = normal(activation_rng);
+            if (i % 32 == 0) { value = ((i / 32 + col) & 1) ? 4.0f : -4.0f; }
+            x_host[std::size_t(col) * k + i] = __float2bfloat16(value);
+        }
+    }
+    std::vector<float> x_float(x_host.size());
+    for (std::size_t i = 0; i < x_host.size(); ++i) {
+        x_float[i] = __bfloat162float(x_host[i]);
+    }
+    DeviceBuffer x_device(x_host.size() * sizeof(__nv_bfloat16));
+    x_device.copy_from_host(x_host.data(), x_host.size() * sizeof(__nv_bfloat16));
+    const std::size_t capacity = ops::linear_workspace_capacity_bytes(
+        c.qtype, rows, k, ops::LinearPolicy::A16Only, 1, max_t);
+    WorkspaceArena workspace(capacity + (1U << 20));
+    int failures = 0;
+
+    for (const std::int32_t t : widths) {
+        GuardedOutput guarded(std::size_t(rows) * t);
+        Tensor x(x_device.p, DType::BF16, {k, t});
+        Tensor out(guarded.data(), DType::BF16, {rows, t});
+        guarded.poison();
+        ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, nullptr);
+        check(cudaDeviceSynchronize(), "MMQ real-shape linear");
+        const auto host = guarded.read("read MMQ real-shape output");
+        const auto got = to_float(host);
+        if (!std::all_of(got.begin(), got.end(),
+                         [](float value) { return std::isfinite(value); })) {
+            throw std::runtime_error("MMQ real-shape output contains non-finite values");
+        }
+
+        std::vector<std::int32_t> samples{0, 1, t / 2, t - 2, t - 1};
+        std::sort(samples.begin(), samples.end());
+        samples.erase(std::unique(samples.begin(), samples.end()), samples.end());
+        std::vector<float> sampled_got;
+        std::vector<double> sampled_want;
+        sampled_got.reserve(samples.size() * rows);
+        sampled_want.reserve(samples.size() * rows);
+        for (const std::int32_t col : samples) {
+            for (std::int32_t row = 0; row < rows; ++row) {
+                double acc = 0.0;
+                const float* wr = cpu_weights.data() + std::size_t(row) * k;
+                const float* xr = x_float.data() + std::size_t(col) * k;
+                for (std::int32_t i = 0; i < k; ++i) {
+                    acc += double(wr[i]) * xr[i];
+                }
+                sampled_got.push_back(got[std::size_t(col) * rows + row]);
+                sampled_want.push_back(acc);
+            }
+        }
+        const Error error = compare(sampled_got, sampled_want);
+        if (!(error.relative_rms < 5e-2 && error.relative_max < 2e-1)) {
+            std::cerr << "FAIL MMQ Q4_K K=" << k << " T=" << t
+                      << " rms_rel=" << error.relative_rms << " max_rel="
+                      << error.relative_max << " max_abs=" << error.max_absolute << '\n';
+            ++failures;
+        } else {
+            std::cout << "OK MMQ Q4_K K=" << k << " T=" << t << " rms_rel="
+                      << std::setprecision(8) << error.relative_rms << " max_rel="
+                      << error.relative_max << " max_abs=" << error.max_absolute << '\n';
+        }
+        write_outputs(output_file, host);
+        if (t == 130 || t == 1024) {
+            check_graph_parity(
+                [&](cudaStream_t stream) {
+                    ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
+                },
+                guarded, host,
+                "MMQ Q4_K K=" + std::to_string(k) + " T=" + std::to_string(t), output_file);
+        }
+    }
+    std::cout << "MMQ source Q4_K K=" << k << " rows=" << rows
+              << " weights=" << source << '\n';
+    return failures;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1026,6 +1135,7 @@ int main(int argc, char** argv) {
         return 77;
     }
     bool real_shapes = false;
+    bool mmq_real_shapes = false;
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
     bool output_specified = false;
@@ -1036,6 +1146,8 @@ int main(int argc, char** argv) {
         const std::string argument(argv[i]);
         if (argument == "--real-shapes" && !real_shapes) {
             real_shapes = true;
+        } else if (argument == "--mmq-real-shapes" && !mmq_real_shapes) {
+            mmq_real_shapes = true;
         } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
@@ -1048,15 +1160,16 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
-    if ((output_specified && (!real_shapes || output_path.empty())) ||
-        (weight_directory_specified && (!real_shapes || weight_directory.empty())) ||
-        (real_shapes && swiglu_q8_fusion)) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --real-shapes [--output <file>] "
+    if ((output_specified && (!(real_shapes || mmq_real_shapes) || output_path.empty())) ||
+        (weight_directory_specified && (!(real_shapes || mmq_real_shapes) || weight_directory.empty())) ||
+        (real_shapes && mmq_real_shapes) ||
+        ((real_shapes || mmq_real_shapes) && swiglu_q8_fusion)) {
+        std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
@@ -1064,6 +1177,40 @@ int main(int argc, char** argv) {
         if (swiglu_q8_fusion) {
             const int failures = run_swiglu_q8_fusion(28001, !swiglu_q8_benchmark);
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF SwiGLU q8 fusion\n";
+            return failures == 0 ? 0 : 1;
+        }
+        if (mmq_real_shapes) {
+            std::ofstream output_file;
+            std::ofstream* output = nullptr;
+            if (output_specified) {
+                output_file.open(output_path, std::ios::binary | std::ios::trunc);
+                if (!output_file) {
+                    throw std::runtime_error("could not open MMQ output file: " + output_path);
+                }
+                output = &output_file;
+            }
+            if (weight_directory_specified && !std::filesystem::is_directory(weight_directory)) {
+                throw std::runtime_error("--weight-dir is not a directory: " + weight_directory);
+            }
+            const auto all = cases();
+            const auto q4 = std::find_if(all.begin(), all.end(), [](const TypeCase& c) {
+                return c.qtype == QType::GGUF_Q4_K;
+            });
+            if (q4 == all.end()) { throw std::logic_error("Q4_K case is not registered"); }
+            std::size_t files_used = 0;
+            int failures = 0;
+            for (const std::int32_t k : {5120, 17408}) {
+                failures += run_mmq_real_shape(*q4, k, 29003 + k, output, weight_directory,
+                                                files_used);
+            }
+            if (weight_directory_specified && files_used == 0) {
+                throw std::runtime_error("--weight-dir provided no q4-k5120.bin or q4-k17408.bin");
+            }
+            if (output != nullptr) {
+                output_file.flush();
+                if (!output_file) { throw std::runtime_error("failed flushing MMQ output file"); }
+            }
+            std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF MMQ real shapes\n";
             return failures == 0 ? 0 : 1;
         }
         if (real_shapes) {
