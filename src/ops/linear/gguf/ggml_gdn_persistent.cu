@@ -39,7 +39,6 @@ constexpr int kQkHeads = 16;
 constexpr int kValueHeads = 48;
 constexpr int kDim = 128;
 constexpr int kConvTaps = 4;
-constexpr int kMaxColumns = 4;
 constexpr int kThreads = 128;
 constexpr int kWarps = kThreads / 32;
 constexpr int kRecurrentTasks = kValueHeads * 8;
@@ -57,15 +56,15 @@ struct ProjectionPart {
 struct ProjectionArgs {
     ProjectionPart parts[kMaxParts];
     int part_count;
-    int columns;
     gdn::head_map heads;
-    const std::int8_t* q8;
-    const half2* ds;
-    __nv_bfloat16* qkv;
-    __nv_bfloat16* z;
 };
 
-__device__ __forceinline__ void load_activation(const ProjectionArgs& p, int column, int slice,
+struct ActivationView {
+    const std::int8_t* q8;
+    const half2* ds;
+};
+
+__device__ __forceinline__ void load_activation(const ActivationView& p, int column, int slice,
                                                 int k, int (&a)[8], float& d, float& sum) {
     const std::int64_t at = static_cast<std::int64_t>(column) * k + 32LL * slice;
     const int4 lo = *reinterpret_cast<const int4*>(p.q8 + at);
@@ -83,22 +82,25 @@ __device__ __forceinline__ void load_activation(const ProjectionArgs& p, int col
     sum = pair.y;
 }
 
-template <ggml_type Type>
+template <ggml_type Type, int Columns>
 __device__ __forceinline__ void project_row(const ProjectionPart& part, int row,
-                                            const ProjectionArgs& p, int k,
-                                            float (&acc)[kMaxColumns]) {
+                                            const ActivationView& p, int k,
+                                            float (&acc)[Columns]) {
     using D = vec::Decoder<Type>;
     constexpr int kPerBlock = D::kBlockElems / 32;
     const int lane = threadIdx.x & 31;
     const int sub = lane % kPerBlock;
     const std::int64_t lane_offset = std::int64_t(lane / kPerBlock) * D::kBlockBytes;
     const auto* weight = part.weight + std::int64_t(row) * part.row_bytes + lane_offset;
-    for (int column = 0; column < p.columns; ++column) { acc[column] = 0.0f; }
+    #pragma unroll
+    for (int column = 0; column < Columns; ++column) { acc[column] = 0.0f; }
+    #pragma unroll
     for (int it = 0; it < k / 1024; ++it) {
         vec::Slice slice;
         D::decode(weight + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub,
                   D::table(), slice);
-        for (int column = 0; column < p.columns; ++column) {
+        #pragma unroll
+        for (int column = 0; column < Columns; ++column) {
             int a[8];
             float d;
             float sum;
@@ -106,8 +108,10 @@ __device__ __forceinline__ void project_row(const ProjectionPart& part, int row,
             acc[column] += D::dot(slice, a, d, sum);
         }
     }
+    #pragma unroll
     for (int offset = 16; offset > 0; offset >>= 1) {
-        for (int column = 0; column < p.columns; ++column) {
+        #pragma unroll
+        for (int column = 0; column < Columns; ++column) {
             acc[column] += __shfl_xor_sync(0xffffffffu, acc[column], offset);
         }
     }
@@ -124,23 +128,26 @@ __device__ __forceinline__ const ProjectionPart* find_part(const ProjectionArgs&
     return nullptr;
 }
 
+template <int Columns>
 __device__ __forceinline__ void project_dispatch(const ProjectionPart& part, int row,
-                                                 const ProjectionArgs& p,
-                                                 float (&acc)[kMaxColumns]) {
+                                                 const ActivationView& p,
+                                                 float (&acc)[Columns]) {
     if (part.type == static_cast<int>(QType::GGUF_Q4_K)) {
-        project_row<GGML_TYPE_Q4_K>(part, row - part.row, p, kHidden, acc);
+        project_row<GGML_TYPE_Q4_K, Columns>(part, row - part.row, p, kHidden, acc);
     } else {
-        project_row<GGML_TYPE_Q6_K>(part, row - part.row, p, kHidden, acc);
+        project_row<GGML_TYPE_Q6_K, Columns>(part, row - part.row, p, kHidden, acc);
     }
 }
 
+template <int Columns>
 __device__ __forceinline__ void store_projected(const ProjectionPart& part, int row,
-                                                const ProjectionArgs& p,
+                                                const ActivationView& p,
                                                 __nv_bfloat16* output, int stride) {
-    float acc[kMaxColumns];
-    project_dispatch(part, row, p, acc);
+    float acc[Columns];
+    project_dispatch<Columns>(part, row, p, acc);
     if ((threadIdx.x & 31) == 0) {
-        for (int column = 0; column < p.columns; ++column) {
+        #pragma unroll
+        for (int column = 0; column < Columns; ++column) {
             output[static_cast<std::int64_t>(column) * stride + row] = __float2bfloat16(acc[column]);
         }
     }
@@ -226,8 +233,8 @@ struct PersistentRecordAccess {
     }
 };
 
-template <class StateT>
-__global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
+template <class StateT, int Columns>
+__global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs projection,
                                       const __nv_bfloat16* hidden, const float* g,
                                       const float* beta, const __nv_bfloat16* convolution,
                                       const __nv_bfloat16* norm_weight,
@@ -248,6 +255,7 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
                                       __nv_bfloat16* qkv_convolved,
                                       __nv_bfloat16* z, __nv_bfloat16* recurrent_out,
                                       __nv_bfloat16* normalized, int action, float eps) {
+    constexpr int columns = Columns;
     cg::grid_group grid = cg::this_grid();
     const int lane = threadIdx.x & 31;
     const int warp = threadIdx.x >> 5;
@@ -273,8 +281,8 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
     }
     grid.sync();
 
-    projection.q8 = reinterpret_cast<const std::int8_t*>(q8_bytes);
-    projection.ds = reinterpret_cast<const half2*>(q8_bytes + q8_scale_offset);
+    const ActivationView input_activation{reinterpret_cast<const std::int8_t*>(q8_bytes),
+                                          reinterpret_cast<const half2*>(q8_bytes + q8_scale_offset)};
     const int project_rows = kQkv + kZ;
     const int project_total = static_cast<int>(gridDim.x) * kWarps;
     for (int row = static_cast<int>(blockIdx.x) * kWarps + warp; row < project_rows;
@@ -283,8 +291,8 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
         const int output_row = output == 0 ? row : row - kQkv;
         const ProjectionPart* part = find_part(projection, output, output_row);
         if (part == nullptr) { continue; }
-        store_projected(*part, output_row, projection,
-                        output == 0 ? qkv_projection : z, output == 0 ? kQkv : kZ);
+        store_projected<Columns>(*part, output_row, input_activation,
+                                 output == 0 ? qkv_projection : z, output == 0 ? kQkv : kZ);
     }
     grid.sync();
 
@@ -296,7 +304,8 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
         const __nv_bfloat16 s1 = conv_states[state_base + kQkv + channel];
         const __nv_bfloat16 s2 = conv_states[state_base + 2LL * kQkv + channel];
         __nv_bfloat16 history[3] = {s0, s1, s2};
-        __nv_bfloat16 projected[kMaxColumns];
+        __nv_bfloat16 projected[Columns];
+#pragma unroll
         for (int token = 0; token < columns; ++token) {
             projected[token] = qkv_projection[static_cast<std::int64_t>(token) * kQkv + channel];
             if (token < valid) {
@@ -405,11 +414,8 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
     grid.sync();
 
     const int output_rows = kHidden;
-    ProjectionArgs output_projection{};
-    output_projection.part_count = 1;
-    output_projection.columns = columns;
-    output_projection.q8 = reinterpret_cast<const std::int8_t*>(output_q8);
-    output_projection.ds = reinterpret_cast<const half2*>(output_q8 + output_scale_offset);
+    const ActivationView output_activation{reinterpret_cast<const std::int8_t*>(output_q8),
+                                           reinterpret_cast<const half2*>(output_q8 + output_scale_offset)};
     for (int row = static_cast<int>(blockIdx.x) * kWarps + warp; row < output_rows;
          row += static_cast<int>(gridDim.x) * kWarps) {
         constexpr int kPerBlock = vec::Decoder<GGML_TYPE_Q4_K>::kBlockElems / 32;
@@ -417,29 +423,36 @@ __global__ void persistent_gdn_kernel(ProjectionArgs projection, int columns,
                                          vec::Decoder<GGML_TYPE_Q4_K>::kBlockBytes;
         const int sub = lane % kPerBlock;
         const auto* row_weight = output_weight + static_cast<std::int64_t>(row) * output_row_bytes + lane_offset;
-        float acc[kMaxColumns] = {0.0f, 0.0f, 0.0f, 0.0f};
+        float acc[Columns] = {};
+#pragma unroll
         for (int it = 0; it < kValue / 1024; ++it) {
-            int a[kMaxColumns][8];
-            float d[kMaxColumns];
-            float sum[kMaxColumns];
+            int a[Columns][8];
+            float d[Columns];
+            float sum[Columns];
+#pragma unroll
             for (int column = 0; column < columns; ++column) {
-                load_activation(output_projection, column, lane + 32 * it, kValue, a[column], d[column], sum[column]);
+                load_activation(output_activation, column, lane + 32 * it, kValue,
+                                a[column], d[column], sum[column]);
             }
             vec::Slice slice;
             vec::Decoder<GGML_TYPE_Q4_K>::decode(
                 row_weight + std::int64_t(32 / kPerBlock) * it *
                                  vec::Decoder<GGML_TYPE_Q4_K>::kBlockBytes,
                 sub, vec::Decoder<GGML_TYPE_Q4_K>::table(), slice);
+#pragma unroll
             for (int column = 0; column < columns; ++column) {
                 acc[column] += vec::Decoder<GGML_TYPE_Q4_K>::dot(slice, a[column], d[column], sum[column]);
             }
         }
+#pragma unroll
         for (int offset = 16; offset > 0; offset >>= 1) {
+#pragma unroll
             for (int column = 0; column < columns; ++column) {
                 acc[column] += __shfl_xor_sync(0xffffffffu, acc[column], offset);
             }
         }
         if (lane == 0) {
+#pragma unroll
             for (int column = 0; column < columns; ++column) {
                 const std::int64_t at = static_cast<std::int64_t>(column) * output_rows + row;
                 residual_out[at] = __float2bfloat16(acc[column] + __bfloat162float(residual[at]));
@@ -458,9 +471,23 @@ std::size_t align_workspace(std::size_t n) { return (n + 255) & ~std::size_t(255
 
 struct PersistentLaunchFacts {
     int multiprocessors;
-    int active_float;
-    int active_half;
+    std::array<int, 3> active_float;
+    std::array<int, 3> active_half;
 };
+
+template <class StateT, int Columns>
+cudaError_t query_persistent_occupancy(int* active) {
+    return cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+        active, persistent_gdn_kernel<StateT, Columns>, kThreads, 0);
+}
+
+template <class StateT>
+bool query_persistent_occupancy(std::array<int, 3>& active) {
+    return query_persistent_occupancy<StateT, 2>(&active[0]) == cudaSuccess &&
+           query_persistent_occupancy<StateT, 3>(&active[1]) == cudaSuccess &&
+           query_persistent_occupancy<StateT, 4>(&active[2]) == cudaSuccess &&
+           active[0] > 0 && active[1] > 0 && active[2] > 0;
+}
 
 bool persistent_launch_facts(cudaStream_t stream, PersistentLaunchFacts& result) {
     int device = 0;
@@ -495,11 +522,8 @@ bool persistent_launch_facts(cudaStream_t stream, PersistentLaunchFacts& result)
     }
     PersistentLaunchFacts facts{};
     facts.multiprocessors = properties.multiProcessorCount;
-    if (cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-            &facts.active_float, persistent_gdn_kernel<float>, kThreads, 0) != cudaSuccess ||
-        cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-            &facts.active_half, persistent_gdn_kernel<__half>, kThreads, 0) != cudaSuccess ||
-        facts.active_float <= 0 || facts.active_half <= 0 || facts.multiprocessors <= 0) {
+    if (!query_persistent_occupancy<float>(facts.active_float) ||
+        !query_persistent_occupancy<__half>(facts.active_half) || facts.multiprocessors <= 0) {
         return false;
     }
     {
@@ -511,7 +535,7 @@ bool persistent_launch_facts(cudaStream_t stream, PersistentLaunchFacts& result)
     result = facts;
     return true;
 }
-template <class StateT>
+template <class StateT, int Columns>
 cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs& args,
                                      ProjectionArgs projection, int blocks, cudaStream_t stream) {
     auto* q8 = static_cast<__nv_bfloat16*>(args.workspace);
@@ -525,7 +549,6 @@ cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs
     auto* recurrent_out = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
     offset += align_workspace(sizeof(__nv_bfloat16) * static_cast<std::size_t>(kValue) * args.columns);
     auto* normalized = reinterpret_cast<__nv_bfloat16*>(reinterpret_cast<std::uint8_t*>(args.workspace) + offset);
-    int columns = args.columns;
     const auto* hidden = static_cast<const __nv_bfloat16*>(args.hidden);
     const auto* g = args.g;
     const auto* beta = args.beta;
@@ -546,14 +569,23 @@ cudaError_t launch_persistent_kernel(const gguf::detail::GdnPersistentLaunchArgs
     auto* gate_record = static_cast<float*>(args.gate_record);
     int action = args.action;
     float eps = args.eps;
-    void* launch_args[] = {&projection, &columns, &hidden, &g, &beta, &convolution,
+    void* launch_args[] = {&projection, &hidden, &g, &beta, &convolution,
                            &norm_weight, &output_columns, &output_weight, &output_row_bytes,
                            &residual, &residual_out, &conv_states, &recurrent_states,
                            &source_slots, &valid_columns, &conv_record, &key_record,
                            &value_record, &gate_record, &q8, &qkv_projection, &qkv_convolved,
                            &z, &recurrent_out, &normalized, &action, &eps};
     return cudaLaunchCooperativeKernel(
-        reinterpret_cast<void*>(persistent_gdn_kernel<StateT>), blocks, kThreads, launch_args, 0, stream);
+        reinterpret_cast<void*>(persistent_gdn_kernel<StateT, Columns>), blocks, kThreads,
+        launch_args, 0, stream);
+}
+
+template <class StateT, int Columns>
+cudaError_t launch_persistent_width(const gguf::detail::GdnPersistentLaunchArgs& args,
+                                    ProjectionArgs projection, const PersistentLaunchFacts& facts,
+                                    int active_blocks, cudaStream_t stream) {
+    return launch_persistent_kernel<StateT, Columns>(
+        args, projection, active_blocks * facts.multiprocessors, stream);
 }
 
 }
@@ -564,18 +596,27 @@ bool gguf::detail::gdn_persistent_mixer_launch(
     if (!persistent_launch_facts(stream, facts)) { return false; }
     ProjectionArgs projection{};
     projection.part_count = args.part_count;
-    projection.columns = args.columns;
     projection.heads = gdn::head_map::of(kQkHeads, kValueHeads);
     for (int i = 0; i < args.part_count; ++i) {
         const auto& part = args.parts[i];
         projection.parts[i] = {part.weight, part.row_bytes, part.type, part.rows, part.row, part.output};
     }
-    const int active_blocks = args.state_fp16 ? facts.active_half : facts.active_float;
-    const int blocks = active_blocks * facts.multiprocessors;
-    if (blocks <= 0) { return false; }
-    const cudaError_t status = args.state_fp16
-        ? launch_persistent_kernel<__half>(args, projection, blocks, stream)
-        : launch_persistent_kernel<float>(args, projection, blocks, stream);
+    if (args.columns < 2 || args.columns > 4) { return false; }
+    const int width_index = args.columns - 2;
+    cudaError_t status = cudaErrorInvalidValue;
+    if (args.state_fp16) {
+        switch (args.columns) {
+        case 2: status = launch_persistent_width<__half, 2>(args, projection, facts, facts.active_half[width_index], stream); break;
+        case 3: status = launch_persistent_width<__half, 3>(args, projection, facts, facts.active_half[width_index], stream); break;
+        case 4: status = launch_persistent_width<__half, 4>(args, projection, facts, facts.active_half[width_index], stream); break;
+        }
+    } else {
+        switch (args.columns) {
+        case 2: status = launch_persistent_width<float, 2>(args, projection, facts, facts.active_float[width_index], stream); break;
+        case 3: status = launch_persistent_width<float, 3>(args, projection, facts, facts.active_float[width_index], stream); break;
+        case 4: status = launch_persistent_width<float, 4>(args, projection, facts, facts.active_float[width_index], stream); break;
+        }
+    }
     if (status != cudaSuccess) {
         throw std::runtime_error(std::string("gdn_persistent_mixer launch: ") + cudaGetErrorString(status));
     }

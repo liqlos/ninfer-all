@@ -292,9 +292,13 @@ int run_width(Fixture& fixture, int width, int valid, bool fp16_state = false) {
     Tensor candidate_conv_tensor(candidate_conv.data(), DType::BF16, {kQkv, width});
     Tensor baseline_q(projected_q.data(), DType::BF16, {kDim, kQkHeads, width});
     Tensor baseline_k(projected_k.data(), DType::BF16, {kDim, kQkHeads, width});
+    Tensor projection_q(projected_q.data(), DType::BF16, {kDim * kQkHeads, width});
+    Tensor projection_k(projected_k.data(), DType::BF16, {kDim * kQkHeads, width});
     Tensor candidate_key_tensor(candidate_key.data(), DType::BF16, {kDim, kQkHeads, width});
     Tensor baseline_v(projected_v.data(), DType::BF16, {kDim, kValueHeads, width});
     Tensor baseline_z(projected_z.data(), DType::BF16, {kDim, kValueHeads, width});
+    Tensor projection_v(projected_v.data(), DType::BF16, {kValue, width});
+    Tensor projection_z(projected_z.data(), DType::BF16, {kValue, width});
     Tensor baseline_key_record(baseline_key.data(), DType::BF16, {kDim, kQkHeads, width});
     Tensor baseline_value_record(baseline_value.data(), DType::BF16, {kDim, kValueHeads, width});
     Tensor candidate_value_tensor(candidate_value.data(), DType::BF16, {kDim, kValueHeads, width});
@@ -311,7 +315,7 @@ int run_width(Fixture& fixture, int width, int valid, bool fp16_state = false) {
     WorkspaceArena workspace(DeviceSpan{workspace_data.data(), workspace_data.bytes()});
     ops::gdn_input_proj_conv_record(hidden, fixture.projection, convolution, conv_base,
                                     valid_tensor, source_tensor, baseline_conv_tensor,
-                                    baseline_q, baseline_k, baseline_v, baseline_z,
+                                    projection_q, projection_k, projection_v, projection_z,
                                     workspace, stream);
     ops::gated_delta_net_replay_record(
         baseline_q, baseline_k, baseline_v, g, beta, 1.0F / std::sqrt(128.0F),
