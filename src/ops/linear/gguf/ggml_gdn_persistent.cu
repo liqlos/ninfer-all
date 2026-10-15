@@ -117,6 +117,52 @@ __device__ __forceinline__ void project_row(const ProjectionPart& part, int row,
     }
 }
 
+#if defined(NINFER_GDN_PERSISTENT_ROW_REUSE)
+template <ggml_type Type, int Columns>
+__device__ __forceinline__ void project_row_pair(const ProjectionPart& part, int row,
+                                                 const ActivationView& p, int k,
+                                                 float (&acc0)[Columns],
+                                                 float (&acc1)[Columns]) {
+    using D = vec::Decoder<Type>;
+    constexpr int kPerBlock = D::kBlockElems / 32;
+    const int lane = threadIdx.x & 31;
+    const int sub = lane % kPerBlock;
+    const std::int64_t lane_offset = std::int64_t(lane / kPerBlock) * D::kBlockBytes;
+    const std::uint8_t* row0 = part.weight + std::int64_t(row - part.row) * part.row_bytes + lane_offset;
+    const std::uint8_t* row1 = row0 + part.row_bytes;
+#pragma unroll
+    for (int column = 0; column < Columns; ++column) {
+        acc0[column] = 0.0f;
+        acc1[column] = 0.0f;
+    }
+#pragma unroll
+    for (int it = 0; it < k / 1024; ++it) {
+        vec::Slice slice0;
+        vec::Slice slice1;
+        const std::int64_t block_offset = std::int64_t(32 / kPerBlock) * it * D::kBlockBytes;
+        D::decode(row0 + block_offset, sub, D::table(), slice0);
+        D::decode(row1 + block_offset, sub, D::table(), slice1);
+#pragma unroll
+        for (int column = 0; column < Columns; ++column) {
+            int a[8];
+            float d;
+            float sum;
+            load_activation(p, column, lane + 32 * it, k, a, d, sum);
+            acc0[column] += D::dot(slice0, a, d, sum);
+            acc1[column] += D::dot(slice1, a, d, sum);
+        }
+    }
+#pragma unroll
+    for (int offset = 16; offset > 0; offset >>= 1) {
+#pragma unroll
+        for (int column = 0; column < Columns; ++column) {
+            acc0[column] += __shfl_xor_sync(0xffffffffu, acc0[column], offset);
+            acc1[column] += __shfl_xor_sync(0xffffffffu, acc1[column], offset);
+        }
+    }
+}
+#endif
+
 __device__ __forceinline__ const ProjectionPart* find_part(const ProjectionArgs& p, int output,
                                                             int row) {
     for (int i = 0; i < p.part_count; ++i) {
@@ -152,6 +198,36 @@ __device__ __forceinline__ void store_projected(const ProjectionPart& part, int 
         }
     }
 }
+
+#if defined(NINFER_GDN_PERSISTENT_ROW_REUSE)
+template <int Columns>
+__device__ __forceinline__ void project_pair_dispatch(const ProjectionPart& part, int row,
+                                                      const ActivationView& p,
+                                                      float (&acc0)[Columns],
+                                                      float (&acc1)[Columns]) {
+    if (part.type == static_cast<int>(QType::GGUF_Q4_K)) {
+        project_row_pair<GGML_TYPE_Q4_K, Columns>(part, row, p, kHidden, acc0, acc1);
+    } else {
+        project_row_pair<GGML_TYPE_Q6_K, Columns>(part, row, p, kHidden, acc0, acc1);
+    }
+}
+
+template <int Columns>
+__device__ __forceinline__ void store_projected_pair(const ProjectionPart& part, int row,
+                                                     const ActivationView& p,
+                                                     __nv_bfloat16* output, int stride) {
+    float acc0[Columns];
+    float acc1[Columns];
+    project_pair_dispatch<Columns>(part, row, p, acc0, acc1);
+    if ((threadIdx.x & 31) == 0) {
+#pragma unroll
+        for (int column = 0; column < Columns; ++column) {
+            output[static_cast<std::int64_t>(column) * stride + row] = __float2bfloat16(acc0[column]);
+            output[static_cast<std::int64_t>(column) * stride + row + 1] = __float2bfloat16(acc1[column]);
+        }
+    }
+}
+#endif
 
 
 template <class StateT>
@@ -284,6 +360,39 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
     const ActivationView input_activation{reinterpret_cast<const std::int8_t*>(q8_bytes),
                                           reinterpret_cast<const half2*>(q8_bytes + q8_scale_offset)};
     const int project_rows = kQkv + kZ;
+#if defined(NINFER_GDN_PERSISTENT_ROW_REUSE)
+    const int project_pairs = (project_rows + 1) / 2;
+    const int project_pair_total = static_cast<int>(gridDim.x) * kWarps;
+    for (int pair = static_cast<int>(blockIdx.x) * kWarps + warp; pair < project_pairs;
+         pair += project_pair_total) {
+        const int row0 = pair * 2;
+        const int row1 = row0 + 1;
+        const int output0 = row0 < kQkv ? 0 : 1;
+        const int output_row0 = output0 == 0 ? row0 : row0 - kQkv;
+        const ProjectionPart* part0 = find_part(projection, output0, output_row0);
+        const int output1 = row1 < kQkv ? 0 : 1;
+        const int output_row1 = output1 == 0 ? row1 : row1 - kQkv;
+        const ProjectionPart* part1 = row1 < project_rows
+            ? find_part(projection, output1, output_row1)
+            : nullptr;
+        if (part0 != nullptr && part0 == part1) {
+            __nv_bfloat16* output = output0 == 0 ? qkv_projection : z;
+            store_projected_pair<Columns>(*part0, output_row0, input_activation, output,
+                                          output0 == 0 ? kQkv : kZ);
+        } else {
+            if (part0 != nullptr) {
+                store_projected<Columns>(*part0, output_row0, input_activation,
+                                         output0 == 0 ? qkv_projection : z,
+                                         output0 == 0 ? kQkv : kZ);
+            }
+            if (part1 != nullptr) {
+                store_projected<Columns>(*part1, output_row1, input_activation,
+                                         output1 == 0 ? qkv_projection : z,
+                                         output1 == 0 ? kQkv : kZ);
+            }
+        }
+    }
+#else
     const int project_total = static_cast<int>(gridDim.x) * kWarps;
     for (int row = static_cast<int>(blockIdx.x) * kWarps + warp; row < project_rows;
          row += project_total) {
@@ -294,6 +403,7 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
         store_projected<Columns>(*part, output_row, input_activation,
                                  output == 0 ? qkv_projection : z, output == 0 ? kQkv : kZ);
     }
+#endif
     grid.sync();
 
     for (int channel = static_cast<int>(blockIdx.x) * kThreads + threadIdx.x;
@@ -416,6 +526,32 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
     const int output_rows = kHidden;
     const ActivationView output_activation{reinterpret_cast<const std::int8_t*>(output_q8),
                                            reinterpret_cast<const half2*>(output_q8 + output_scale_offset)};
+#if defined(NINFER_GDN_PERSISTENT_ROW_REUSE)
+    const ProjectionPart output_part{output_weight, output_row_bytes,
+                                     static_cast<int>(QType::GGUF_Q4_K), output_rows, 0, 0};
+    const int output_pairs = (output_rows + 1) / 2;
+    const int output_pair_total = static_cast<int>(gridDim.x) * kWarps;
+    for (int pair = static_cast<int>(blockIdx.x) * kWarps + warp; pair < output_pairs;
+         pair += output_pair_total) {
+        const int row0 = pair * 2;
+        const int row1 = row0 + 1;
+        float acc0[Columns];
+        float acc1[Columns];
+        project_row_pair<GGML_TYPE_Q4_K, Columns>(output_part, row0, output_activation,
+                                                  kValue, acc0, acc1);
+        if (lane == 0) {
+#pragma unroll
+            for (int column = 0; column < columns; ++column) {
+                const std::int64_t at0 = static_cast<std::int64_t>(column) * output_rows + row0;
+                residual_out[at0] = __float2bfloat16(acc0[column] + __bfloat162float(residual[at0]));
+                if (row1 < output_rows) {
+                    const std::int64_t at1 = static_cast<std::int64_t>(column) * output_rows + row1;
+                    residual_out[at1] = __float2bfloat16(acc1[column] + __bfloat162float(residual[at1]));
+                }
+            }
+        }
+    }
+#else
     for (int row = static_cast<int>(blockIdx.x) * kWarps + warp; row < output_rows;
          row += static_cast<int>(gridDim.x) * kWarps) {
         constexpr int kPerBlock = vec::Decoder<GGML_TYPE_Q4_K>::kBlockElems / 32;
@@ -459,6 +595,7 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
             }
         }
     }
+#endif
     grid.sync();
 }
 

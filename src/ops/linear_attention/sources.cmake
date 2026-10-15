@@ -10,6 +10,7 @@ target_sources(ninfer_ops PRIVATE
 )
 
 option(NINFER_GDN_PERSISTENT_MIXER "Enable the SM86 persistent GDN main-region mixer" OFF)
+option(NINFER_GDN_PERSISTENT_ROW_REUSE "Reuse q8 activations across adjacent GDN projection rows" OFF)
 if(NINFER_GDN_PERSISTENT_MIXER)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "The persistent GDN mixer requires SM86")
@@ -20,6 +21,10 @@ if(NINFER_GDN_PERSISTENT_MIXER)
     "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu")
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
     APPEND PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
+  if(NINFER_GDN_PERSISTENT_ROW_REUSE)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
+      APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GDN_PERSISTENT_ROW_REUSE=1)
+  endif()
   if(NINFER_GGUF_Q4_COOPERATIVE_DECODE)
     set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
       APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_COOPERATIVE_DECODE=1)

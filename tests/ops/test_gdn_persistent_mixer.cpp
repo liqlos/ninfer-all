@@ -189,16 +189,23 @@ struct Fixture {
         output.input_columns = static_cast<const std::int32_t*>(gather_data.data());
         Weight qkv_part = qkv;
         qkv_part.n = qkv_part.shape[0] = qkv_part.padded_shape[0] = kQkv;
+        const auto qkv_block = gguf_block_shape(qkv_type);
+        const std::size_t qkv_row_bytes =
+            static_cast<std::size_t>(kHidden / qkv_block.elements) * qkv_block.bytes;
+        Weight qkv_first = qkv_part;
+        qkv_first.n = qkv_first.shape[0] = qkv_first.padded_shape[0] = 1;
+        Weight qkv_tail = qkv_part;
+        qkv_tail.qdata = static_cast<const std::byte*>(qkv_part.qdata) + qkv_row_bytes;
+        qkv_tail.payload = qkv_tail.qdata;
+        qkv_tail.n = qkv_tail.shape[0] = qkv_tail.padded_shape[0] = kQkv - 1;
         Weight z_part = z;
         if (qkv_type == z_type) {
-            const auto block = gguf_block_shape(qkv_type);
-            const std::size_t row_bytes = static_cast<std::size_t>(kHidden / block.elements) * block.bytes;
             z_part = qkv;
-            z_part.qdata = static_cast<const std::byte*>(qkv.qdata) + kQkv * row_bytes;
+            z_part.qdata = static_cast<const std::byte*>(qkv.qdata) + kQkv * qkv_row_bytes;
             z_part.payload = z_part.qdata;
             z_part.n = z_part.shape[0] = z_part.padded_shape[0] = kValue;
         }
-        projection.parts = {{qkv_part, 0, 0}, {z_part, 1, 0}};
+        projection.parts = {{qkv_first, 0, 0}, {qkv_tail, 0, 1}, {z_part, 1, 0}};
     }
 };
 
