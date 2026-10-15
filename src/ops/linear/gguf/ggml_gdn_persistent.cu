@@ -308,6 +308,9 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
 #pragma unroll
         for (int token = 0; token < columns; ++token) {
             projected[token] = qkv_projection[static_cast<std::int64_t>(token) * kQkv + channel];
+            if (action == 1) {
+                conv_record[static_cast<std::int64_t>(token) * kQkv + channel] = projected[token];
+            }
             if (token < valid) {
                 const __nv_bfloat16 x0 = token >= 3
                     ? qkv_projection[static_cast<std::int64_t>(token - 3) * kQkv + channel]
@@ -325,9 +328,6 @@ __global__ void persistent_gdn_kernel(const __grid_constant__ ProjectionArgs pro
                            __bfloat162float(projected[token]), acc);
                 qkv_convolved[static_cast<std::int64_t>(token) * kQkv + channel] =
                     __float2bfloat16_rn(silu(acc));
-                if (action == 1) {
-                    conv_record[static_cast<std::int64_t>(token) * kQkv + channel] = projected[token];
-                }
             } else {
                 qkv_convolved[static_cast<std::int64_t>(token) * kQkv + channel] =
                     __float2bfloat16_rn(0.0f);
