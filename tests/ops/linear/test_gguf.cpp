@@ -139,6 +139,12 @@ Weight gguf_weight(QType qtype, const void* data, std::int32_t rows, std::int32_
     return w;
 }
 
+std::string fixture_prefix(QType qtype) {
+    if (qtype == QType::GGUF_Q4_K) { return "q4"; }
+    if (qtype == QType::GGUF_Q6_K) { return "q6"; }
+    throw std::logic_error("unsupported real-shape GGUF fixture type");
+}
+
 std::vector<float> to_float(const std::vector<__nv_bfloat16>& values) {
     std::vector<float> out(values.size());
     for (std::size_t i = 0; i < values.size(); ++i) { out[i] = __bfloat162float(values[i]); }
@@ -537,7 +543,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 
     const auto block = gguf_block_shape(c.qtype);
     const std::size_t block_bytes = std::size_t(rows) * (k / block.elements) * block.bytes;
-    const std::string filename = std::string(c.name) + "-k" + std::to_string(k) + ".bin";
+    const std::string filename = fixture_prefix(c.qtype) + "-k" + std::to_string(k) + ".bin";
     std::vector<std::uint8_t> host_blocks;
     const bool loaded = !weight_directory.empty() &&
                         load_blocks(weight_directory, filename, block_bytes, host_blocks);
@@ -784,7 +790,7 @@ int main(int argc, char** argv) {
                 for (const TypeCase* c : {q4, q6}) {
                     for (const std::int32_t k : shapes) {
                         const std::string filename =
-                            std::string(c->name) + "-k" + std::to_string(k) + ".bin";
+                            fixture_prefix(c->qtype) + "-k" + std::to_string(k) + ".bin";
                         recognized_file = recognized_file ||
                                           std::filesystem::exists(weight_directory + "/" + filename);
                     }
@@ -792,7 +798,10 @@ int main(int argc, char** argv) {
                 recognized_file = recognized_file || std::filesystem::exists(
                     weight_directory + "/q4-swiglu-k5120.bin");
                 if (!recognized_file) {
-                    throw std::runtime_error("--weight-dir contains no recognized weight files");
+                    throw std::runtime_error(
+                        "--weight-dir contains no recognized q4-k5120.bin, q4-k6144.bin, "
+                        "q4-k17408.bin, q6-k5120.bin, q6-k6144.bin, q6-k17408.bin, or "
+                        "q4-swiglu-k5120.bin files");
                 }
             }
             std::uint64_t checksum = 14695981039346656037ULL;
