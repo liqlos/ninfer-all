@@ -8,11 +8,10 @@
 namespace ninfer::ops::gguf {
 namespace {
 
-template <ggml_type type, int T, int KS>
-__global__ void swiglu_q8_kernel(const detail::VecArgs p, std::int8_t* out_qs, half2* out_ds,
+template <ggml_type type, int T, int KS, int kWarps>
+__launch_bounds__(kWarps * 32) __global__ void swiglu_q8_kernel(const detail::VecArgs p, std::int8_t* out_qs, half2* out_ds,
                                  int out_rows) {
     using D = detail::vec::Decoder<type>;
-    constexpr int kWarps = detail::kVecWarps;
     constexpr int kBlockElems = D::kBlockElems;
     constexpr int kBlockBytes = D::kBlockBytes;
     constexpr int kPerBlock = kBlockElems / 32;
@@ -104,46 +103,57 @@ __global__ void swiglu_q8_kernel(const detail::VecArgs p, std::int8_t* out_qs, h
     }
 }
 
-template <ggml_type type, int T, int KS>
+template <ggml_type type, int T, int KS, int kWarps>
 void launch(const detail::VecArgs& args, std::int8_t* out_qs, half2* out_ds, int out_rows,
             cudaStream_t stream) {
     if (args.rows % 32 != 0 || out_rows % 32 != 0) {
         throw std::invalid_argument("gguf fused swiglu q8: rows must be divisible by 32");
     }
     const int groups = out_rows / 32;
-    swiglu_q8_kernel<type, T, KS><<<groups, detail::kVecWarps * 32, 0, stream>>>(args, out_qs,
+    swiglu_q8_kernel<type, T, KS, kWarps><<<groups, kWarps * 32, 0, stream>>>(args, out_qs,
                                                                                 out_ds, out_rows);
     detail::check(cudaGetLastError(), "fused SwiGLU q8 launch");
 }
 
-template <ggml_type type>
+template <ggml_type type, int kWarps>
 void launch_columns(const detail::VecArgs& args, int columns, std::int8_t* out_qs, half2* out_ds,
                     int out_rows, cudaStream_t stream) {
     switch (columns) {
-    case 1: return args.k == 5120 ? launch<type, 1, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 1, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 2: return args.k == 5120 ? launch<type, 2, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 2, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 3: return args.k == 5120 ? launch<type, 3, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 3, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 4: return args.k == 5120 ? launch<type, 4, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 4, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 5: return args.k == 5120 ? launch<type, 5, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 5, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 6: return args.k == 5120 ? launch<type, 6, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 6, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 7: return args.k == 5120 ? launch<type, 7, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 7, 0>(args, out_qs, out_ds, out_rows, stream);
-    case 8: return args.k == 5120 ? launch<type, 8, 5120>(args, out_qs, out_ds, out_rows, stream)
-                                  : launch<type, 8, 0>(args, out_qs, out_ds, out_rows, stream);
+    case 1: return args.k == 5120 ? launch<type, 1, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 1, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 2: return args.k == 5120 ? launch<type, 2, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 2, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 3: return args.k == 5120 ? launch<type, 3, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 3, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 4: return args.k == 5120 ? launch<type, 4, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 4, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 5: return args.k == 5120 ? launch<type, 5, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 5, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 6: return args.k == 5120 ? launch<type, 6, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 6, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 7: return args.k == 5120 ? launch<type, 7, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 7, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
+    case 8: return args.k == 5120 ? launch<type, 8, 5120, kWarps>(args, out_qs, out_ds, out_rows, stream)
+                                  : launch<type, 8, 0, kWarps>(args, out_qs, out_ds, out_rows, stream);
     default: throw std::invalid_argument("gguf fused swiglu q8: columns must be 1..8");
+    }
+}
+
+template <ggml_type type>
+void launch_policy(const detail::VecArgs& args, int columns, std::int8_t* out_qs, half2* out_ds,
+                   int rows, cudaStream_t stream, int warps) {
+    switch (warps) {
+    case 4: return launch_columns<type, 4>(args, columns, out_qs, out_ds, rows, stream);
+    case 8: return launch_columns<type, 8>(args, columns, out_qs, out_ds, rows, stream);
+    case 16: return launch_columns<type, 16>(args, columns, out_qs, out_ds, rows, stream);
+    default: throw std::invalid_argument("gguf fused swiglu q8: warps must be 4, 8 or 16");
     }
 }
 
 }
 
 void vector_swiglu_q8(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
-                      const void* activation, int columns, void* out, cudaStream_t stream) {
+                      const void* activation, int columns, void* out, cudaStream_t stream, int warps) {
     const BlockShape block = block_shape(type);
     if (rows <= 0 || rows % 32 != 0 || k <= 0 || k % 256 != 0 || columns < 1 || columns > 8 ||
         weight == nullptr || activation == nullptr || out == nullptr || block.elements <= 0 ||
@@ -160,8 +170,8 @@ void vector_swiglu_q8(GgmlType type, const void* weight, std::int64_t row_bytes,
     auto* out_qs = reinterpret_cast<std::int8_t*>(output);
     auto* out_ds = reinterpret_cast<half2*>(output + detail::vec_scales_offset(rows, columns));
     switch (type) {
-    case GgmlType::Q4_K: return launch_columns<GGML_TYPE_Q4_K>(args, columns, out_qs, out_ds, rows, stream);
-    case GgmlType::Q6_K: return launch_columns<GGML_TYPE_Q6_K>(args, columns, out_qs, out_ds, rows, stream);
+    case GgmlType::Q4_K: return launch_policy<GGML_TYPE_Q4_K>(args, columns, out_qs, out_ds, rows, stream, warps);
+    case GgmlType::Q6_K: return launch_policy<GGML_TYPE_Q6_K>(args, columns, out_qs, out_ds, rows, stream, warps);
     default: throw std::invalid_argument("gguf fused swiglu q8: unsupported gate type");
     }
 }

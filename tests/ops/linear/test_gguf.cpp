@@ -647,6 +647,64 @@ int run_swiglu_q8_fusion(std::uint32_t seed) {
                     throw std::runtime_error(std::string(c.name) + " fused q8 pack differs at N=" +
                                              std::to_string(n) + " T=" + std::to_string(t));
                 }
+                for (const int warps : {8, 16}) {
+                    actual.poison();
+                    ops::gguf::vector_swiglu_q8(ops::detail::gguf_type(c.qtype), gate.qdata,
+                                                row_bytes, n, k, input.p, t, actual.data(), nullptr,
+                                                warps);
+                    check(cudaDeviceSynchronize(), "fused q8 alternate row scheduling");
+                    if (actual.read("read scheduled fused q8 output") != want) {
+                        throw std::runtime_error("alternate fused q8 scheduling changed packed bytes");
+                    }
+                }
+                if (n == 17408) {
+                    cudaStream_t timing_stream = nullptr;
+                    cudaEvent_t start = nullptr, end = nullptr;
+                    check(cudaStreamCreate(&timing_stream), "create fusion timing stream");
+                    check(cudaEventCreate(&start), "create fusion timing start");
+                    check(cudaEventCreate(&end), "create fusion timing end");
+                    for (const int warps : {0, 4, 8, 16}) {
+                        cudaGraph_t timing_graph = nullptr;
+                        cudaGraphExec_t timing_exec = nullptr;
+                        check(cudaStreamBeginCapture(timing_stream, cudaStreamCaptureModeGlobal),
+                              "begin fusion timing graph");
+                        if (warps == 0) {
+                            ops::gguf::vector_swiglu(ops::detail::gguf_type(c.qtype), gate.qdata,
+                                                     row_bytes, n, k, input.p, t,
+                                                     static_cast<__nv_bfloat16*>(reference.p), n,
+                                                     timing_stream);
+                            ops::gguf::quantize_vector_activation(
+                                static_cast<const __nv_bfloat16*>(reference.p), n, t, nullptr,
+                                expected.p, timing_stream);
+                        } else {
+                            ops::gguf::vector_swiglu_q8(ops::detail::gguf_type(c.qtype), gate.qdata,
+                                                        row_bytes, n, k, input.p, t, actual.data(),
+                                                        timing_stream, warps);
+                        }
+                        check(cudaStreamEndCapture(timing_stream, &timing_graph), "end fusion timing graph");
+                        check(cudaGraphInstantiate(&timing_exec, timing_graph, nullptr, nullptr, 0),
+                              "instantiate fusion timing graph");
+                        for (int i = 0; i < 10; ++i) {
+                            check(cudaGraphLaunch(timing_exec, timing_stream), "warm fusion timing graph");
+                        }
+                        check(cudaEventRecord(start, timing_stream), "start fusion timing");
+                        for (int i = 0; i < 100; ++i) {
+                            check(cudaGraphLaunch(timing_exec, timing_stream), "replay fusion timing graph");
+                        }
+                        check(cudaEventRecord(end, timing_stream), "end fusion timing");
+                        check(cudaEventSynchronize(end), "wait fusion timing");
+                        float elapsed = 0.0f;
+                        check(cudaEventElapsedTime(&elapsed, start, end), "read fusion timing");
+                        std::cout << "FUSION_TIMING type=" << c.name << " N=" << n << " K=" << k
+                                  << " T=" << t << " warps=" << warps
+                                  << " graph_us=" << elapsed * 10.0f << std::endl;
+                        check(cudaGraphExecDestroy(timing_exec), "destroy fusion timing executable");
+                        check(cudaGraphDestroy(timing_graph), "destroy fusion timing graph");
+                    }
+                    check(cudaEventDestroy(start), "destroy fusion timing start");
+                    check(cudaEventDestroy(end), "destroy fusion timing end");
+                    check(cudaStreamDestroy(timing_stream), "destroy fusion timing stream");
+                }
                 if (n == 17408 &&
                     ((c.qtype == QType::GGUF_Q4_K && t == 4) ||
                      (c.qtype == QType::GGUF_Q6_K && t == 3))) {
