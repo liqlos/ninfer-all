@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <string>
@@ -213,7 +214,9 @@ int run_type(const TypeCase& c, std::uint32_t seed) {
                                const std::vector<double>& want) {
         const Error e     = compare(got, want);
         const double gain = label.starts_with("swiglu") ? 2.0 : 1.0;
-        const bool ok     = e.relative_rms < 2e-2 * gain && e.relative_max < 8e-2 * gain;
+        const bool finite = std::all_of(got.begin(), got.end(),
+                                        [](float value) { return std::isfinite(value); });
+        const bool ok = finite && e.relative_rms < 2e-2 * gain && e.relative_max < 8e-2 * gain;
         if (!ok) {
             std::cerr << "FAIL " << c.name << " " << label << " rms=" << e.relative_rms
                       << " max=" << e.relative_max << '\n';
@@ -291,15 +294,136 @@ int run_type(const TypeCase& c, std::uint32_t seed) {
     return failures;
 }
 
+void update_checksum(std::uint64_t& checksum, const std::vector<__nv_bfloat16>& values) {
+    for (const __nv_bfloat16 value : values) {
+        std::uint16_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        for (unsigned shift = 0; shift < 16; shift += 8) {
+            checksum ^= (bits >> shift) & 0xffU;
+            checksum *= 1099511628211ULL;
+        }
+    }
+}
+
+int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
+                   std::uint64_t& checksum) {
+    constexpr std::int32_t rows   = 257;
+    constexpr std::int32_t max_t  = 8;
+    const std::int32_t widths[]   = {1, 3, 4, 8};
+    std::mt19937 rng(seed);
+    int failures = 0;
+
+    const auto host_blocks = random_blocks(c, rows, k, rng);
+    DeviceBuffer blocks(host_blocks.size());
+    blocks.copy_from_host(host_blocks.data(), host_blocks.size());
+    const auto block            = gguf_block_shape(c.qtype);
+    const std::int64_t row_bytes = std::int64_t(k / block.elements) * block.bytes;
+    const Weight weight = gguf_weight(c.qtype, blocks.p, rows, k);
+
+    DeviceBuffer exact_device(std::size_t(rows) * k * sizeof(float));
+    ops::gguf::dequantize_rows(ops::detail::gguf_type(c.qtype), blocks.p, row_bytes, k, nullptr,
+                               rows, static_cast<float*>(exact_device.p), k, nullptr);
+    check(cudaDeviceSynchronize(), "real-shape dequantize");
+    std::vector<float> exact(std::size_t(rows) * k);
+    exact_device.copy_to_host(exact.data(), exact.size() * sizeof(float));
+    for (const float value : exact) {
+        if (!std::isfinite(value)) {
+            std::cerr << c.name << " K=" << k << ": non-finite dequantized weight\n";
+            return 1;
+        }
+    }
+
+    std::normal_distribution<float> normal(0.0f, 1.0f);
+    std::vector<__nv_bfloat16> x_host(std::size_t(k) * max_t);
+    for (auto& value : x_host) { value = __float2bfloat16(normal(rng)); }
+    std::vector<float> x_float(x_host.size());
+    for (std::size_t i = 0; i < x_host.size(); ++i) {
+        x_float[i] = __bfloat162float(x_host[i]);
+    }
+    DeviceBuffer x_device(x_host.size() * sizeof(__nv_bfloat16));
+    x_device.copy_from_host(x_host.data(), x_host.size() * sizeof(__nv_bfloat16));
+
+    const std::size_t capacity = ops::linear_workspace_capacity_bytes(
+        c.qtype, rows, k, ops::LinearPolicy::A16Only, 1, max_t);
+    WorkspaceArena workspace(capacity + (1U << 20));
+    DeviceBuffer out_device(std::size_t(rows) * max_t * sizeof(__nv_bfloat16));
+
+    for (const std::int32_t t : widths) {
+        Tensor x(x_device.p, DType::BF16, {k, t});
+        Tensor out(out_device.p, DType::BF16, {rows, t});
+        std::vector<__nv_bfloat16> host(std::size_t(rows) * t);
+        ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, nullptr);
+        check(cudaDeviceSynchronize(), "real-shape linear");
+        out_device.copy_to_host(host.data(), host.size() * sizeof(__nv_bfloat16));
+
+        std::vector<double> want(std::size_t(rows) * t);
+        for (std::int32_t col = 0; col < t; ++col) {
+            const float* activation = x_float.data() + std::size_t(col) * k;
+            for (std::int32_t row = 0; row < rows; ++row) {
+                const float* row_weights = exact.data() + std::size_t(row) * k;
+                double acc = 0.0;
+                for (std::int32_t i = 0; i < k; ++i) {
+                    acc += double(row_weights[i]) * activation[i];
+                }
+                want[std::size_t(col) * rows + row] = acc;
+            }
+        }
+
+        const std::vector<float> got = to_float(host);
+        const Error error             = compare(got, want);
+        const bool finite = std::all_of(got.begin(), got.end(),
+                                        [](float value) { return std::isfinite(value); });
+        if (!finite || !(error.relative_rms < 2e-2 && error.relative_max < 8e-2)) {
+            std::cerr << "FAIL " << c.name << " K=" << k << " T=" << t
+                      << " rms=" << error.relative_rms << " max=" << error.relative_max << '\n';
+            ++failures;
+        }
+        update_checksum(checksum, host);
+    }
+
+    std::cout << (failures == 0 ? "OK   " : "FAIL ") << "gguf real-shape " << c.name
+              << " K=" << k << " rows=" << rows << '\n';
+    return failures;
+}
+
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
     int devices = 0;
     if (cudaGetDeviceCount(&devices) != cudaSuccess || devices == 0) {
         std::cout << "SKIP: no usable CUDA device\n";
         return 77;
     }
+    if (argc > 2 || (argc == 2 && std::string(argv[1]) != "--real-shapes")) {
+        std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes]\n";
+        return 2;
+    }
     try {
+        if (argc == 2) {
+            const auto all = cases();
+            const TypeCase* q4 = nullptr;
+            const TypeCase* q6 = nullptr;
+            for (const auto& c : all) {
+                if (c.qtype == QType::GGUF_Q4_K) { q4 = &c; }
+                if (c.qtype == QType::GGUF_Q6_K) { q6 = &c; }
+            }
+            if (q4 == nullptr || q6 == nullptr) {
+                throw std::logic_error("real-shape GGUF cases are not registered");
+            }
+            constexpr std::int32_t shapes[] = {5120, 6144, 17408};
+            std::uint64_t checksum = 14695981039346656037ULL;
+            int failures = 0;
+            std::uint32_t seed = 19001;
+            for (const TypeCase* c : {q4, q6}) {
+                for (const std::int32_t k : shapes) {
+                    failures += run_real_shape(*c, k, seed++, checksum);
+                }
+            }
+            std::cout << "real-shapes checksum=0x" << std::hex << std::setw(16)
+                      << std::setfill('0') << checksum << std::dec << '\n';
+            std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF real shapes\n";
+            return failures == 0 ? 0 : 1;
+        }
         int failures      = 0;
         std::uint32_t seed = 9001;
         for (const auto& c : cases()) {
