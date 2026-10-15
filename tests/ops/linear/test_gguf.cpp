@@ -154,6 +154,7 @@ std::vector<float> to_float(const std::vector<__nv_bfloat16>& values) {
 struct Error {
     double relative_rms = 0;
     double relative_max = 0;
+    double max_absolute = 0;
 };
 
 Error compare(const std::vector<float>& got, const std::vector<double>& want) {
@@ -165,7 +166,7 @@ Error compare(const std::vector<float>& got, const std::vector<double>& want) {
         worst = std::max(worst, std::abs(d));
         scale = std::max(scale, std::abs(want[i]));
     }
-    return {std::sqrt(num / std::max(den, 1e-30)), worst / std::max(scale, 1e-30)};
+    return {std::sqrt(num / std::max(den, 1e-30)), worst / std::max(scale, 1e-30), worst};
 }
 
 int run_type(const TypeCase& c, std::uint32_t seed) {
@@ -623,6 +624,10 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             std::cerr << "FAIL " << c.name << " K=" << k << " T=" << t
                       << " rms=" << error.relative_rms << " max=" << error.relative_max << '\n';
             ++failures;
+        } else {
+            std::cout << "OK   " << c.name << " K=" << k << " T=" << t << " rms_rel="
+                      << std::setprecision(8) << error.relative_rms << " max_rel="
+                      << error.relative_max << " max_abs=" << error.max_absolute << '\n';
         }
         update_checksum(checksum, host);
         write_outputs(output_file, host);
@@ -703,6 +708,11 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             std::cerr << "FAIL " << c.name << " K=" << k << " SwiGLU T=" << t
                       << " rms=" << error.relative_rms << " max=" << error.relative_max << '\n';
             ++failures;
+        } else {
+            std::cout << "OK   " << c.name << " K=" << k << " SwiGLU T=" << t
+                      << " rms_rel=" << std::setprecision(8) << error.relative_rms
+                      << " max_rel=" << error.relative_max << " max_abs=" << error.max_absolute
+                      << '\n';
         }
         update_checksum(checksum, host);
         write_outputs(output_file, host);
