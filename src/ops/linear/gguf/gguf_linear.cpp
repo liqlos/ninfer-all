@@ -82,7 +82,7 @@ std::size_t fixup_bound() {
     return std::size_t(gguf::multiprocessor_count()) * kFixupTileBytes;
 }
 
-#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION) || defined(NINFER_GGUF_PERSISTENT_FFN)
 bool fused_swiglu_q8_weights_admit(const Weight& gate, const Weight* up, const Weight& down,
                                    std::int32_t min_tokens, std::int32_t max_tokens) {
     return up == nullptr &&
@@ -320,10 +320,14 @@ std::size_t gguf_swiglu_linear_add_workspace_capacity_bytes(const Weight& gate, 
     if (min_tokens <= 0 || max_tokens < min_tokens) {
         throw std::invalid_argument("gguf fused swiglu q8: invalid token interval");
     }
-#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
-    if (!fused_swiglu_q8_weights_admit(gate, up, down, min_tokens, max_tokens)) {
-        return 0;
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION) || defined(NINFER_GGUF_PERSISTENT_FFN)
+    if (!fused_swiglu_q8_weights_admit(gate, up, down, min_tokens, max_tokens)) { return 0; }
+    bool route_admitted = false;
+    for (std::int32_t tokens = min_tokens; tokens <= max_tokens; ++tokens) {
+        route_admitted |= gguf_swiglu_linear_add_route(gate, up, down, tokens) !=
+                          GgufSwiGluRoute::Fallback;
     }
+    if (!route_admitted) { return 0; }
     WorkspaceLayoutBuilder layout;
     (void)layout.alloc_bytes(gguf::vector_activation_bytes(gate.k, max_tokens));
     (void)layout.alloc_bytes(gguf::vector_activation_bytes(gate.n / 2, max_tokens));
@@ -335,10 +339,32 @@ std::size_t gguf_swiglu_linear_add_workspace_capacity_bytes(const Weight& gate, 
 #endif
 }
 
+GgufSwiGluRoute gguf_swiglu_linear_add_route(const Weight& gate, const Weight* up,
+                                            const Weight& down, std::int32_t tokens) {
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION) || defined(NINFER_GGUF_PERSISTENT_FFN)
+    if (fused_swiglu_q8_weights_admit(gate, up, down, tokens, tokens)) {
+#if defined(NINFER_GGUF_PERSISTENT_FFN)
+        if (gate.qtype == QType::GGUF_Q4_K && gate.n == 34816 && gate.k == 5120 &&
+            gate.input_columns == nullptr && down.qtype == QType::GGUF_Q6_K &&
+            down.n == 5120 && down.k == 17408 &&
+            gguf::persistent_swiglu_q8_add_available(tokens, nullptr)) {
+            return GgufSwiGluRoute::PersistentFfn;
+        }
+#endif
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+        return GgufSwiGluRoute::ProducerQ8;
+#endif
+    }
+#else
+    (void)gate; (void)up; (void)down; (void)tokens;
+#endif
+    return GgufSwiGluRoute::Fallback;
+}
+
 bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* up,
                             const Weight& down, Tensor& residual, WorkspaceArena& workspace,
                             cudaStream_t stream) {
-#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION) || defined(NINFER_GGUF_PERSISTENT_FFN)
     if (!fused_swiglu_q8_weights_admit(gate, up, down, x.ne[1], x.ne[1]) ||
         down.n <= 0 || down.n != residual.ne[0] || x.ne[1] < 1 || x.ne[1] > 8 ||
         residual.ne[1] != x.ne[1] || residual.dtype != DType::BF16 || !residual.is_contiguous() ||
@@ -347,12 +373,28 @@ bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* u
     }
     auto scope = workspace.scope();
     const std::int32_t rows = gate.n / 2;
+    const auto route = gguf_swiglu_linear_add_route(gate, up, down, x.ne[1]);
+    if (route == GgufSwiGluRoute::Fallback) { return false; }
+    if (route == GgufSwiGluRoute::PersistentFfn) {
+        void* input = workspace.alloc_bytes(gguf::vector_activation_bytes(gate.k, x.ne[1])).data;
+        void* output = workspace.alloc_bytes(gguf::vector_activation_bytes(rows, x.ne[1])).data;
+        gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(x.data), gate.k, x.ne[1],
+                                         gate.input_columns, input, stream);
+        return gguf::persistent_swiglu_q8_add(
+            gguf_type(gate.qtype), gate.qdata, row_bytes(gate), rows, gate.k, input,
+            gguf_type(down.qtype), down.qdata, row_bytes(down), down.n, down.k, output,
+            static_cast<__nv_bfloat16*>(residual.data), residual.ne[0], x.ne[1], stream);
+    }
     void* input = workspace.alloc_bytes(gguf::vector_activation_bytes(gate.k, x.ne[1])).data;
     void* output = workspace.alloc_bytes(gguf::vector_activation_bytes(rows, x.ne[1])).data;
     gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(x.data), gate.k, x.ne[1],
                                      gate.input_columns, input, stream);
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
     gguf::vector_swiglu_q8(gguf_type(gate.qtype), gate.qdata, row_bytes(gate), rows, gate.k,
                            input, x.ne[1], output, stream, NINFER_GGUF_SWIGLU_Q8_WARPS);
+#else
+    return false;
+#endif
     gguf::VectorOutput destination;
     destination.bf16 = static_cast<__nv_bfloat16*>(residual.data);
     destination.column_stride = residual.ne[0];

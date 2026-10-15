@@ -68,6 +68,11 @@ void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& 
 void gguf_linear_add(const Tensor& x, const Weight& w, Tensor& residual,
                      WorkspaceArena& workspace, cudaStream_t stream);
 
+enum class GgufSwiGluRoute { Fallback, ProducerQ8, PersistentFfn };
+
+[[nodiscard]] GgufSwiGluRoute gguf_swiglu_linear_add_route(
+    const Weight& gate, const Weight* up, const Weight& down, std::int32_t tokens);
+
 [[nodiscard]] std::size_t gguf_swiglu_linear_add_workspace_capacity_bytes(
     const Weight& gate, const Weight* up, const Weight& down, std::int32_t min_tokens,
     std::int32_t max_tokens);

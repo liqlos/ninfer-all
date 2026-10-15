@@ -51,3 +51,9 @@ ninfer_add_op_test(ninfer_linear_bf16_a16_test
 ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
+
+if(NINFER_GGUF_PERSISTENT_FFN)
+  ninfer_add_op_test(ninfer_linear_persistent_ffn_test
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_persistent_ffn.cpp"
+    LIBRARIES ninfer_ops)
+endif()

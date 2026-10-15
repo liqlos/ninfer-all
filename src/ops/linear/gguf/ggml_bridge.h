@@ -88,6 +88,14 @@ void vector_swiglu_q8(GgmlType type, const void* weight, std::int64_t row_bytes,
                       const void* activation, int columns, void* out, cudaStream_t stream,
                       int warps = 4);
 
+[[nodiscard]] bool persistent_swiglu_q8_add_available(int columns, cudaStream_t stream);
+bool persistent_swiglu_q8_add(GgmlType gate_type, const void* gate_weight, std::int64_t gate_row_bytes,
+                              int intermediate_rows, int gate_k, const void* input_activation,
+                              GgmlType down_type, const void* down_weight,
+                              std::int64_t down_row_bytes, int down_rows, int down_k,
+                              void* q8_workspace, __nv_bfloat16* residual,
+                              std::int64_t residual_stride, int columns, cudaStream_t stream);
+
 // Activation for the matrix kernel, laid out for the type's scale/sum schedule. Types that share a
 // schedule share an activation, see matrix_activation_layout().
 [[nodiscard]] int matrix_activation_layout(GgmlType type);
