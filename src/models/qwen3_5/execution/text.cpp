@@ -14,6 +14,7 @@
 #include "ninfer/ops/argmax.h"
 #include "ninfer/ops/attn_input_proj.h"
 #include "ops/linear/gguf/ggml_bridge.h"
+#include "ops/linear/gguf/gguf_linear.h"
 #include "ninfer/ops/causal_conv1d_silu.h"
 #include "ninfer/ops/embedding.h"
 #include "ninfer/ops/gated_delta_net.h"
