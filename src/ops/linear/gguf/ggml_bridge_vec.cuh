@@ -498,6 +498,10 @@ struct Decoder<GGML_TYPE_IQ1_M> {
     }
 };
 
+#if defined(NINFER_GGUF_Q4_ASYNC_EXTENDED_K) && !defined(NINFER_GGUF_Q4_ASYNC_PIPELINE)
+#error NINFER_GGUF_Q4_ASYNC_EXTENDED_K requires NINFER_GGUF_Q4_ASYNC_PIPELINE
+#endif
+
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
 template <ggml_type type, int T, bool Fused, int KS>
@@ -615,6 +619,23 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                     __syncwarp();
                 }
             }
+#if defined(NINFER_GGUF_Q4_ASYNC_EXTENDED_K)
+        } else if constexpr (type == GGML_TYPE_Q4_K && (KS == 6144 || KS == 17408)) {
+            static_assert(KS % 1024 == 0);
+            constexpr int kQ4Stages = KS / 1024;
+            prefetch(0, 0);
+            ninfer::ops::cp_wait<0>();
+            __syncwarp();
+#pragma unroll
+            for (int it = 0; it < kQ4Stages; ++it) {
+                if (it + 1 < kQ4Stages) { prefetch(it + 1, (it + 1) & 1); }
+                staged_slice(it, it & 1);
+                if (it + 1 < kQ4Stages) {
+                    ninfer::ops::cp_wait<0>();
+                    __syncwarp();
+                }
+            }
+#endif
         } else if constexpr (KS != 0) {
             static_assert(KS % 1024 == 0);
 #pragma unroll
