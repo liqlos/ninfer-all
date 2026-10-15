@@ -57,7 +57,7 @@ struct GgufShape {
 
 // Runs every product against one BF16 activation x [K,T], quantizing x once per activation layout
 // (and once more per distinct input gather).
-void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
+bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                   WorkspaceArena& workspace, cudaStream_t stream);
 void gguf_project_q8_1_activation(int k, int columns, const void* activation,
                                   std::span<const GgufProduct> products,
@@ -66,7 +66,7 @@ void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_fo
                                          const void* activation,
                                          std::span<const GgufProduct> products,
                                          WorkspaceArena& workspace, cudaStream_t stream);
-void gguf_project_matrix_q8_1_activations(
+bool gguf_project_matrix_q8_1_activations(
     int k, int columns, std::span<const gguf::MatrixActivationPlane> activations,
     std::span<const GgufProduct> products, WorkspaceArena& workspace, cudaStream_t stream);
 

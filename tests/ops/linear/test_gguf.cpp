@@ -1023,14 +1023,17 @@ void run_dual_mmq_fusion() {
             {QType::GGUF_Q4_K, rows, k}, {QType::GGUF_Q4_K, rows, k}};
         WorkspaceArena workspace(
             ops::detail::gguf_project_workspace_bytes(shapes, columns, columns) + (1U << 20));
-        const ops::gguf::MatrixActivationPlane plane{ops::gguf::GgmlType::Q4_K, activation.p};
+        bool dual_enqueued = false;
         cudaGraph_t graph = nullptr;
         cudaGraphExec_t executable = nullptr;
         check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
               "begin dual MMQ projection graph");
-        ops::detail::gguf_project_matrix_q8_1_activations(k, columns, {&plane, 1}, products,
-                                                          workspace, stream);
+        dual_enqueued = ops::detail::gguf_project(
+            Tensor{x.p, DType::BF16, {k, columns}}, products, workspace, stream);
         check(cudaStreamEndCapture(stream, &graph), "end dual MMQ projection graph");
+        if (!dual_enqueued) {
+            throw std::runtime_error("ordinary gguf_project did not enqueue paired Q4_K MMQ");
+        }
         check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
               "instantiate dual MMQ projection graph");
         check(cudaGraphLaunch(executable, stream), "launch dual MMQ projection graph");

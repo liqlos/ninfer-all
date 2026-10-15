@@ -198,15 +198,47 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
     return widest;
 }
 
-void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
+bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                   WorkspaceArena& workspace, cudaStream_t stream) {
     require_activation(x, "gguf product");
-    if (products.empty()) { return; }
+    if (products.empty()) { return false; }
     for (const auto& p : products) { require_product(x, p); }
     const std::int32_t k = x.ne[0];
     const std::int32_t t = x.ne[1];
     const auto* xb       = static_cast<const __nv_bfloat16*>(x.data);
     auto scope           = workspace.scope();
+
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
+    if (k == 5120 && t > gguf::kMaxVectorColumns && t <= 1024) {
+        std::size_t eligible_q4 = 0;
+        bool all_native = true;
+        for (const GgufProduct& product : products) {
+            const Weight& weight = *product.weight;
+            all_native = all_native && matrix_kernel(weight) && weight.input_columns == nullptr;
+            if (weight.qtype == QType::GGUF_Q4_K && weight.n == 6144 && weight.k == k) {
+                ++eligible_q4;
+            }
+        }
+        if (all_native && eligible_q4 >= 2) {
+            std::vector<gguf::MatrixActivationPlane> matrix_activations;
+            for (const GgufProduct& product : products) {
+                const auto type = gguf_type(product.weight->qtype);
+                const int layout = gguf::matrix_activation_layout(type);
+                const bool present = std::any_of(
+                    matrix_activations.begin(), matrix_activations.end(), [&](const auto& plane) {
+                        return gguf::matrix_activation_layout(plane.type) == layout;
+                    });
+                if (!present) {
+                    void* data = workspace.alloc_bytes(gguf::matrix_activation_bytes(k, t)).data;
+                    gguf::quantize_matrix_activation(type, xb, k, t, nullptr, data, stream);
+                    matrix_activations.push_back({type, data});
+                }
+            }
+            return gguf_project_matrix_q8_1_activations(k, t, matrix_activations, products,
+                                                        workspace, stream);
+        }
+    }
+#endif
 
     if (t <= gguf::kMaxVectorColumns) {
         struct Activation {
@@ -227,7 +259,7 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
             gguf::vector_product(gguf_type(w.qtype), w.qdata, row_bytes(w), w.n, k, found->data,
                                  t, output(p, 0), stream);
         }
-        return;
+        return false;
     }
 
     struct Activation {
@@ -294,6 +326,7 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
         }
         if (!direct) { gguf::store_plane(plane, w.n, w.n, t, output(p, 0), stream); }
     }
+    return false;
 }
 
 void gguf_project_q8_1_activation(int k, int columns, const void* activation,
@@ -324,7 +357,7 @@ void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_fo
     gguf_project_matrix_q8_1_activations(k, columns, {&plane, 1}, products, workspace, stream);
 }
 
-void gguf_project_matrix_q8_1_activations(
+bool gguf_project_matrix_q8_1_activations(
     int k, int columns, std::span<const gguf::MatrixActivationPlane> activations,
     std::span<const GgufProduct> products, WorkspaceArena& workspace, cudaStream_t stream) {
     if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > 1024 || products.empty() ||
@@ -450,6 +483,11 @@ void gguf_project_matrix_q8_1_activations(
                              stride, fixup, stream);
         if (!direct) { gguf::store_plane(plane, w.n, w.n, columns, output(p, 0), stream); }
     }
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
+    return pair_done;
+#else
+    return false;
+#endif
 }
 
 void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& workspace,
