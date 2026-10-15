@@ -1,6 +1,7 @@
 #include "core/arena.h"
 #include "core/tensor.h"
 #include "core/weight.h"
+#include "models/qwen3_5/execution/ffn.h"
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/linear_add.h"
 #include "ninfer/ops/linear_swiglu.h"
@@ -23,6 +24,10 @@
 namespace {
 
 using namespace ninfer;
+using ninfer::models::qwen3_5::execution::DenseParameters;
+using ninfer::models::qwen3_5::execution::FfnParameters;
+using ninfer::models::qwen3_5::execution::ffn;
+using ninfer::models::qwen3_5::execution::ffn_workspace_bytes;
 
 void check(cudaError_t status, const char* what) {
     if (status != cudaSuccess) { throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(status)); }
@@ -175,6 +180,11 @@ int run_persistent_ffn() {
         Tensor expect(expected.p, DType::BF16, {down_rows, t});
         Tensor got(actual.p, DType::BF16, {down_rows, t});
         Tensor intermediate_bf16(activation.p, DType::BF16, {intermediate, t});
+        const auto* misaligned_q8 = static_cast<const std::uint8_t*>(input_q8.p) + 4;
+        if (ops::detail::gguf_swiglu_prequantized(misaligned_q8, k, t, gate,
+                                                   intermediate_bf16, nullptr)) {
+            throw std::runtime_error("prepared SwiGLU accepted misaligned q8 input");
+        }
         const auto route = ops::detail::gguf_swiglu_linear_add_route(gate, nullptr, down, t);
         const auto bytes = ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
             gate, nullptr, down, t, t);
@@ -215,7 +225,24 @@ int run_persistent_ffn() {
         if (std::memcmp(expected_host.data(), actual_host.data(), expected.bytes) != 0) {
             throw std::runtime_error("RMSNorm-q8 FFN changed exact BF16 residual values");
         }
-        if (t == 1) {
+#if defined(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
+        DenseParameters dense;
+        dense.gate_up.weight = gate;
+        dense.down.weight = down;
+        dense.gate_up.policy = ops::LinearPolicy::A16Only;
+        dense.down.policy = ops::LinearPolicy::A16Only;
+        const FfnParameters parameters = dense;
+        actual.copy_from(residual_host.data(), actual.bytes);
+        WorkspaceArena verify_workspace(ffn_workspace_bytes(parameters, t, t, false, true) +
+                                         (1U << 20));
+        ffn(x, parameters, got, {}, verify_workspace, nullptr, false, true,
+            models::qwen3_5::execution::InputBasis::Primal, input_q8.p);
+        check(cudaDeviceSynchronize(), "verified prepared FFN completion");
+        actual.copy_to(actual_host.data(), actual.bytes);
+        if (std::memcmp(expected_host.data(), actual_host.data(), expected.bytes) != 0) {
+            throw std::runtime_error("Verify-phase prepared FFN changed exact BF16 residual values");
+        }
+        if (t == 4) {
             actual.copy_from(residual_host.data(), actual.bytes);
             cudaStream_t stream = nullptr;
             cudaGraph_t graph = nullptr;
@@ -228,17 +255,8 @@ int run_persistent_ffn() {
                 static_cast<const __nv_bfloat16*>(norm.data), k, t, 1.0e-6f, true,
                 input_q8.p, stream);
             Tensor graph_output(actual.p, DType::BF16, {down_rows, t});
-            const bool graph_selected = ops::detail::gguf_swiglu_linear_add_prequantized(
-                input_q8.p, k, t, gate, nullptr, down, graph_output, prepared_workspace, stream);
-            if (!graph_selected) {
-                Tensor graph_activation(activation.p, DType::BF16, {intermediate, t});
-                if (!ops::detail::gguf_swiglu_prequantized(
-                        input_q8.p, k, t, gate, graph_activation, stream)) {
-                    throw std::runtime_error("prepared graph SwiGLU route was rejected");
-                }
-                ops::linear_add(graph_activation, down, graph_output, ops::LinearPolicy::A16Only,
-                                prepared_workspace, stream);
-            }
+            ffn(x, parameters, graph_output, {}, verify_workspace, stream, false, true,
+                models::qwen3_5::execution::InputBasis::Primal, input_q8.p);
             check(cudaStreamEndCapture(stream, &graph), "end prepared FFN graph capture");
             check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
                   "instantiate prepared FFN graph");
@@ -252,6 +270,7 @@ int run_persistent_ffn() {
             check(cudaGraphDestroy(graph), "destroy prepared FFN graph");
             check(cudaStreamDestroy(stream), "destroy prepared FFN graph stream");
         }
+#endif
     }
     auto gathered = down;
     std::vector<std::int32_t> ids(intermediate);

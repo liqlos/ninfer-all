@@ -1,4 +1,5 @@
 #include "ops/linear/gguf/gguf_linear.h"
+#include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
 
 #include "core/layout.h"
 
@@ -137,6 +138,9 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
     std::vector<int> layouts;
     std::size_t rows = 0;
     bool dequantized = false;
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
+    std::size_t dual_q4_rows = 0;
+#endif
     for (const GgufShape& shape : shapes) {
         const auto block = gguf_block_shape(shape.qtype);
         if (!is_gguf(shape.qtype) || shape.rows <= 0 || shape.k != k || k <= 0 ||
@@ -153,6 +157,11 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
             dequantized = true;
         }
         rows = std::max<std::size_t>(rows, shape.rows);
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
+        if (shape.qtype == QType::GGUF_Q4_K && shape.rows == 6144 && shape.k == 5120) {
+            ++dual_q4_rows;
+        }
+#endif
     }
     // Every product may carry its own input gather, so each may quantize its own activation.
     const std::size_t activations = shapes.size();
@@ -170,6 +179,12 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
         WorkspaceLayoutBuilder layout;
         (void)layout.alloc_bytes(rows * t * sizeof(float));
         (void)layout.alloc_bytes(fixup_bound());
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
+        if (t > gguf::kMaxVectorColumns && t <= 1024 && dual_q4_rows >= 2) {
+            (void)layout.alloc_bytes(rows * t * sizeof(float));
+            (void)layout.alloc_bytes(gguf::dual_q4_k_matrix_fixup_bytes(6144, t));
+        }
+#endif
         if (dequantized) {
             (void)layout.alloc_bytes(gguf::vector_activation_bytes(k, gguf::kMaxVectorColumns));
             (void)layout.alloc_bytes(kDequantizedScratchBytes);
@@ -305,24 +320,36 @@ void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_fo
                                          const void* activation,
                                          std::span<const GgufProduct> products,
                                          WorkspaceArena& workspace, cudaStream_t stream) {
-    if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > 1024 || activation == nullptr ||
-        (reinterpret_cast<std::uintptr_t>(activation) & (alignof(std::uint32_t) - 1)) != 0 ||
-        products.empty()) {
+    const gguf::MatrixActivationPlane plane{gguf_type(activation_format), activation};
+    gguf_project_matrix_q8_1_activations(k, columns, {&plane, 1}, products, workspace, stream);
+}
+
+void gguf_project_matrix_q8_1_activations(
+    int k, int columns, std::span<const gguf::MatrixActivationPlane> activations,
+    std::span<const GgufProduct> products, WorkspaceArena& workspace, cudaStream_t stream) {
+    if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > 1024 || products.empty() ||
+        activations.empty()) {
         throw std::invalid_argument("gguf prepared matrix activation: unsupported geometry");
     }
-    const auto prepared_type = gguf_type(activation_format);
-    if (!gguf::has_matrix_kernel(prepared_type)) {
-        throw std::invalid_argument("gguf prepared matrix activation: unsupported format");
+    for (const auto& activation : activations) {
+        if (activation.data == nullptr ||
+            (reinterpret_cast<std::uintptr_t>(activation.data) &
+             (alignof(std::uint32_t) - 1)) != 0 ||
+            !gguf::has_matrix_kernel(activation.type)) {
+            throw std::invalid_argument("gguf prepared matrix activation: unsupported plane");
+        }
     }
-    const int prepared_layout = gguf::matrix_activation_layout(prepared_type);
     const Tensor input(nullptr, DType::BF16, {k, columns});
     std::int32_t plane_rows = 0;
     for (const GgufProduct& p : products) {
         require_gguf(*p.weight, "gguf prepared matrix product");
         require_product(input, p);
         const auto type = gguf_type(p.weight->qtype);
-        if (!matrix_kernel(*p.weight) || p.weight->input_columns != nullptr ||
-            gguf::matrix_activation_layout(type) != prepared_layout) {
+        const int product_layout = gguf::matrix_activation_layout(type);
+        const bool found = std::any_of(activations.begin(), activations.end(), [&](const auto& a) {
+            return gguf::matrix_activation_layout(a.type) == product_layout;
+        });
+        if (!matrix_kernel(*p.weight) || p.weight->input_columns != nullptr || !found) {
             throw std::invalid_argument("gguf prepared matrix activation: incompatible product");
         }
         plane_rows = std::max(plane_rows, p.weight->n);
@@ -331,13 +358,92 @@ void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_fo
     auto* plane = static_cast<float*>(
         workspace.alloc_bytes(std::size_t(plane_rows) * columns * sizeof(float)).data);
     void* fixup = workspace.alloc_bytes(fixup_bound()).data;
-    for (const GgufProduct& p : products) {
+#if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
+    const auto dual_pair_admitted = [&](std::size_t a, std::size_t b) {
+        const GgufProduct& first = products[a];
+        const GgufProduct& second = products[b];
+        const Weight& wa = *first.weight;
+        const Weight& wb = *second.weight;
+        if (columns <= gguf::kMaxVectorColumns || columns > 1024 || k != 5120 ||
+            wa.qtype != QType::GGUF_Q4_K || wb.qtype != QType::GGUF_Q4_K ||
+            wa.n != 6144 || wb.n != 6144 || wa.k != k || wb.k != k ||
+            wa.input_columns != nullptr || wb.input_columns != nullptr ||
+            first.epilogue != GgufEpilogue::Store || second.epilogue != GgufEpilogue::Store ||
+            first.f32 != nullptr || second.f32 != nullptr || first.out == nullptr ||
+            second.out == nullptr || row_bytes(wa) != row_bytes(wb) ||
+            (reinterpret_cast<std::uintptr_t>(wa.qdata) & (alignof(std::uint32_t) - 1)) != 0 ||
+            (reinterpret_cast<std::uintptr_t>(wb.qdata) & (alignof(std::uint32_t) - 1)) != 0) {
+            return false;
+        }
+        const auto begin = [](const GgufProduct& p) {
+            return reinterpret_cast<std::uintptr_t>(p.out->data) +
+                   std::size_t(p.row) * sizeof(__nv_bfloat16);
+        };
+        const auto end = [&](const GgufProduct& p) {
+            return begin(p) +
+                   (std::size_t(columns - 1) * p.out->ne[0] + p.weight->n) *
+                       sizeof(__nv_bfloat16);
+        };
+        const bool outputs_overlap = begin(first) < end(second) && begin(second) < end(first);
+        return !outputs_overlap && gguf::dual_q4_k_matrix_supported(6144, columns);
+    };
+    std::size_t pair_a = products.size();
+    std::size_t pair_b = products.size();
+    for (std::size_t a = 0; a < products.size() && pair_a == products.size(); ++a) {
+        for (std::size_t b = a + 1; b < products.size(); ++b) {
+            if (dual_pair_admitted(a, b)) {
+                pair_a = a;
+                pair_b = b;
+                break;
+            }
+        }
+    }
+    float* dual_plane = nullptr;
+    void* dual_fixup = nullptr;
+    if (pair_a != products.size()) {
+        dual_plane = static_cast<float*>(
+            workspace.alloc_bytes(std::size_t(plane_rows) * columns * sizeof(float)).data);
+        dual_fixup = workspace.alloc_bytes(
+            gguf::dual_q4_k_matrix_fixup_bytes(6144, columns)).data;
+    }
+    bool pair_done = false;
+    for (std::size_t i = 0; i < products.size(); ++i) {
+        if (pair_a != products.size() && !pair_done && i == pair_a) {
+            const GgufProduct& a = products[pair_a];
+            const GgufProduct& b = products[pair_b];
+            const Weight& wa = *a.weight;
+            const Weight& wb = *b.weight;
+            const auto activation = std::find_if(activations.begin(), activations.end(),
+                [&](const auto& plane) {
+                    return gguf::matrix_activation_layout(plane.type) ==
+                           gguf::matrix_activation_layout(gguf::GgmlType::Q4_K);
+                });
+            if (activation == activations.end()) {
+                throw std::invalid_argument("gguf prepared matrix activation: Q4_K plane missing");
+            }
+            const bool fused = gguf::dual_q4_k_matrix_product(
+                wa.qdata, row_bytes(wa), wb.qdata, row_bytes(wb), wa.n, k,
+                activation->data, columns, plane, wa.n, dual_plane, wb.n,
+                fixup, dual_fixup, stream);
+            if (fused) {
+                gguf::store_plane(plane, wa.n, wa.n, columns, output(a, 0), stream);
+                gguf::store_plane(dual_plane, wb.n, wb.n, columns, output(b, 0), stream);
+                pair_done = true;
+                continue;
+            }
+        }
+        if (pair_done && i == pair_b) { continue; }
+        const GgufProduct& p = products[i];
         const Weight& w = *p.weight;
         const auto type = gguf_type(w.qtype);
+        const int product_layout = gguf::matrix_activation_layout(type);
+        const auto activation = std::find_if(activations.begin(), activations.end(), [&](const auto& a) {
+            return gguf::matrix_activation_layout(a.type) == product_layout;
+        });
         const bool direct = p.f32 != nullptr && p.epilogue == GgufEpilogue::Store;
         float* out = direct ? p.f32 + p.row : plane;
         const std::int64_t stride = direct ? p.f32_rows : w.n;
-        gguf::matrix_product(type, w.qdata, row_bytes(w), w.n, k, activation, columns, out,
+        gguf::matrix_product(type, w.qdata, row_bytes(w), w.n, k, activation->data, columns, out,
                              stride, fixup, stream);
         if (!direct) { gguf::store_plane(plane, w.n, w.n, columns, output(p, 0), stream); }
     }

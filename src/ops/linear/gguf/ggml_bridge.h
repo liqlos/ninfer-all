@@ -31,6 +31,11 @@ enum class GgmlType : int {
     IQ1_M   = 29,
 };
 
+struct MatrixActivationPlane {
+    GgmlType type;
+    const void* data;
+};
+
 struct BlockShape {
     int elements = 0;
     int bytes    = 0;
@@ -59,6 +64,10 @@ void rmsnorm_q8_1_vector_activation(const __nv_bfloat16* x, const __nv_bfloat16*
 void rmsnorm_q8_1_matrix_activation(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
                                     int columns, float eps, bool unit_offset, GgmlType type,
                                     void* out, cudaStream_t stream);
+void rmsnorm_q8_1_matrix_activations(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
+                                    int columns, float eps, bool unit_offset, GgmlType type_a,
+                                    void* out_a, GgmlType type_b, void* out_b,
+                                    cudaStream_t stream);
 
 enum class Epilogue : int {
     Store,       // out = y

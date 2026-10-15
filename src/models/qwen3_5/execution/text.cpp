@@ -43,6 +43,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -885,6 +886,33 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
 #endif
 #if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
     const auto* gguf_mmq_projection = std::get_if<ops::GgufProjectionWeights>(&p.projection);
+    bool mmq_layouts_eligible = gguf_mmq_projection != nullptr &&
+                                !gguf_mmq_projection->parts.empty();
+    ops::gguf::GgmlType mmq_type_a = ops::gguf::GgmlType::Q4_K;
+    ops::gguf::GgmlType mmq_type_b = ops::gguf::GgmlType::Q4_K;
+    int mmq_layout_a = -1;
+    int mmq_layout_b = -1;
+    if (mmq_layouts_eligible) {
+        mmq_type_a = ops::detail::gguf_type(gguf_mmq_projection->parts.front().weight.qtype);
+        mmq_type_b = mmq_type_a;
+        mmq_layout_a = ops::gguf::matrix_activation_layout(mmq_type_a);
+        for (const auto& part : gguf_mmq_projection->parts) {
+            const auto type = ops::detail::gguf_type(part.weight.qtype);
+            if (part.weight.k != 5120 || part.weight.input_columns != nullptr ||
+                !ops::gguf::has_matrix_kernel(type)) {
+                mmq_layouts_eligible = false;
+                break;
+            }
+            const int layout = ops::gguf::matrix_activation_layout(type);
+            if (layout != mmq_layout_a && mmq_layout_b < 0) {
+                mmq_layout_b = layout;
+                mmq_type_b = type;
+            } else if (layout != mmq_layout_a && layout != mmq_layout_b) {
+                mmq_layouts_eligible = false;
+                break;
+            }
+        }
+    }
     const bool fused_gguf_mmq = input_basis == InputBasis::Primal && gguf_mmq_projection != nullptr &&
                                 T > 8 && T <= 1024 && x.dtype == DType::BF16 && x.ne[0] == 5120 &&
                                 x.ne[1] == T && x.ne[2] == 1 && x.ne[3] == 1 &&
@@ -896,32 +924,19 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
                                 w.input_norm.ne[3] == 1 && w.input_norm.is_contiguous() &&
                                 w.input_norm.data != nullptr &&
                                 (reinterpret_cast<std::uintptr_t>(w.input_norm.data) &
-                                 (alignof(__nv_bfloat162) - 1)) == 0 &&
-                                !gguf_mmq_projection->parts.empty() &&
-                                ops::gguf::has_matrix_kernel(ops::detail::gguf_type(
-                                    gguf_mmq_projection->parts.front().weight.qtype)) &&
-                                std::all_of(gguf_mmq_projection->parts.begin(),
-                                            gguf_mmq_projection->parts.end(),
-                                            [&](const ops::GgufProjectionPart& part) {
-                                                return part.weight.input_columns == nullptr &&
-                                                       ops::gguf::has_matrix_kernel(
-                                                           ops::detail::gguf_type(part.weight.qtype)) &&
-                                                       ops::gguf::matrix_activation_layout(
-                                                           ops::detail::gguf_type(part.weight.qtype)) ==
-                                                           ops::gguf::matrix_activation_layout(
-                                                               ops::detail::gguf_type(
-                                                                   gguf_mmq_projection->parts.front()
-                                                                       .weight.qtype));
-                                            });
-    void* mmq_activation = nullptr;
+                                 (alignof(__nv_bfloat162) - 1)) == 0 && mmq_layouts_eligible;
+    std::array<ops::gguf::MatrixActivationPlane, 2> mmq_activations{};
     if (fused_gguf_mmq) {
-        mmq_activation = work_.alloc_bytes(ops::gguf::matrix_activation_bytes(5120, T)).data;
-        ops::gguf::rmsnorm_q8_1_matrix_activation(
+        void* activation_a = work_.alloc_bytes(ops::gguf::matrix_activation_bytes(5120, T)).data;
+        void* activation_b = mmq_layout_b < 0
+                                 ? activation_a
+                                 : work_.alloc_bytes(ops::gguf::matrix_activation_bytes(5120, T)).data;
+        ops::gguf::rmsnorm_q8_1_matrix_activations(
             static_cast<const __nv_bfloat16*>(x.data),
             static_cast<const __nv_bfloat16*>(w.input_norm.data), 5120, T,
-            config_.rms_norm_eps, true,
-            ops::detail::gguf_type(gguf_mmq_projection->parts.front().weight.qtype),
-            mmq_activation, s);
+            config_.rms_norm_eps, true, mmq_type_a, activation_a, mmq_type_b, activation_b, s);
+        mmq_activations[0] = {mmq_type_a, activation_a};
+        mmq_activations[1] = {mmq_type_b, activation_b};
     }
 #endif
     if (input_basis == InputBasis::Rotated) {
@@ -960,9 +975,9 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
 #endif
 #if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
     } else if (fused_gguf_mmq) {
-        ops::attn_input_proj_matrix_q8_1_activation(
-            5120, T, gguf_mmq_projection->parts.front().weight.qtype, mmq_activation,
-            *gguf_mmq_projection, q_flat, gate_flat, k_flat, v_flat, work_, s);
+        ops::attn_input_proj_matrix_q8_1_activations(
+            5120, T, mmq_activations, *gguf_mmq_projection, q_flat, gate_flat, k_flat, v_flat,
+            work_, s);
 #endif
     } else {
         attention_projection(h, p, q_flat, gate_flat, k_flat, v_flat, work_, s, input_basis);
@@ -1204,7 +1219,7 @@ void TextContext::mlp_tail(const BlockParameters& weights, Tensor& x, Phase phas
         return;
     }
 #if defined(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
-    const bool fused_ffn_q8 = phase != Phase::Verify && x.dtype == DType::BF16 &&
+    const bool fused_ffn_q8 = x.dtype == DType::BF16 &&
                               x.ne[0] == 5120 && x.ne[1] >= 1 && x.ne[1] <= 8 &&
                               x.ne[2] == 1 && x.ne[3] == 1 && x.is_contiguous() &&
                               x.data != nullptr &&
@@ -1221,15 +1236,15 @@ void TextContext::mlp_tail(const BlockParameters& weights, Tensor& x, Phase phas
                                (alignof(__nv_bfloat162) - 1)) == 0 &&
                               h.data != nullptr &&
                               (reinterpret_cast<std::uintptr_t>(h.data) &
-                               (alignof(__nv_bfloat162) - 1)) == 0 &&
+                               (alignof(int4) - 1)) == 0 &&
                               ffn_prequantized_q8_input_eligible(weights.ffn, x.ne[1]);
     if (fused_ffn_q8) {
         ops::gguf::rmsnorm_q8_1_vector_activation(
             static_cast<const __nv_bfloat16*>(x.data),
             static_cast<const __nv_bfloat16*>(weights.post_attention_norm.data), 5120, x.ne[1],
             config_.rms_norm_eps, true, h.data, ctx_.stream);
-        ffn(x, weights.ffn, x, hints, work_, ctx_.stream, false, false, InputBasis::Primal,
-            h.data);
+        ffn(x, weights.ffn, x, hints, work_, ctx_.stream, false, phase == Phase::Verify,
+            InputBasis::Primal, h.data);
         return;
     }
 #endif

@@ -551,7 +551,16 @@ void attn_input_proj_matrix_q8_1_activation(int input_rows, int columns, QType a
                                            const GgufProjectionWeights& weights, Tensor& q,
                                            Tensor& gate, Tensor& k, Tensor& v,
                                            WorkspaceArena& workspace, cudaStream_t stream) {
-    if (input_rows != 5120 || columns <= 8 || columns > 1024 || activation == nullptr) {
+    const gguf::MatrixActivationPlane plane{detail::gguf_type(activation_format), activation};
+    attn_input_proj_matrix_q8_1_activations(input_rows, columns, {&plane, 1}, weights, q, gate, k,
+                                            v, workspace, stream);
+}
+
+void attn_input_proj_matrix_q8_1_activations(
+    int input_rows, int columns, std::span<const gguf::MatrixActivationPlane> activations,
+    const GgufProjectionWeights& weights, Tensor& q, Tensor& gate, Tensor& k, Tensor& v,
+    WorkspaceArena& workspace, cudaStream_t stream) {
+    if (input_rows != 5120 || columns <= 8 || columns > 1024 || activations.empty()) {
         throw std::invalid_argument("attn_input_proj: invalid prepared matrix q8_1 activation");
     }
     const std::int32_t query_rows = q.ne[0];
@@ -571,8 +580,8 @@ void attn_input_proj_matrix_q8_1_activation(int input_rows, int columns, QType a
         product.row = part.row;
         products.push_back(product);
     }
-    detail::gguf_project_matrix_q8_1_activation(input_rows, columns, activation_format, activation,
-                                               products, workspace, stream);
+    detail::gguf_project_matrix_q8_1_activations(input_rows, columns, activations, products,
+                                                workspace, stream);
 }
 
 } // namespace ninfer::ops

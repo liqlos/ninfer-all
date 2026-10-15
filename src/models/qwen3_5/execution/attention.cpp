@@ -60,7 +60,7 @@ std::size_t attention_projection_workspace_bytes(const AttentionParameters& para
 #endif
 #if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
         if (gguf->parts.front().weight.k == 5120 && last > 8) {
-            bytes += ops::gguf::matrix_activation_bytes(5120, std::min(last, 1024)) + 256;
+            bytes += 2 * (ops::gguf::matrix_activation_bytes(5120, std::min(last, 1024)) + 256);
         }
 #endif
         return bytes;

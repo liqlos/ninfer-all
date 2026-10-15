@@ -66,6 +66,9 @@ void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_fo
                                          const void* activation,
                                          std::span<const GgufProduct> products,
                                          WorkspaceArena& workspace, cudaStream_t stream);
+void gguf_project_matrix_q8_1_activations(
+    int k, int columns, std::span<const gguf::MatrixActivationPlane> activations,
+    std::span<const GgufProduct> products, WorkspaceArena& workspace, cudaStream_t stream);
 
 void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& workspace,
                  cudaStream_t stream);

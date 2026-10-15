@@ -36,6 +36,14 @@ if(NINFER_GGUF_RMSNORM_MMQ_FUSION)
     message(FATAL_ERROR "GGUF RMSNorm MMQ fusion requires sm_86")
   endif()
 endif()
+option(NINFER_GGUF_DUAL_MMQ_FUSION "Reuse SM86 Q4_K MMQ activation tiles across paired projections" OFF)
+if(NINFER_GGUF_DUAL_MMQ_FUSION)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF dual MMQ fusion requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DUAL_MMQ_FUSION=1)
+endif()
 option(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION "Fuse Qwen3.5 FFN input RMSNorm with exact GGUF q8_1 packing" OFF)
 if(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
@@ -125,6 +133,17 @@ if(NINFER_GGUF_Q4_ASYNC_PIPELINE)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_ASYNC_PIPELINE=1)
 endif()
+option(NINFER_GGUF_Q4_ASYNC_EXTENDED_K "Extend the SM86 Q4 async pipeline to long K rows" OFF)
+if(NINFER_GGUF_Q4_ASYNC_EXTENDED_K)
+  if(NOT NINFER_GGUF_Q4_ASYNC_PIPELINE)
+    message(FATAL_ERROR "GGUF Q4 extended K requires the Q4 async pipeline")
+  endif()
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF Q4 extended K requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_ASYNC_EXTENDED_K=1)
+endif()
 if(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF Q4 MMQ async activation staging requires sm_86")
@@ -144,6 +163,7 @@ add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_rmsnorm_q8.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_persistent_ffn.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_bridge.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_dual_q4_k.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_iq1_s.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_iq2_s.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_iq2_xs.cu"

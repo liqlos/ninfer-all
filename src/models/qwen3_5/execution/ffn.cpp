@@ -167,8 +167,7 @@ void ffn(const Tensor& hidden, const FfnParameters& parameters, Tensor& residual
     auto scope         = workspace.scope();
     const auto columns = hidden.ne[1];
     if (prequantized_q8_input != nullptr &&
-        (mtp || verify ||
-         !ffn_prequantized_q8_input_eligible(parameters, columns, basis))) {
+        (mtp || !ffn_prequantized_q8_input_eligible(parameters, columns, basis))) {
         throw std::invalid_argument("FFN: unsupported prequantized q8 input");
     }
     if (const auto* moe = std::get_if<ops::SparseMoeWeights>(&parameters)) {
