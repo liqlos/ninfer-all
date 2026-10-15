@@ -68,7 +68,7 @@ std::size_t matrix_fixup_bytes_impl(int rows, int columns) {
     return launch.fixup ? std::size_t(launch.blocks) * launch.J * launch.I * sizeof(float) : 0;
 }
 
-template <ggml_type type, int J>
+template <ggml_type type, int J, bool bf16_accumulate = false>
 void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_row_blocks, int rows,
                    int k, const int* activation, int columns, float* out,
                    __nv_bfloat16* out_bf16, std::int64_t out_column_stride, float* fixup,
@@ -88,7 +88,7 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro
 #if defined(NINFER_GGUF_MMQ_STORE_FUSION)
     if (out_bf16 != nullptr) {
         std::call_once(raised_bf16[device & 15], [&] {
-            check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8, true>,
+            check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8, true, bf16_accumulate>,
                                        cudaFuncAttributeMaxDynamicSharedMemorySize,
                                        static_cast<int>(launch.shared)),
                   "matrix BF16 shared memory");
@@ -104,7 +104,7 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro
     if (!launch.stream_k) {
 #if defined(NINFER_GGUF_MMQ_STORE_FUSION)
         if (out_bf16 != nullptr) {
-            mul_mat_q<type, J, false, GGML_PREC_Q8, true>
+            mul_mat_q<type, J, false, GGML_PREC_Q8, true, bf16_accumulate>
                 <<<dim3(launch.row_tiles, launch.column_tiles, 1), block_dims, launch.shared, stream>>>(
                     weight, activation, nullptr, nullptr, out, out_bf16, nullptr, nullptr, blocks_fd, rows,
                     columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0, one_fd,
@@ -132,7 +132,7 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro
 #if defined(NINFER_GGUF_MMQ_STORE_FUSION)
     if (out_bf16 != nullptr) {
         if (launch.fixup) { throw std::invalid_argument("gguf BF16 matrix product requires no fixup"); }
-        mul_mat_q<type, J, false, GGML_PREC_Q8, true><<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(
+        mul_mat_q<type, J, false, GGML_PREC_Q8, true, bf16_accumulate><<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(
             weight, activation, nullptr, nullptr, out, out_bf16, nullptr, nullptr,
             blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,
             one_fd, one_fd, 0, 0, 0, ntx_fd);
@@ -205,10 +205,38 @@ bool matrix_bf16_store_plan_impl(int rows, int columns, int& J, int& I, bool& st
     return !launch.fixup;
 }
 
+template <ggml_type type, bool accumulate>
+bool launch_matrix_bf16_store(const MatrixLaunch& launch, const char* weight,
+                              int stride_row, int rows, int k, const int* activation,
+                              int columns, __nv_bfloat16* out,
+                              std::int64_t out_column_stride, cudaStream_t stream) {
+    switch (launch.J) {
+    case 16:
+        launch_matrix<type, 16, accumulate>(launch, weight, stride_row, rows, k, activation,
+            columns, nullptr, out, out_column_stride, nullptr, stream);
+        return true;
+    case 32:
+        launch_matrix<type, 32, accumulate>(launch, weight, stride_row, rows, k, activation,
+            columns, nullptr, out, out_column_stride, nullptr, stream);
+        return true;
+    case 64:
+        launch_matrix<type, 64, accumulate>(launch, weight, stride_row, rows, k, activation,
+            columns, nullptr, out, out_column_stride, nullptr, stream);
+        return true;
+    case 128:
+        launch_matrix<type, 128, accumulate>(launch, weight, stride_row, rows, k, activation,
+            columns, nullptr, out, out_column_stride, nullptr, stream);
+        return true;
+    default:
+        return false;
+    }
+}
+
 template <ggml_type type>
 bool matrix_product_bf16_store_impl(const void* weight, std::int64_t row_bytes, int rows, int k,
                                     const void* activation, int columns, __nv_bfloat16* out,
-                                    std::int64_t out_column_stride, cudaStream_t stream) {
+                                    std::int64_t out_column_stride, cudaStream_t stream,
+                                    bool accumulate) {
     constexpr int qk = ggml_cuda_type_traits<type>::qk;
     constexpr int block_bytes = ggml_cuda_type_traits<type>::bs;
     if (weight == nullptr || activation == nullptr || out == nullptr || k <= 0 || k % 256 != 0 ||
@@ -230,26 +258,12 @@ bool matrix_product_bf16_store_impl(const void* weight, std::int64_t row_bytes, 
     const auto* x = static_cast<const char*>(weight);
     const auto* y = static_cast<const int*>(activation);
     const int stride_row = static_cast<int>(row_bytes / block_bytes);
-    switch (launch.J) {
-    case 16:
-        launch_matrix<type, 16>(launch, x, stride_row, rows, k, y, columns, nullptr, out,
-                                out_column_stride, nullptr, stream);
-        return true;
-    case 32:
-        launch_matrix<type, 32>(launch, x, stride_row, rows, k, y, columns, nullptr, out,
-                                out_column_stride, nullptr, stream);
-        return true;
-    case 64:
-        launch_matrix<type, 64>(launch, x, stride_row, rows, k, y, columns, nullptr, out,
-                                out_column_stride, nullptr, stream);
-        return true;
-    case 128:
-        launch_matrix<type, 128>(launch, x, stride_row, rows, k, y, columns, nullptr, out,
-                                 out_column_stride, nullptr, stream);
-        return true;
-    default:
-        return false;
+    if (accumulate) {
+        return launch_matrix_bf16_store<type, true>(launch, x, stride_row, rows, k, y, columns,
+                                                   out, out_column_stride, stream);
     }
+    return launch_matrix_bf16_store<type, false>(launch, x, stride_row, rows, k, y, columns,
+                                                 out, out_column_stride, stream);
 }
 
 } // namespace ninfer::ops::gguf::detail
@@ -265,4 +279,4 @@ bool matrix_product_bf16_store_impl(const void* weight, std::int64_t row_bytes, 
         int, int, int&, int&, bool&);                                                               \
     template bool ninfer::ops::gguf::detail::matrix_product_bf16_store_impl<TYPE>(                 \
         const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t,       \
-        cudaStream_t)
+        cudaStream_t, bool)

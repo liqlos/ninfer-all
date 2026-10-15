@@ -124,20 +124,25 @@ bool run_case(const Case& c, int columns, bool prepared, bool expect_fused) {
     Weight product_weight = make_gguf_weight(c, weight.p);
     GgufProduct product{&product_weight, &output_tensor, 0, GgufEpilogue::Store};
     bool fused = false;
+    bool store_enqueued = false;
     if (prepared) {
         const gguf::MatrixActivationPlane plane{c.type, activation.p};
         WorkspaceArena workspace(std::size_t(512) << 20);
         fused = detail::gguf_project_matrix_q8_1_activations(
-            c.k, columns, {&plane, 1}, {&product, 1}, workspace, nullptr);
+            c.k, columns, {&plane, 1}, {&product, 1}, workspace, nullptr,
+            &store_enqueued);
     } else {
         const GgufShape shape{c.qtype, c.rows, c.k};
         const std::size_t workspace_bytes = detail::gguf_project_workspace_bytes({&shape, 1}, columns, columns);
         WorkspaceArena workspace(workspace_bytes + (1U << 20));
         Tensor x(input.p, DType::BF16, {c.k, columns});
-        fused = detail::gguf_project(x, {&product, 1}, workspace, nullptr);
+        fused = detail::gguf_project(x, {&product, 1}, workspace, nullptr,
+                                     &store_enqueued);
     }
     check(cudaDeviceSynchronize(), "MMQ store test sync");
-    if (fused != expect_fused) { throw std::runtime_error("GGUF projector reported the wrong MMQ store route"); }
+    if (fused || store_enqueued != expect_fused) {
+        throw std::runtime_error("GGUF projector reported the wrong MMQ store route");
+    }
 
     std::vector<float> host_fp32(std::size_t(c.rows) * columns);
     std::vector<__nv_bfloat16> host_bf16(std::size_t(c.rows) * columns);
@@ -146,6 +151,108 @@ bool run_case(const Case& c, int columns, bool prepared, bool expect_fused) {
     if (!compare_rounding(host_fp32, host_bf16, c.rows, columns)) {
         throw std::runtime_error("fused BF16 MMQ store differs from the native FP32 accumulator rounding");
     }
+    return true;
+}
+
+bool run_accumulate_graph_case() {
+    const Case c = q6_case();
+    constexpr int columns = 1024;
+    const int stride = c.rows + 19;
+    cudaStream_t stream = nullptr;
+    check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "create graph test stream");
+    const auto host_weight = make_weight(c, 0xE19ACCU);
+    DeviceBuffer weight(host_weight.size());
+    check(cudaMemcpyAsync(weight.p, host_weight.data(), host_weight.size(), cudaMemcpyHostToDevice,
+                          stream), "copy graph test weight");
+    const auto host_input = make_input(c.k, columns, 0xA19ACCU);
+    DeviceBuffer input(host_input.size() * sizeof(__nv_bfloat16));
+    check(cudaMemcpyAsync(input.p, host_input.data(), input.bytes, cudaMemcpyHostToDevice, stream),
+          "copy graph test input");
+    DeviceBuffer activation(gguf::matrix_activation_bytes(c.k, columns));
+    gguf::quantize_matrix_activation(c.type, static_cast<const __nv_bfloat16*>(input.p), c.k,
+                                     columns, nullptr, activation.p, stream);
+
+    std::vector<__nv_bfloat16> initial(std::size_t(stride) * columns);
+    std::mt19937 rng(0xA66U);
+    std::uniform_real_distribution<float> residual(-0.5f, 0.5f);
+    for (int column = 0; column < columns; ++column) {
+        for (int row = 0; row < stride; ++row) {
+            initial[std::size_t(column) * stride + row] =
+                row < c.rows ? __float2bfloat16(residual(rng)) : __float2bfloat16(123.0f);
+        }
+    }
+    DeviceBuffer actual(initial.size() * sizeof(__nv_bfloat16));
+    check(cudaMemcpyAsync(actual.p, initial.data(), actual.bytes, cudaMemcpyHostToDevice, stream),
+          "initialize graph test output");
+    DeviceBuffer fp32(std::size_t(c.rows) * columns * sizeof(float));
+    DeviceBuffer fixup(gguf::matrix_fixup_bytes(c.type, c.rows, columns));
+    gguf::matrix_product(c.type, weight.p,
+                         std::int64_t(c.k / 256) * gguf::block_shape(c.type).bytes,
+                         c.rows, c.k, activation.p, columns, static_cast<float*>(fp32.p), c.rows,
+                         fixup.p, stream);
+    check(cudaStreamSynchronize(stream), "warm graph test kernels");
+
+    Tensor input_tensor(input.p, DType::BF16, {c.k, columns});
+    Tensor output_tensor(actual.p, DType::BF16, {stride, columns});
+    Weight product_weight = make_gguf_weight(c, weight.p);
+    GgufProduct product{&product_weight, &output_tensor, 0, GgufEpilogue::Accumulate};
+    const GgufShape shape{c.qtype, c.rows, c.k};
+    WorkspaceArena workspace(detail::gguf_project_workspace_bytes({&shape, 1}, columns, columns) +
+                             (1U << 20));
+    bool warm_store_enqueued = false;
+    if (detail::gguf_project(input_tensor, {&product, 1}, workspace, stream,
+                             &warm_store_enqueued) || !warm_store_enqueued) {
+        throw std::runtime_error("E19 accumulate warmup did not select its store route");
+    }
+    check(cudaMemcpyAsync(actual.p, initial.data(), actual.bytes, cudaMemcpyHostToDevice, stream),
+          "reset warmed graph output residual");
+    check(cudaStreamSynchronize(stream), "synchronize E19 accumulate warmup");
+    bool store_enqueued = false;
+    check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal), "begin MMQ accumulate capture");
+    const bool pair_enqueued = detail::gguf_project(input_tensor, {&product, 1}, workspace, stream,
+                                                     &store_enqueued);
+    cudaGraph_t graph = nullptr;
+    check(cudaStreamEndCapture(stream, &graph), "end MMQ accumulate capture");
+    if (pair_enqueued || !store_enqueued) {
+        throw std::runtime_error("E19 accumulate graph did not select its store route");
+    }
+    cudaGraphExec_t graph_exec = nullptr;
+    check(cudaGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0), "instantiate MMQ accumulate graph");
+
+    const std::size_t total = initial.size();
+    std::vector<__nv_bfloat16> actual_host(total);
+    std::vector<float> fp32_host(std::size_t(c.rows) * columns);
+    fp32.copy_to_host(fp32_host.data(), fp32.bytes);
+    for (int replay = 0; replay < 2; ++replay) {
+        check(cudaMemcpyAsync(actual.p, initial.data(), actual.bytes, cudaMemcpyHostToDevice, stream),
+              "reset graph output residual");
+        check(cudaGraphLaunch(graph_exec, stream), "launch MMQ accumulate graph");
+        check(cudaStreamSynchronize(stream), "synchronize MMQ accumulate graph");
+        actual.copy_to_host(actual_host.data(), actual.bytes);
+        for (int column = 0; column < columns; ++column) {
+            for (int row = 0; row < stride; ++row) {
+                const auto at = std::size_t(column) * stride + row;
+                __nv_bfloat16 expected = initial[at];
+                if (row < c.rows) {
+                    expected = __float2bfloat16(fp32_host[std::size_t(column) * c.rows + row] +
+                                               __bfloat162float(initial[at]));
+                }
+                std::uint16_t expected_bits = 0;
+                std::uint16_t actual_bits = 0;
+                std::memcpy(&expected_bits, &expected, sizeof(expected_bits));
+                std::memcpy(&actual_bits, &actual_host[at], sizeof(actual_bits));
+                if (expected_bits != actual_bits) {
+                    cudaGraphExecDestroy(graph_exec);
+                    cudaGraphDestroy(graph);
+                    cudaStreamDestroy(stream);
+                    throw std::runtime_error("E19 accumulate graph changed oracle output or guard rows");
+                }
+            }
+        }
+    }
+    cudaGraphExecDestroy(graph_exec);
+    cudaGraphDestroy(graph);
+    cudaStreamDestroy(stream);
     return true;
 }
 
@@ -161,7 +268,8 @@ int main() {
         if (!run_case(q4_case(), 1024, false, true) ||
             !run_case(q4_case(), 1024, true, true) ||
             !run_case(q6_case(), 1024, false, true) ||
-            !run_case(q4_case(), 130, false, false)) {
+            !run_case(q4_case(), 130, false, false) ||
+            !run_accumulate_graph_case()) {
             return 1;
         }
         std::cout << "native MMQ BF16 store exactness and fallback checks passed\n";

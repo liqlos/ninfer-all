@@ -137,7 +137,7 @@ void matrix_product(GgmlType type, const void* weight, std::int64_t row_bytes, i
                                              const void* activation, int columns,
                                              __nv_bfloat16* out,
                                              std::int64_t out_column_stride,
-                                             cudaStream_t stream);
+                                             cudaStream_t stream, bool accumulate = false);
 
 // out <- epilogue(in) for an FP32 [rows, columns] plane whose columns are `in_column_stride` apart.
 void store_plane(const float* in, std::int64_t in_column_stride, int rows, int columns,

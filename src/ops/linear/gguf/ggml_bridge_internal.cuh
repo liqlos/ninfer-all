@@ -97,6 +97,7 @@ bool matrix_bf16_store_plan_impl(int rows, int columns, int& J, int& I, bool& st
 template <ggml_type type>
 bool matrix_product_bf16_store_impl(const void* weight, std::int64_t row_bytes, int rows, int k,
                                     const void* activation, int columns, __nv_bfloat16* out,
-                                    std::int64_t out_column_stride, cudaStream_t stream);
+                                    std::int64_t out_column_stride, cudaStream_t stream,
+                                    bool accumulate);
 
 } // namespace ninfer::ops::gguf::detail
