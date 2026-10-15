@@ -520,4 +520,30 @@ void attn_input_proj(const Tensor& x, const GgufProjectionWeights& weights, Tens
     detail::gguf_project(x, products, workspace, stream);
 }
 
+void attn_input_proj_q8_1_activation(int input_rows, int columns, const void* activation,
+                                    const GgufProjectionWeights& weights, Tensor& q, Tensor& gate,
+                                    Tensor& k, Tensor& v, cudaStream_t stream) {
+    if (input_rows != 5120 || columns <= 0 || columns > 8 || activation == nullptr) {
+        throw std::invalid_argument("attn_input_proj: invalid prepared q8_1 activation");
+    }
+    const std::int32_t query_rows = q.ne[0];
+    const std::int32_t kv_rows = k.ne[0];
+    require_matrix(q, query_rows, columns, "q");
+    require_matrix(gate, query_rows, columns, "gate");
+    require_matrix(k, kv_rows, columns, "k");
+    require_matrix(v, kv_rows, columns, "v");
+    require_gguf_attention(weights, input_rows, query_rows, kv_rows);
+    Tensor* outputs[] = {&q, &gate, &k, &v};
+    std::vector<detail::GgufProduct> products;
+    products.reserve(weights.parts.size());
+    for (const auto& part : weights.parts) {
+        detail::GgufProduct product;
+        product.weight = &part.weight;
+        product.out = outputs[part.output];
+        product.row = part.row;
+        products.push_back(product);
+    }
+    detail::gguf_project_q8_1_activation(input_rows, columns, activation, products, stream);
+}
+
 } // namespace ninfer::ops

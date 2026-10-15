@@ -281,6 +281,26 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
     }
 }
 
+void gguf_project_q8_1_activation(int k, int columns, const void* activation,
+                                  std::span<const GgufProduct> products,
+                                  cudaStream_t stream) {
+    if (k != 5120 || columns <= 0 || columns > gguf::kMaxVectorColumns || activation == nullptr ||
+        (reinterpret_cast<std::uintptr_t>(activation) & (alignof(half2) - 1)) != 0 ||
+        products.empty()) {
+        throw std::invalid_argument("gguf prepared vector activation: unsupported geometry");
+    }
+    for (const GgufProduct& p : products) {
+        require_gguf(*p.weight, "gguf prepared vector product");
+        require_product(Tensor(nullptr, DType::BF16, {k, columns}), p);
+        if (p.weight->input_columns != nullptr) {
+            throw std::invalid_argument("gguf prepared vector activation: gather is unsupported");
+        }
+        gguf::vector_product(gguf_type(p.weight->qtype), p.weight->qdata,
+                             row_bytes(*p.weight), p.weight->n, k, activation, columns,
+                             output(p, 0), stream);
+    }
+}
+
 void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& workspace,
                  cudaStream_t stream) {
     const GgufProduct product{&w, &out, 0, GgufEpilogue::Store};

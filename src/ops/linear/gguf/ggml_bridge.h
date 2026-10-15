@@ -53,6 +53,9 @@ inline constexpr int kMaxVectorColumns = 8;
 // `input_columns` (optional, [k]) makes element c of each column x[input_columns[c]].
 void quantize_vector_activation(const __nv_bfloat16* x, int k, int columns,
                                 const std::int32_t* input_columns, void* out, cudaStream_t stream);
+void rmsnorm_q8_1_vector_activation(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
+                                    int columns, float eps, bool unit_offset, void* out,
+                                    cudaStream_t stream);
 
 enum class Epilogue : int {
     Store,       // out = y

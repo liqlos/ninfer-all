@@ -9,6 +9,7 @@
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/linear_add.h"
 #include "ninfer/ops/linear_swiglu.h"
+#include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
 #include "ops/linear/gguf/gguf_linear.h"
 
@@ -594,6 +595,102 @@ std::vector<std::uint8_t> cpu_quantize_vector_activation(
     return output;
 }
 
+void run_rmsnorm_q8_fusion(std::uint32_t seed) {
+    constexpr std::int32_t k = 5120;
+    constexpr std::int32_t widths[] = {1, 3, 4, 8};
+    std::mt19937 rng(seed);
+    std::normal_distribution<float> normal(0.0f, 0.5f);
+    cudaStream_t stream = nullptr;
+    check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "create RMSNorm q8 stream");
+    constexpr int kWidth = 5120;
+    const auto rejected_alignment = [=](const __nv_bfloat16* x, const __nv_bfloat16* weight,
+                                       void* out) {
+        try {
+            ops::gguf::rmsnorm_q8_1_vector_activation(x, weight, kWidth, 1, 1.0e-6f, true,
+                                                      out, nullptr);
+        } catch (const std::invalid_argument&) {
+            return true;
+        }
+        return false;
+    };
+    const auto* misaligned_bf16 = reinterpret_cast<const __nv_bfloat16*>(std::uintptr_t{2});
+    void* misaligned_output = reinterpret_cast<void*>(std::uintptr_t{2});
+    if (!rejected_alignment(misaligned_bf16, reinterpret_cast<const __nv_bfloat16*>(4),
+                            reinterpret_cast<void*>(4)) ||
+        !rejected_alignment(reinterpret_cast<const __nv_bfloat16*>(4), misaligned_bf16,
+                            reinterpret_cast<void*>(4)) ||
+        !rejected_alignment(reinterpret_cast<const __nv_bfloat16*>(4),
+                            reinterpret_cast<const __nv_bfloat16*>(4), misaligned_output)) {
+        throw std::runtime_error("RMSNorm q8 API accepted a misaligned operand");
+    }
+    for (int weight_case = 0; weight_case < 2; ++weight_case) {
+        std::vector<__nv_bfloat16> host_weight(k);
+        for (auto& value : host_weight) {
+            value = weight_case == 0 ? __float2bfloat16(1.0f + normal(rng))
+                                     : __float2bfloat16(-0.0f);
+        }
+        DeviceBuffer weight(std::size_t(k) * sizeof(__nv_bfloat16));
+        weight.copy_from_host(host_weight.data(), std::size_t(k) * sizeof(__nv_bfloat16));
+        for (const std::int32_t t : widths) {
+            std::vector<__nv_bfloat16> host_x(std::size_t(k) * t);
+            for (auto& value : host_x) { value = __float2bfloat16(normal(rng)); }
+            if (t == 1) { std::fill(host_x.begin(), host_x.end(), __float2bfloat16(1.25f)); }
+            if (weight_case == 1 && t == 3) {
+                std::fill(host_x.begin(), host_x.end(), __float2bfloat16(0.0f));
+            }
+            DeviceBuffer x(std::size_t(k) * t * sizeof(__nv_bfloat16));
+            DeviceBuffer normalized(std::size_t(k) * t * sizeof(__nv_bfloat16));
+            x.copy_from_host(host_x.data(), host_x.size() * sizeof(__nv_bfloat16));
+            for (const bool unit_offset : {false, true}) {
+                const std::size_t bytes = ops::gguf::vector_activation_bytes(k, t);
+                DeviceBuffer reference(bytes);
+                GuardedRaw actual(bytes);
+                actual.poison();
+                cudaGraph_t reference_graph = nullptr;
+                cudaGraphExec_t reference_exec = nullptr;
+                check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
+                      "begin RMSNorm q8 reference graph");
+                ops::rmsnorm(Tensor{x.p, DType::BF16, {k, t}}, Tensor{weight.p, DType::BF16, {k}},
+                             1.0e-6f, unit_offset,
+                             Tensor{normalized.p, DType::BF16, {k, t}}, stream);
+                ops::gguf::quantize_vector_activation(
+                    static_cast<const __nv_bfloat16*>(normalized.p), k, t, nullptr, reference.p,
+                    stream);
+                check(cudaStreamEndCapture(stream, &reference_graph),
+                      "end RMSNorm q8 reference graph");
+                check(cudaGraphInstantiate(&reference_exec, reference_graph, nullptr, nullptr, 0),
+                      "instantiate RMSNorm q8 reference graph");
+                check(cudaGraphLaunch(reference_exec, stream), "launch RMSNorm q8 reference graph");
+                check(cudaStreamSynchronize(stream), "wait RMSNorm q8 reference graph");
+                std::vector<std::uint8_t> expected(bytes);
+                reference.copy_to_host(expected.data(), expected.size());
+                check(cudaGraphExecDestroy(reference_exec), "destroy RMSNorm q8 reference executable");
+                check(cudaGraphDestroy(reference_graph), "destroy RMSNorm q8 reference graph");
+                cudaGraph_t fused_graph = nullptr;
+                cudaGraphExec_t fused_exec = nullptr;
+                check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
+                      "begin fused RMSNorm q8 graph");
+                ops::gguf::rmsnorm_q8_1_vector_activation(
+                    static_cast<const __nv_bfloat16*>(x.p),
+                    static_cast<const __nv_bfloat16*>(weight.p), k, t, 1.0e-6f, unit_offset,
+                    actual.data(), stream);
+                check(cudaStreamEndCapture(stream, &fused_graph), "end fused RMSNorm q8 graph");
+                check(cudaGraphInstantiate(&fused_exec, fused_graph, nullptr, nullptr, 0),
+                      "instantiate fused RMSNorm q8 graph");
+                check(cudaGraphLaunch(fused_exec, stream), "launch fused RMSNorm q8 graph");
+                check(cudaStreamSynchronize(stream), "wait fused RMSNorm q8 graph");
+                if (actual.read("read fused RMSNorm q8 graph") != expected) {
+                    throw std::runtime_error(
+                        "RMSNorm q8 fusion differs from BF16 RMSNorm plus q8_1 graph");
+                }
+                check(cudaGraphExecDestroy(fused_exec), "destroy fused RMSNorm q8 executable");
+                check(cudaGraphDestroy(fused_graph), "destroy fused RMSNorm q8 graph");
+            }
+        }
+    }
+    check(cudaStreamDestroy(stream), "destroy RMSNorm q8 stream");
+}
+
 int run_swiglu_q8_fusion(std::uint32_t seed, bool test_route) {
     constexpr std::int32_t k = 5120;
     constexpr std::int32_t rows[] = {32, 64, 17408};
@@ -1138,6 +1235,7 @@ int main(int argc, char** argv) {
     bool mmq_real_shapes = false;
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
+    bool rmsnorm_q8_fusion = false;
     bool output_specified = false;
     bool weight_directory_specified = false;
     std::string output_path;
@@ -1153,6 +1251,8 @@ int main(int argc, char** argv) {
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
             swiglu_q8_benchmark = true;
+        } else if (argument == "--rmsnorm-q8-fusion" && !rmsnorm_q8_fusion) {
+            rmsnorm_q8_fusion = true;
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
             output_path = argv[++i];
@@ -1160,7 +1260,7 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
@@ -1168,8 +1268,9 @@ int main(int argc, char** argv) {
     if ((output_specified && (!(real_shapes || mmq_real_shapes) || output_path.empty())) ||
         (weight_directory_specified && (!(real_shapes || mmq_real_shapes) || weight_directory.empty())) ||
         (real_shapes && mmq_real_shapes) ||
-        ((real_shapes || mmq_real_shapes) && swiglu_q8_fusion)) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
+        ((real_shapes || mmq_real_shapes) && (swiglu_q8_fusion || rmsnorm_q8_fusion)) ||
+        (rmsnorm_q8_fusion && swiglu_q8_fusion)) {
+        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
@@ -1212,6 +1313,11 @@ int main(int argc, char** argv) {
             }
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF MMQ real shapes\n";
             return failures == 0 ? 0 : 1;
+        }
+        if (rmsnorm_q8_fusion) {
+            run_rmsnorm_q8_fusion(28002);
+            std::cout << "OK GGUF RMSNorm q8 fusion\n";
+            return 0;
         }
         if (real_shapes) {
             std::ofstream output_file;

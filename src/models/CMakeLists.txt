@@ -5,6 +5,9 @@ target_link_libraries(ninfer_model_loading PUBLIC ninfer_artifact ninfer_text ni
 
 add_library(ninfer_model_runtime STATIC)
 ninfer_internal_includes(ninfer_model_runtime)
+if(NINFER_GGUF_RMSNORM_Q8_FUSION)
+  target_compile_definitions(ninfer_model_runtime PRIVATE NINFER_GGUF_RMSNORM_Q8_FUSION=1)
+endif()
 target_link_libraries(ninfer_model_runtime
   PUBLIC ninfer_model_loading ninfer_ops ninfer_runtime_support
   PRIVATE ninfer_media_decode ninfer_jinja)

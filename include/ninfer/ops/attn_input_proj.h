@@ -147,6 +147,10 @@ void attn_input_proj(const Tensor& x, const GgufProjectionWeights& weights, Tens
                      Tensor& gate, Tensor& k, Tensor& v, WorkspaceArena& workspace,
                      cudaStream_t stream);
 
+void attn_input_proj_q8_1_activation(int input_rows, int columns, const void* activation,
+                                    const GgufProjectionWeights& weights, Tensor& q, Tensor& gate,
+                                    Tensor& k, Tensor& v, cudaStream_t stream);
+
 [[nodiscard]] std::size_t attn_input_proj_workspace_capacity_bytes(
     const GgufProjectionWeights& weights, std::int32_t min_tokens, std::int32_t max_tokens);
 

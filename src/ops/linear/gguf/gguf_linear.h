@@ -59,6 +59,9 @@ struct GgufShape {
 // (and once more per distinct input gather).
 void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                   WorkspaceArena& workspace, cudaStream_t stream);
+void gguf_project_q8_1_activation(int k, int columns, const void* activation,
+                                  std::span<const GgufProduct> products,
+                                  cudaStream_t stream);
 
 void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& workspace,
                  cudaStream_t stream);

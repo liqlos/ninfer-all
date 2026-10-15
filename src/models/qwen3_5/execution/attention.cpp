@@ -5,6 +5,7 @@
 #include "ninfer/ops/rmsnorm.h"
 #include "ninfer/ops/rmsnorm_rope.h"
 #include "ninfer/ops/rope.h"
+#include "ops/linear/gguf/ggml_bridge.h"
 
 #include <stdexcept>
 
@@ -48,9 +49,15 @@ std::size_t attention_projection_workspace_bytes(const AttentionParameters& para
     }
     const Tensor& signs = projection_signs(parameters.projection);
     if (const auto* gguf = std::get_if<ops::GgufProjectionWeights>(&parameters.projection)) {
-        return rotated_workspace_bytes(
+        std::size_t bytes = rotated_workspace_bytes(
             signs, gguf->parts.front().weight.k, last,
             ops::attn_input_proj_workspace_capacity_bytes(*gguf, first, last));
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+        if (gguf->parts.front().weight.k == 5120 && last <= 8) {
+            bytes += ops::gguf::vector_activation_bytes(5120, last) + 256;
+        }
+#endif
+        return bytes;
     }
     if (const auto* single = std::get_if<LinearParameters>(&parameters.projection)) {
         const auto& weight = single->weight;

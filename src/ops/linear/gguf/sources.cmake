@@ -22,6 +22,12 @@ if(NINFER_GGUF_SWIGLU_Q8_SEQUENTIAL_DECODE)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_SWIGLU_Q8_SEQUENTIAL_DECODE=1)
 endif()
+option(NINFER_GGUF_RMSNORM_Q8_FUSION "Fuse Qwen3.5 hidden RMSNorm with exact GGUF q8_1 packing" OFF)
+if(NINFER_GGUF_RMSNORM_Q8_FUSION)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF RMSNorm q8 fusion requires sm_86")
+  endif()
+endif()
 if(NINFER_GGUF_SWIGLU_Q8_FUSION)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF SwiGLU q8 fusion requires sm_86")
@@ -90,6 +96,7 @@ if(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
 endif()
 add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/ggml_rmsnorm_q8.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_bridge.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_iq1_s.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_iq2_s.cu"

@@ -13,6 +13,7 @@
 #include "models/qwen3_5/program/vision_control.h"
 #include "ninfer/ops/argmax.h"
 #include "ninfer/ops/attn_input_proj.h"
+#include "ops/linear/gguf/ggml_bridge.h"
 #include "ninfer/ops/causal_conv1d_silu.h"
 #include "ninfer/ops/embedding.h"
 #include "ninfer/ops/gated_delta_net.h"
@@ -855,9 +856,40 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
     const bool fused_nvfp4 = input_basis == InputBasis::Primal && single != nullptr &&
                              ops::attn_input_proj_fused_rmsnorm_nvfp4_eligible(single->weight,
                                                                                single->policy, T);
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+    const auto* gguf_projection = std::get_if<ops::GgufProjectionWeights>(&p.projection);
+    const bool fused_gguf_q8 = input_basis == InputBasis::Primal && gguf_projection != nullptr &&
+                               T <= 8 && x.dtype == DType::BF16 && x.ne[0] == 5120 &&
+                               x.ne[1] == T && x.ne[2] == 1 && x.ne[3] == 1 && x.is_contiguous() &&
+                               x.data != nullptr &&
+                               (reinterpret_cast<std::uintptr_t>(x.data) &
+                                (alignof(__nv_bfloat162) - 1)) == 0 &&
+                               w.input_norm.dtype == DType::BF16 && w.input_norm.ne[0] == 5120 &&
+                               w.input_norm.ne[1] == 1 && w.input_norm.ne[2] == 1 &&
+                               w.input_norm.ne[3] == 1 && w.input_norm.is_contiguous() &&
+                               w.input_norm.data != nullptr &&
+                               (reinterpret_cast<std::uintptr_t>(w.input_norm.data) &
+                                (alignof(__nv_bfloat162) - 1)) == 0 &&
+                               std::all_of(gguf_projection->parts.begin(), gguf_projection->parts.end(),
+                                           [](const ops::GgufProjectionPart& part) {
+                                               return part.weight.input_columns == nullptr;
+                                           });
+    void* q8_activation = nullptr;
+    if (fused_gguf_q8) {
+        q8_activation = work_.alloc_bytes(ops::gguf::vector_activation_bytes(5120, T)).data;
+        ops::gguf::rmsnorm_q8_1_vector_activation(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(w.input_norm.data), 5120, T,
+            config_.rms_norm_eps, true, q8_activation, s);
+    }
+#endif
     if (input_basis == InputBasis::Rotated) {
         ops::rmsnorm_hadamard(x, w.input_norm, config_.rms_norm_eps, true, input_signs, h, s);
-    } else if (!fused_nvfp4) {
+    } else if (!fused_nvfp4
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+               && !fused_gguf_q8
+#endif
+    ) {
         ops::rmsnorm(x, w.input_norm, config_.rms_norm_eps, true, h, s);
     }
 
@@ -877,6 +909,11 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
         ops::attn_input_proj_fused_rmsnorm_nvfp4(x, w.input_norm, config_.rms_norm_eps,
                                                  single->weight, q_flat, gate_flat, k_flat, v_flat,
                                                  single->policy, work_, s);
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+    } else if (fused_gguf_q8) {
+        ops::attn_input_proj_q8_1_activation(5120, T, q8_activation, *gguf_projection,
+                                             q_flat, gate_flat, k_flat, v_flat, s);
+#endif
     } else {
         attention_projection(h, p, q_flat, gate_flat, k_flat, v_flat, work_, s, input_basis);
     }
