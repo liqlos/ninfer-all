@@ -682,12 +682,15 @@ int run_swiglu_q8_fusion(std::uint32_t seed) {
                     const bool used = ops::detail::gguf_swiglu_linear_add(
                         x_tensor, gate, nullptr, down, fused_tensor, workspace, nullptr);
                     check(cudaDeviceSynchronize(), "fused q8 residual");
+                    if (!used) {
+                        throw std::runtime_error("eligible fused q8 down projection was not selected");
+                    }
                     std::vector<__nv_bfloat16> baseline_host(initial.size());
                     std::vector<__nv_bfloat16> fused_host(initial.size());
                     baseline.copy_to_host(baseline_host.data(), baseline_host.size() * sizeof(__nv_bfloat16));
                     fused.copy_to_host(fused_host.data(), fused_host.size() * sizeof(__nv_bfloat16));
-                    if (used && std::memcmp(baseline_host.data(), fused_host.data(),
-                                            fused_host.size() * sizeof(__nv_bfloat16)) != 0) {
+                    if (std::memcmp(baseline_host.data(), fused_host.data(),
+                                    fused_host.size() * sizeof(__nv_bfloat16)) != 0) {
                         throw std::runtime_error("fused q8 down projection differs from GGUF fallback");
                     }
                     if (used) {
