@@ -43,9 +43,6 @@ option(BUILD_TESTING "Build NInfer tests" OFF)
 option(NINFER_BUILD_BENCHMARKS "Build NInfer benchmarks" OFF)
 option(NINFER_SPECULATIVE_SELECT_SCATTER_FUSION
        "Fuse accepted-hidden selection and continuation-state scatter" OFF)
-if(NINFER_SPECULATIVE_SELECT_SCATTER_FUSION)
-  add_compile_definitions(NINFER_SPECULATIVE_SELECT_SCATTER_FUSION=1)
-endif()
 option(NINFER_SFU_SIGMOID_SILU
        "Evaluate sigmoid and SiLU on the SFU instead of with expf and a divide" OFF)
 if(NINFER_SFU_SIGMOID_SILU)
