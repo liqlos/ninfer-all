@@ -208,9 +208,17 @@ bool launch_persistent(const PersistentFfnArgs& args, cudaStream_t stream) {
     const int blocks = persistent_blocks<T>();
     if (blocks <= 0) { return false; }
     void* kernel_args[] = {const_cast<PersistentFfnArgs*>(&args)};
+    cudaStreamCaptureStatus capture = cudaStreamCaptureStatusNone;
+    detail::check(cudaStreamIsCapturing(stream, &capture), "persistent FFN capture state");
     const cudaError_t status = cudaLaunchCooperativeKernel(
         reinterpret_cast<void*>(persistent_q4_q6_ffn_kernel<T>), dim3(blocks),
         dim3(detail::kVecWarps * 32), kernel_args, 0, stream);
+    if (capture == cudaStreamCaptureStatusNone &&
+        (status == cudaErrorCooperativeLaunchTooLarge ||
+         status == cudaErrorLaunchOutOfResources || status == cudaErrorNotSupported)) {
+        (void)cudaGetLastError();
+        return false;
+    }
     if (status != cudaSuccess) { detail::check(status, "persistent FFN cooperative launch"); }
     return true;
 }
