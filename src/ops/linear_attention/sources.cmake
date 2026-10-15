@@ -11,6 +11,9 @@ target_sources(ninfer_ops PRIVATE
 
 option(NINFER_GDN_PERSISTENT_MIXER "Enable the SM86 persistent GDN main-region mixer" OFF)
 option(NINFER_GDN_PERSISTENT_ROW_REUSE "Reuse q8 activations across adjacent GDN projection rows" OFF)
+if(NINFER_GDN_PERSISTENT_ROW_REUSE AND NOT NINFER_GDN_PERSISTENT_MIXER)
+  message(FATAL_ERROR "NINFER_GDN_PERSISTENT_ROW_REUSE requires NINFER_GDN_PERSISTENT_MIXER")
+endif()
 if(NINFER_GDN_PERSISTENT_MIXER)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "The persistent GDN mixer requires SM86")
