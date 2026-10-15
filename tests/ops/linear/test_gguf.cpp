@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -99,6 +100,29 @@ std::vector<std::uint8_t> random_blocks(const TypeCase& c, std::int32_t rows, st
         }
     }
     return bytes;
+}
+
+bool load_blocks(const std::string& directory, const std::string& filename,
+                 std::size_t expected_bytes, std::vector<std::uint8_t>& bytes) {
+    const std::string path = directory + "/" + filename;
+    std::ifstream input(path, std::ios::binary | std::ios::ate);
+    if (!input) {
+        if (std::filesystem::exists(path)) {
+            throw std::runtime_error("could not open weight file: " + path);
+        }
+        return false;
+    }
+    const std::streampos size = input.tellg();
+    if (size < 0 || static_cast<std::uintmax_t>(size) != expected_bytes) {
+        throw std::runtime_error("weight file has wrong size: " + path);
+    }
+    bytes.resize(expected_bytes);
+    input.seekg(0);
+    input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!input || static_cast<std::size_t>(input.gcount()) != bytes.size()) {
+        throw std::runtime_error("could not read weight file: " + path);
+    }
+    return true;
 }
 
 Weight gguf_weight(QType qtype, const void* data, std::int32_t rows, std::int32_t k) {
@@ -503,19 +527,27 @@ std::uint64_t checksum_value(std::uint64_t value) {
 }
 
 int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
-                   std::uint64_t& total_checksum, std::ofstream* output_file) {
+                   std::uint64_t& total_checksum, std::ofstream* output_file,
+                   const std::string& weight_directory, std::size_t& files_used) {
     constexpr std::int32_t rows   = 257;
     constexpr std::int32_t max_t  = 8;
     const std::int32_t widths[]   = {1, 3, 4, 8};
     std::mt19937 rng(seed);
     int failures = 0;
 
-    const auto host_blocks = random_blocks(c, rows, k, rng, true);
+    const auto block = gguf_block_shape(c.qtype);
+    const std::size_t block_bytes = std::size_t(rows) * (k / block.elements) * block.bytes;
+    const std::string filename = std::string(c.name) + "-k" + std::to_string(k) + ".bin";
+    std::vector<std::uint8_t> host_blocks;
+    const bool loaded = !weight_directory.empty() &&
+                        load_blocks(weight_directory, filename, block_bytes, host_blocks);
+    if (!loaded) { host_blocks = random_blocks(c, rows, k, rng, true); }
+    if (loaded) { ++files_used; }
+    const std::string source = loaded ? filename : "synthetic";
     std::vector<float> cpu_exact;
     decode_k_cpu(c.qtype, host_blocks, rows, k, cpu_exact);
     DeviceBuffer blocks(host_blocks.size());
     blocks.copy_from_host(host_blocks.data(), host_blocks.size());
-    const auto block            = gguf_block_shape(c.qtype);
     const std::int64_t row_bytes = std::int64_t(k / block.elements) * block.bytes;
     const Weight weight = gguf_weight(c.qtype, blocks.p, rows, k);
 
@@ -599,7 +631,16 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 
     if (c.qtype == QType::GGUF_Q4_K && k == 5120) {
         constexpr std::int32_t t = 4;
-        const auto swiglu_blocks = random_blocks(c, 2 * rows, k, rng, true);
+        const std::size_t swiglu_block_bytes =
+            std::size_t(2 * rows) * (k / block.elements) * block.bytes;
+        const std::string swiglu_filename = "q4-swiglu-k5120.bin";
+        std::vector<std::uint8_t> swiglu_blocks;
+        const bool swiglu_loaded = !weight_directory.empty() &&
+                                   load_blocks(weight_directory, swiglu_filename,
+                                               swiglu_block_bytes, swiglu_blocks);
+        if (!swiglu_loaded) { swiglu_blocks = random_blocks(c, 2 * rows, k, rng, true); }
+        if (swiglu_loaded) { ++files_used; }
+        const std::string swiglu_source = swiglu_loaded ? swiglu_filename : "synthetic";
         DeviceBuffer swiglu_device(swiglu_blocks.size());
         swiglu_device.copy_from_host(swiglu_blocks.data(), swiglu_blocks.size());
         const std::int64_t swiglu_row_bytes =
@@ -665,10 +706,13 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                                    swiglu_workspace, stream);
             },
             guarded, host, c.name + " K=" + std::to_string(k) + " SwiGLU T=4", output_file);
+        std::cout << "gguf real-shape " << c.name << " K=" << k << " SwiGLU source="
+                  << swiglu_source << '\n';
     }
 
     std::cout << (failures == 0 ? "OK   " : "FAIL ") << "gguf real-shape " << c.name
-              << " K=" << k << " rows=" << rows << " checksum=0x" << std::hex << std::setw(16)
+              << " K=" << k << " rows=" << rows << " source=" << source << " checksum=0x"
+              << std::hex << std::setw(16)
               << std::setfill('0') << checksum << std::dec << '\n';
     total_checksum ^= checksum_value(checksum);
     total_checksum *= 1099511628211ULL;
@@ -685,7 +729,9 @@ int main(int argc, char** argv) {
     }
     bool real_shapes = false;
     bool output_specified = false;
+    bool weight_directory_specified = false;
     std::string output_path;
+    std::string weight_directory;
     for (int i = 1; i < argc; ++i) {
         const std::string argument(argv[i]);
         if (argument == "--real-shapes" && !real_shapes) {
@@ -693,13 +739,19 @@ int main(int argc, char** argv) {
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
             output_path = argv[++i];
+        } else if (argument == "--weight-dir" && !weight_directory_specified && i + 1 < argc) {
+            weight_directory_specified = true;
+            weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>]]\n";
+            std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>] "
+                         "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
-    if (output_specified && (!real_shapes || output_path.empty())) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>]]\n";
+    if ((output_specified && (!real_shapes || output_path.empty())) ||
+        (weight_directory_specified && (!real_shapes || weight_directory.empty()))) {
+        std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>] "
+                     "[--weight-dir <dir>]]\n";
         return 2;
     }
     try {
@@ -724,13 +776,37 @@ int main(int argc, char** argv) {
                 throw std::logic_error("real-shape GGUF cases are not registered");
             }
             constexpr std::int32_t shapes[] = {5120, 6144, 17408};
+            if (weight_directory_specified) {
+                if (!std::filesystem::is_directory(weight_directory)) {
+                    throw std::runtime_error("--weight-dir is not a directory: " + weight_directory);
+                }
+                bool recognized_file = false;
+                for (const TypeCase* c : {q4, q6}) {
+                    for (const std::int32_t k : shapes) {
+                        const std::string filename =
+                            std::string(c->name) + "-k" + std::to_string(k) + ".bin";
+                        recognized_file = recognized_file ||
+                                          std::filesystem::exists(weight_directory + "/" + filename);
+                    }
+                }
+                recognized_file = recognized_file || std::filesystem::exists(
+                    weight_directory + "/q4-swiglu-k5120.bin");
+                if (!recognized_file) {
+                    throw std::runtime_error("--weight-dir contains no recognized weight files");
+                }
+            }
             std::uint64_t checksum = 14695981039346656037ULL;
             int failures = 0;
+            std::size_t files_used = 0;
             std::uint32_t seed = 19001;
             for (const TypeCase* c : {q4, q6}) {
                 for (const std::int32_t k : shapes) {
-                    failures += run_real_shape(*c, k, seed++, checksum, output);
+                    failures += run_real_shape(*c, k, seed++, checksum, output, weight_directory,
+                                               files_used);
                 }
+            }
+            if (weight_directory_specified && files_used == 0) {
+                throw std::runtime_error("--weight-dir did not provide any recognized weight files");
             }
             if (output != nullptr) {
                 output_file.flush();
