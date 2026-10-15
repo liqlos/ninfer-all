@@ -27,7 +27,7 @@ struct MatrixLaunch {
 };
 
 template <ggml_type type>
-MatrixLaunch select_matrix_launch(int rows, int columns) {
+static MatrixLaunch select_matrix_launch(int rows, int columns) {
     const DeviceFacts& device = device_facts();
     MatrixLaunch best;
     int best_tiles = INT_MAX;
