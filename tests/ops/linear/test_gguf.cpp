@@ -650,9 +650,10 @@ void run_rmsnorm_q8_fusion(std::uint32_t seed) {
                 cudaGraphExec_t reference_exec = nullptr;
                 check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
                       "begin RMSNorm q8 reference graph");
+                Tensor normalized_view{normalized.p, DType::BF16, {k, t}};
                 ops::rmsnorm(Tensor{x.p, DType::BF16, {k, t}}, Tensor{weight.p, DType::BF16, {k}},
                              1.0e-6f, unit_offset,
-                             Tensor{normalized.p, DType::BF16, {k, t}}, stream);
+                             normalized_view, stream);
                 ops::gguf::quantize_vector_activation(
                     static_cast<const __nv_bfloat16*>(normalized.p), k, t, nullptr, reference.p,
                     stream);
