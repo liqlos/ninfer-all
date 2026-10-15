@@ -103,9 +103,15 @@ int run_persistent_ffn() {
         Tensor intermediate_bf16(activation.p, DType::BF16, {intermediate, t});
         const auto route = ops::detail::gguf_swiglu_linear_add_route(gate, nullptr, down, t);
         const bool cooperative = ops::gguf::persistent_swiglu_q8_add_available(t, nullptr);
+#if defined(NINFER_GGUF_PERSISTENT_FFN)
         if (cooperative && route != ops::detail::GgufSwiGluRoute::PersistentFfn) {
             throw std::runtime_error("available cooperative route did not select persistent FFN");
         }
+#else
+        if (route == ops::detail::GgufSwiGluRoute::PersistentFfn) {
+            throw std::runtime_error("persistent route selected while its feature is disabled");
+        }
+#endif
         if (!cooperative && route == ops::detail::GgufSwiGluRoute::PersistentFfn) {
             throw std::runtime_error("persistent route selected without cooperative launch support");
         }
