@@ -18,4 +18,6 @@ if(NINFER_GDN_PERSISTENT_MIXER)
     "${CMAKE_CURRENT_LIST_DIR}/gated_delta_net/persistent_mixer.cpp")
   target_sources(ninfer_ggml_quants PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu")
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/../linear/gguf/ggml_gdn_persistent.cu"
+    APPEND PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
 endif()
