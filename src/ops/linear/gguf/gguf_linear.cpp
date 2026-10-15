@@ -180,11 +180,9 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
         (void)layout.alloc_bytes(rows * t * sizeof(float));
         (void)layout.alloc_bytes(fixup_bound());
 #if defined(NINFER_GGUF_DUAL_MMQ_FUSION)
-        if (t > gguf::kMaxVectorColumns && t <= 1024 && dual_q4_rows >= 2 &&
-            gguf::dual_q4_k_matrix_supported(6144, t)) {
-            (void)layout.alloc_bytes(rows * t * sizeof(float));
-            const auto fixup_bytes = gguf::dual_q4_k_matrix_fixup_bytes(6144, t);
-            if (fixup_bytes != 0) { (void)layout.alloc_bytes(fixup_bytes); }
+        if (min_tokens <= 1024 && dual_q4_rows >= 2) {
+            (void)layout.alloc_bytes(rows * std::min(t, 1024) * sizeof(float));
+            (void)layout.alloc_bytes(fixup_bound());
         }
 #endif
         if (dequantized) {
