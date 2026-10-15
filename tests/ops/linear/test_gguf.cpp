@@ -594,7 +594,7 @@ std::vector<std::uint8_t> cpu_quantize_vector_activation(
     return output;
 }
 
-int run_swiglu_q8_fusion(std::uint32_t seed) {
+int run_swiglu_q8_fusion(std::uint32_t seed, bool test_route) {
     constexpr std::int32_t k = 5120;
     constexpr std::int32_t rows[] = {32, 64, 17408};
     constexpr std::int32_t widths[] = {1, 3, 4, 8};
@@ -663,7 +663,10 @@ int run_swiglu_q8_fusion(std::uint32_t seed) {
                     check(cudaStreamCreate(&timing_stream), "create fusion timing stream");
                     check(cudaEventCreate(&start), "create fusion timing start");
                     check(cudaEventCreate(&end), "create fusion timing end");
-                    for (const int warps : {0, 4, 8, 16}) {
+                    for (int sample = 0; sample < 16; ++sample) {
+                        constexpr int policies[] = {0, 4, 8, 16};
+                        const int pass = sample / 4;
+                        const int warps = policies[(pass & 1) ? 3 - sample % 4 : sample % 4];
                         cudaGraph_t timing_graph = nullptr;
                         cudaGraphExec_t timing_exec = nullptr;
                         check(cudaStreamBeginCapture(timing_stream, cudaStreamCaptureModeGlobal),
@@ -696,7 +699,7 @@ int run_swiglu_q8_fusion(std::uint32_t seed) {
                         float elapsed = 0.0f;
                         check(cudaEventElapsedTime(&elapsed, start, end), "read fusion timing");
                         std::cout << "FUSION_TIMING type=" << c.name << " N=" << n << " K=" << k
-                                  << " T=" << t << " warps=" << warps
+                                  << " T=" << t << " warps=" << warps << " pass=" << pass
                                   << " graph_us=" << elapsed * 10.0f << std::endl;
                         check(cudaGraphExecDestroy(timing_exec), "destroy fusion timing executable");
                         check(cudaGraphDestroy(timing_graph), "destroy fusion timing graph");
@@ -705,7 +708,7 @@ int run_swiglu_q8_fusion(std::uint32_t seed) {
                     check(cudaEventDestroy(end), "destroy fusion timing end");
                     check(cudaStreamDestroy(timing_stream), "destroy fusion timing stream");
                 }
-                if (n == 17408 &&
+                if (test_route && n == 17408 &&
                     ((c.qtype == QType::GGUF_Q4_K && t == 4) ||
                      (c.qtype == QType::GGUF_Q6_K && t == 3))) {
                     const std::int32_t down_rows = 32;
@@ -1024,6 +1027,7 @@ int main(int argc, char** argv) {
     }
     bool real_shapes = false;
     bool swiglu_q8_fusion = false;
+    bool swiglu_q8_benchmark = false;
     bool output_specified = false;
     bool weight_directory_specified = false;
     std::string output_path;
@@ -1034,6 +1038,9 @@ int main(int argc, char** argv) {
             real_shapes = true;
         } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
+        } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
+            swiglu_q8_fusion = true;
+            swiglu_q8_benchmark = true;
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
             output_path = argv[++i];
@@ -1041,7 +1048,7 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
@@ -1049,13 +1056,13 @@ int main(int argc, char** argv) {
     if ((output_specified && (!real_shapes || output_path.empty())) ||
         (weight_directory_specified && (!real_shapes || weight_directory.empty())) ||
         (real_shapes && swiglu_q8_fusion)) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --real-shapes [--output <file>] "
+        std::cerr << "usage: ninfer_linear_gguf_test [--swiglu-q8-fusion | --swiglu-q8-benchmark | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
     try {
         if (swiglu_q8_fusion) {
-            const int failures = run_swiglu_q8_fusion(28001);
+            const int failures = run_swiglu_q8_fusion(28001, !swiglu_q8_benchmark);
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF SwiGLU q8 fusion\n";
             return failures == 0 ? 0 : 1;
         }
