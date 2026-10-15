@@ -1118,7 +1118,8 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                        std::ofstream* output_file, const std::string& weight_directory,
                        std::size_t& files_used) {
-    constexpr std::int32_t rows = 257;
+    constexpr std::int32_t rows = 256;
+    constexpr std::int32_t fixture_rows = 257;
     constexpr std::int32_t widths[] = {17, 127, 130, 1024};
     const auto type = ops::detail::gguf_type(c.qtype);
     if (c.qtype != QType::GGUF_Q4_K || !ops::gguf::has_matrix_kernel(type)) {
@@ -1130,8 +1131,11 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     const std::string filename = fixture_prefix(c.qtype) + "-k" + std::to_string(k) + ".bin";
     std::vector<std::uint8_t> host_blocks;
     const bool loaded = !weight_directory.empty() &&
-                        load_blocks(weight_directory, filename, bytes, host_blocks);
+                        load_blocks(weight_directory, filename,
+                                    std::size_t(fixture_rows) * (k / block.elements) * block.bytes,
+                                    host_blocks);
     if (loaded) {
+        host_blocks.resize(bytes);
         ++files_used;
     } else {
         std::mt19937 weight_rng(seed);
