@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -305,6 +306,119 @@ void update_checksum(std::uint64_t& checksum, const std::vector<__nv_bfloat16>& 
     }
 }
 
+float half_to_float(const std::uint8_t* bytes) {
+    std::uint16_t bits = 0;
+    std::memcpy(&bits, bytes, sizeof(bits));
+    __half value;
+    std::memcpy(&value, &bits, sizeof(bits));
+    return __half2float(value);
+}
+
+void decode_k_cpu(QType qtype, const std::vector<std::uint8_t>& blocks, std::int32_t rows,
+                  std::int32_t k, std::vector<float>& output) {
+    const auto shape = gguf_block_shape(qtype);
+    const std::int32_t blocks_per_row = k / shape.elements;
+    output.resize(std::size_t(rows) * k);
+    for (std::int32_t row = 0; row < rows; ++row) {
+        for (std::int32_t bi = 0; bi < blocks_per_row; ++bi) {
+            const std::uint8_t* block = blocks.data() +
+                                        (std::size_t(row) * blocks_per_row + bi) * shape.bytes;
+            float* decoded = output.data() + std::size_t(row) * k + bi * shape.elements;
+            if (qtype == QType::GGUF_Q4_K) {
+                const float d = half_to_float(block);
+                const float dmin = half_to_float(block + 2);
+                const std::uint8_t* scales = block + 4;
+                const std::uint8_t* quants = block + 16;
+                for (int subblock = 0; subblock < 8; ++subblock) {
+                    int scale;
+                    int minimum;
+                    if (subblock < 4) {
+                        scale = scales[subblock] & 63;
+                        minimum = scales[subblock + 4] & 63;
+                    } else {
+                        scale = (scales[subblock + 4] & 0x0f) |
+                                ((scales[subblock - 4] >> 6) << 4);
+                        minimum = (scales[subblock + 4] >> 4) |
+                                  ((scales[subblock] >> 6) << 4);
+                    }
+                    const float scaled = d * static_cast<float>(scale);
+                    const float offset = dmin * static_cast<float>(minimum);
+                    const std::uint8_t* packed = quants + (subblock / 2) * 32;
+                    const int shift = 4 * (subblock & 1);
+                    for (int i = 0; i < 32; ++i) {
+                        const int quant = (packed[i] >> shift) & 0x0f;
+                        decoded[subblock * 32 + i] =
+                            std::fma(scaled, static_cast<float>(quant), -offset);
+                    }
+                }
+            } else if (qtype == QType::GGUF_Q6_K) {
+                const std::uint8_t* ql = block;
+                const std::uint8_t* qh = block + 128;
+                const float d = half_to_float(block + 208);
+                for (int part = 0; part < 2; ++part) {
+                    for (int lane = 0; lane < 32; ++lane) {
+                        const int scale_index = 8 * part + lane / 16;
+                        const int high = qh[32 * part + lane];
+                        const std::uint8_t* low = ql + 64 * part + lane;
+                        const auto scale_value = [&](int index) {
+                            const int bits = block[192 + index];
+                            return bits < 128 ? bits : bits - 256;
+                        };
+                        const float scale0 = d * static_cast<float>(scale_value(scale_index));
+                        const float scale2 = d * static_cast<float>(scale_value(scale_index + 2));
+                        const float scale4 = d * static_cast<float>(scale_value(scale_index + 4));
+                        const float scale6 = d * static_cast<float>(scale_value(scale_index + 6));
+                        const int q0 = ((low[0] & 0x0f) | ((high & 3) << 4)) - 32;
+                        const int q2 = ((low[32] & 0x0f) | (((high >> 2) & 3) << 4)) - 32;
+                        const int q4 = ((low[0] >> 4) | (((high >> 4) & 3) << 4)) - 32;
+                        const int q6 = ((low[32] >> 4) | (((high >> 6) & 3) << 4)) - 32;
+                        const int base = 128 * part + lane;
+                        decoded[base] = scale0 * static_cast<float>(q0);
+                        decoded[base + 32] = scale2 * static_cast<float>(q2);
+                        decoded[base + 64] = scale4 * static_cast<float>(q4);
+                        decoded[base + 96] = scale6 * static_cast<float>(q6);
+                    }
+                }
+            } else {
+                throw std::invalid_argument("CPU GGUF oracle supports only Q4_K and Q6_K");
+            }
+        }
+    }
+}
+
+int compare_dequantized(const std::vector<float>& gpu, const std::vector<float>& cpu,
+                        const std::string& label) {
+    if (gpu.size() != cpu.size()) {
+        std::cerr << label << ": CPU/GPU dequantized sizes differ\n";
+        return 1;
+    }
+    for (std::size_t i = 0; i < gpu.size(); ++i) {
+        std::uint32_t gpu_bits = 0;
+        std::uint32_t cpu_bits = 0;
+        std::memcpy(&gpu_bits, &gpu[i], sizeof(gpu_bits));
+        std::memcpy(&cpu_bits, &cpu[i], sizeof(cpu_bits));
+        if (gpu_bits != cpu_bits) {
+            std::cerr << label << ": CPU/GPU dequantization differs at " << i
+                      << " gpu=0x" << std::hex << gpu_bits << " cpu=0x" << cpu_bits << std::dec
+                      << '\n';
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void write_outputs(std::ofstream* output, const std::vector<__nv_bfloat16>& values) {
+    if (output == nullptr) { return; }
+    for (const __nv_bfloat16 value : values) {
+        std::uint16_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        const std::uint8_t bytes[2] = {static_cast<std::uint8_t>(bits & 0xffU),
+                                       static_cast<std::uint8_t>((bits >> 8) & 0xffU)};
+        output->write(reinterpret_cast<const char*>(bytes), sizeof(bytes));
+    }
+    if (!*output) { throw std::runtime_error("failed writing real-shape output file"); }
+}
+
 class GuardedOutput {
 public:
     explicit GuardedOutput(std::size_t elements)
@@ -345,7 +459,8 @@ private:
 
 template <typename Launch>
 void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
-                        const std::vector<__nv_bfloat16>& eager, const std::string& label) {
+                        const std::vector<__nv_bfloat16>& eager, const std::string& label,
+                        std::ofstream* output_file) {
     cudaStream_t stream = nullptr;
     cudaGraph_t graph = nullptr;
     cudaGraphExec_t executable = nullptr;
@@ -364,6 +479,7 @@ void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
             std::memcmp(replay.data(), eager.data(), replay.size() * sizeof(__nv_bfloat16)) != 0) {
             throw std::runtime_error(label + ": graph replay differs from eager output");
         }
+        write_outputs(output_file, replay);
     } catch (...) {
         if (executable != nullptr) { cudaGraphExecDestroy(executable); }
         if (graph != nullptr) { cudaGraphDestroy(graph); }
@@ -385,7 +501,7 @@ std::uint64_t checksum_value(std::uint64_t value) {
 }
 
 int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
-                   std::uint64_t& total_checksum) {
+                   std::uint64_t& total_checksum, std::ofstream* output_file) {
     constexpr std::int32_t rows   = 257;
     constexpr std::int32_t max_t  = 8;
     const std::int32_t widths[]   = {1, 3, 4, 8};
@@ -393,6 +509,8 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     int failures = 0;
 
     const auto host_blocks = random_blocks(c, rows, k, rng);
+    std::vector<float> cpu_exact;
+    decode_k_cpu(c.qtype, host_blocks, rows, k, cpu_exact);
     DeviceBuffer blocks(host_blocks.size());
     blocks.copy_from_host(host_blocks.data(), host_blocks.size());
     const auto block            = gguf_block_shape(c.qtype);
@@ -405,6 +523,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     check(cudaDeviceSynchronize(), "real-shape dequantize");
     std::vector<float> exact(std::size_t(rows) * k);
     exact_device.copy_to_host(exact.data(), exact.size() * sizeof(float));
+    failures += compare_dequantized(exact, cpu_exact, c.name + " K=" + std::to_string(k));
     for (const float value : exact) {
         if (!std::isfinite(value)) {
             std::cerr << c.name << " K=" << k << ": non-finite dequantized weight\n";
@@ -441,7 +560,7 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
         for (std::int32_t col = 0; col < t; ++col) {
             const float* activation = x_float.data() + std::size_t(col) * k;
             for (std::int32_t row = 0; row < rows; ++row) {
-                const float* row_weights = exact.data() + std::size_t(row) * k;
+                const float* row_weights = cpu_exact.data() + std::size_t(row) * k;
                 double acc = 0.0;
                 for (std::int32_t i = 0; i < k; ++i) {
                     acc += double(row_weights[i]) * activation[i];
@@ -460,12 +579,13 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             ++failures;
         }
         update_checksum(checksum, host);
+        write_outputs(output_file, host);
         if (t == 4) {
             check_graph_parity(
                 [&](cudaStream_t stream) {
                     ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
                 },
-                guarded, host, c.name + " K=" + std::to_string(k) + " T=4");
+                guarded, host, c.name + " K=" + std::to_string(k) + " T=4", output_file);
         }
     }
 
@@ -484,6 +604,10 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
         check(cudaDeviceSynchronize(), "real-shape SwiGLU dequantize");
         std::vector<float> swiglu_exact(std::size_t(2) * rows * k);
         swiglu_exact_device.copy_to_host(swiglu_exact.data(), swiglu_exact.size() * sizeof(float));
+        std::vector<float> swiglu_cpu_exact;
+        decode_k_cpu(c.qtype, swiglu_blocks, 2 * rows, k, swiglu_cpu_exact);
+        failures += compare_dequantized(swiglu_exact, swiglu_cpu_exact,
+                                        c.name + " K=" + std::to_string(k) + " SwiGLU");
         for (const float value : swiglu_exact) {
             if (!std::isfinite(value)) {
                 std::cerr << c.name << " K=" << k << ": non-finite SwiGLU dequantized weight\n";
@@ -507,8 +631,8 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             for (std::int32_t row = 0; row < rows; ++row) {
                 double gate = 0.0;
                 double up = 0.0;
-                const float* gate_weights = swiglu_exact.data() + std::size_t(row) * k;
-                const float* up_weights = swiglu_exact.data() + std::size_t(rows + row) * k;
+                const float* gate_weights = swiglu_cpu_exact.data() + std::size_t(row) * k;
+                const float* up_weights = swiglu_cpu_exact.data() + std::size_t(rows + row) * k;
                 for (std::int32_t i = 0; i < k; ++i) {
                     gate += double(gate_weights[i]) * activation[i];
                     up += double(up_weights[i]) * activation[i];
@@ -526,12 +650,13 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             ++failures;
         }
         update_checksum(checksum, host);
+        write_outputs(output_file, host);
         check_graph_parity(
             [&](cudaStream_t stream) {
                 ops::linear_swiglu(x, swiglu_weight, out, ops::LinearPolicy::A16Only,
                                    swiglu_workspace, stream);
             },
-            guarded, host, c.name + " K=" + std::to_string(k) + " SwiGLU T=4");
+            guarded, host, c.name + " K=" + std::to_string(k) + " SwiGLU T=4", output_file);
     }
 
     std::cout << (failures == 0 ? "OK   " : "FAIL ") << "gguf real-shape " << c.name
@@ -550,12 +675,36 @@ int main(int argc, char** argv) {
         std::cout << "SKIP: no usable CUDA device\n";
         return 77;
     }
-    if (argc > 2 || (argc == 2 && std::string(argv[1]) != "--real-shapes")) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes]\n";
+    bool real_shapes = false;
+    bool output_specified = false;
+    std::string output_path;
+    for (int i = 1; i < argc; ++i) {
+        const std::string argument(argv[i]);
+        if (argument == "--real-shapes" && !real_shapes) {
+            real_shapes = true;
+        } else if (argument == "--output" && !output_specified && i + 1 < argc) {
+            output_specified = true;
+            output_path = argv[++i];
+        } else {
+            std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>]]\n";
+            return 2;
+        }
+    }
+    if (output_specified && (!real_shapes || output_path.empty())) {
+        std::cerr << "usage: ninfer_linear_gguf_test [--real-shapes [--output <file>]]\n";
         return 2;
     }
     try {
-        if (argc == 2) {
+        if (real_shapes) {
+            std::ofstream output_file;
+            std::ofstream* output = nullptr;
+            if (output_specified) {
+                output_file.open(output_path, std::ios::binary | std::ios::trunc);
+                if (!output_file) {
+                    throw std::runtime_error("could not open real-shape output file: " + output_path);
+                }
+                output = &output_file;
+            }
             const auto all = cases();
             const TypeCase* q4 = nullptr;
             const TypeCase* q6 = nullptr;
@@ -572,8 +721,12 @@ int main(int argc, char** argv) {
             std::uint32_t seed = 19001;
             for (const TypeCase* c : {q4, q6}) {
                 for (const std::int32_t k : shapes) {
-                    failures += run_real_shape(*c, k, seed++, checksum);
+                    failures += run_real_shape(*c, k, seed++, checksum, output);
                 }
+            }
+            if (output != nullptr) {
+                output_file.flush();
+                if (!output_file) { throw std::runtime_error("failed flushing output file"); }
             }
             std::cout << "real-shapes checksum=0x" << std::hex << std::setw(16)
                       << std::setfill('0') << checksum << std::dec << '\n';
