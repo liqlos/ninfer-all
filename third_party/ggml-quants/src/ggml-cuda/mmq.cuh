@@ -537,7 +537,7 @@ static __device__ __forceinline__ void ggml_cuda_mmq_write_back_bf16(
 #else
         typedef tile<16, 8, int> tile_C;
 #endif
-        constexpr int rows_per_warp = ggml_cuda_mmq_get_rows_per_warp(type, J, fallback, prec_src1);
+        constexpr int rows_per_warp = ggml_cuda_mmq_get_rows_per_warp(type, J, fallback);
         constexpr int ntx = rows_per_warp / tile_C::I;
         const int i0 = (threadIdx.y / ntx) * (ntx * tile_C::I);
 #pragma unroll
