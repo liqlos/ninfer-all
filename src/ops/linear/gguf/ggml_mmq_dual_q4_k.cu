@@ -13,6 +13,7 @@ constexpr int kRows = 6144;
 constexpr int kK = 5120;
 constexpr int kMinColumns = 9;
 constexpr int kMaxColumns = 1024;
+constexpr int kDualMatrixColumnTiles[] = {16, 32};
 
 template <int J>
 __launch_bounds__(ggml_cuda_mmq_get_nthreads(GGML_TYPE_Q4_K, J, false), 1)
@@ -134,8 +135,9 @@ std::size_t dual_shared_bytes(const ggml_cuda_mmq_config& config, int cc) {
 MatrixLaunch select_dual_matrix_launch(int rows, int columns) {
     const DeviceFacts& device = device_facts();
     MatrixLaunch best;
+    if (select_matrix_launch<GGML_TYPE_Q4_K>(rows, columns).J > 32) { return best; }
     int best_tiles = INT_MAX;
-    for (const int J : kMatrixColumnTiles) {
+    for (const int J : kDualMatrixColumnTiles) {
         const ggml_cuda_mmq_config config =
             ggml_cuda_mmq_get_config(GGML_TYPE_Q4_K, J, false, device.cc);
         if (config.type == GGML_TYPE_COUNT ||
@@ -280,16 +282,6 @@ bool dual_q4_k_matrix_product(const void* weight_a, std::int64_t row_bytes_a,
         launch_dual<32>(launch, weight_a, row_bytes_a, weight_b, row_bytes_b,
                                rows, k, activation, columns, out_a, out_column_stride_a,
                                out_b, out_column_stride_b, fixup_a, fixup_b, stream);
-        return true;
-    case 64:
-        launch_dual<64>(launch, weight_a, row_bytes_a, weight_b, row_bytes_b,
-                               rows, k, activation, columns, out_a, out_column_stride_a,
-                               out_b, out_column_stride_b, fixup_a, fixup_b, stream);
-        return true;
-    case 128:
-        launch_dual<128>(launch, weight_a, row_bytes_a, weight_b, row_bytes_b,
-                                rows, k, activation, columns, out_a, out_column_stride_a,
-                                out_b, out_column_stride_b, fixup_a, fixup_b, stream);
         return true;
     default:
         return false;

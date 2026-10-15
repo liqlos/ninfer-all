@@ -11,6 +11,7 @@
 #include "ninfer/ops/linear_swiglu.h"
 #include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
+#include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
 #include "ops/linear/gguf/gguf_linear.h"
 
 #include <cuda_bf16.h>
@@ -989,7 +990,8 @@ void run_rmsnorm_mmq_q8_fusion(std::uint32_t seed) {
 void run_dual_mmq_fusion() {
     constexpr std::int32_t rows = 6144;
     constexpr std::int32_t k = 5120;
-    constexpr std::int32_t widths[] = {9, 130};
+    constexpr std::int32_t widths[] = {9, 17, 40, 70, 127, 130, 1024};
+    constexpr bool expected_dual[] = {true, true, false, false, false, false, false};
     const TypeCase q4{QType::GGUF_Q4_K, "q4_k", {0, 2}};
     std::mt19937 rng(28005);
     std::normal_distribution<float> normal(0.0f, 0.35f);
@@ -1002,9 +1004,17 @@ void run_dual_mmq_fusion() {
     const Weight weight_a = gguf_weight(QType::GGUF_Q4_K, weights_a.p, rows, k);
     const Weight weight_b = gguf_weight(QType::GGUF_Q4_K, weights_b.p, rows, k);
     const std::int64_t row_bytes = std::int64_t(k / 256) * 144;
+    const auto dual_available = [&](std::int32_t columns) {
+        return ops::gguf::dual_q4_k_matrix_supported(rows, columns);
+    };
     cudaStream_t stream = nullptr;
     check(cudaStreamCreate(&stream), "create dual MMQ stream");
-    for (const std::int32_t columns : widths) {
+    for (std::size_t width_index = 0;
+         width_index < sizeof(widths) / sizeof(widths[0]); ++width_index) {
+        const std::int32_t columns = widths[width_index];
+        if (dual_available(columns) != expected_dual[width_index]) {
+            throw std::runtime_error("dual MMQ selector did not follow native tile admission");
+        }
         std::vector<__nv_bfloat16> host_x(std::size_t(k) * columns);
         for (auto& value : host_x) { value = __float2bfloat16(normal(rng)); }
         DeviceBuffer x(host_x.size() * sizeof(__nv_bfloat16));
@@ -1060,18 +1070,27 @@ void run_dual_mmq_fusion() {
         bool dual_enqueued = false;
         cudaGraph_t graph = nullptr;
         cudaGraphExec_t executable = nullptr;
-        check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
-              "begin dual MMQ projection graph");
-        dual_enqueued = ops::detail::gguf_project(
-            Tensor{x.p, DType::BF16, {k, columns}}, products, workspace, stream);
-        check(cudaStreamEndCapture(stream, &graph), "end dual MMQ projection graph");
-        if (!dual_enqueued) {
-            throw std::runtime_error("ordinary gguf_project did not enqueue paired Q4_K MMQ");
+        if (columns == 9 || columns == 130 || columns == 1024) {
+            check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
+                  "begin dual MMQ projection graph");
+            dual_enqueued = ops::detail::gguf_project(
+                Tensor{x.p, DType::BF16, {k, columns}}, products, workspace, stream);
+            check(cudaStreamEndCapture(stream, &graph), "end dual MMQ projection graph");
+            if (dual_enqueued != expected_dual[width_index]) {
+                throw std::runtime_error("dual MMQ graph route disagrees with native-tile admission");
+            }
+            check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
+                  "instantiate dual MMQ projection graph");
+            check(cudaGraphLaunch(executable, stream), "launch dual MMQ projection graph");
+            check(cudaStreamSynchronize(stream), "wait dual MMQ projection graph");
+        } else {
+            dual_enqueued = ops::detail::gguf_project(
+                Tensor{x.p, DType::BF16, {k, columns}}, products, workspace, stream);
+            if (dual_enqueued != expected_dual[width_index]) {
+                throw std::runtime_error("dual MMQ route disagrees with native-tile admission");
+            }
+            check(cudaStreamSynchronize(stream), "wait dual MMQ projections");
         }
-        check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
-              "instantiate dual MMQ projection graph");
-        check(cudaGraphLaunch(executable, stream), "launch dual MMQ projection graph");
-        check(cudaStreamSynchronize(stream), "wait dual MMQ projection graph");
         const auto got_a = paired_a.read("read paired dual MMQ Q4_K output");
         const auto got_b = paired_b.read("read paired dual MMQ second Q4_K output");
         const auto report_mismatch = [&](const std::vector<__nv_bfloat16>& got,
@@ -1108,8 +1127,10 @@ void run_dual_mmq_fusion() {
             !report_mismatch(got_b, expected_b, "B")) {
             throw std::runtime_error("dual Q4_K MMQ changed native single-product outputs");
         }
-        check(cudaGraphExecDestroy(executable), "destroy dual MMQ projection executable");
-        check(cudaGraphDestroy(graph), "destroy dual MMQ projection graph");
+        if (graph != nullptr) {
+            check(cudaGraphExecDestroy(executable), "destroy dual MMQ projection executable");
+            check(cudaGraphDestroy(graph), "destroy dual MMQ projection graph");
+        }
     }
     check(cudaStreamDestroy(stream), "destroy dual MMQ stream");
 }
