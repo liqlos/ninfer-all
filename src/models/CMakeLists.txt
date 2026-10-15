@@ -31,6 +31,10 @@ if(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
     "${CMAKE_CURRENT_LIST_DIR}/qwen3_5/execution/text.cpp"
     APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_FFN_RMSNORM_Q8_FUSION=1)
 endif()
+if(NINFER_GDN_PERSISTENT_MIXER)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/qwen3_5/execution/text.cpp"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GDN_PERSISTENT_MIXER=1)
+endif()
 target_link_libraries(ninfer_model_runtime
   PUBLIC ninfer_model_loading ninfer_ops ninfer_runtime_support
   PRIVATE ninfer_media_decode ninfer_jinja)

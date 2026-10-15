@@ -23,6 +23,9 @@
 #include "ninfer/ops/gdn_gating.h"
 #include "ninfer/ops/gdn_gating_proj.h"
 #include "ninfer/ops/gdn_input_proj.h"
+#if defined(NINFER_GDN_PERSISTENT_MIXER)
+#include "ninfer/ops/gdn_persistent_mixer.h"
+#endif
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/kv_cache_append.h"
 #include "ninfer/ops/speculative_round.h"
@@ -1068,6 +1071,44 @@ void TextContext::gdn_mix(const BlockParameters& w, Tensor& x, int gidx, Phase p
     Tensor beta        = control.beta;
     const InputBasis projection_basis = gdn_norm_control(x, w.input_norm, config_.rms_norm_eps, p,
                                                          h, g, beta, work_, ctx_.execution_view());
+
+#if defined(NINFER_GDN_PERSISTENT_MIXER)
+    if (ph == Phase::Verify && projection_basis == InputBasis::Primal &&
+        gdn_state_action_ == GdnStateAction::RecordForReplay &&
+        active_sequence_batch_ == 1 && active_sequence_width_ >= 2 &&
+        active_sequence_width_ <= 4 && active_linear_state_source_slots_ != nullptr &&
+        active_valid_columns_ != nullptr &&
+        replay_records_ != nullptr &&
+        config_.hidden_size == 5120 && config_.gdn->linear_num_key_heads == 16 &&
+        config_.gdn->linear_key_head_dim == 128 &&
+        config_.gdn->linear_num_value_heads == 48 &&
+        config_.gdn->linear_value_head_dim == 128 &&
+        config_.gdn->linear_conv_kernel_dim == 4 &&
+        p.output.weight.qtype == QType::GGUF_Q4_K && p.output.weight.n == 5120 &&
+        p.output.weight.k == 6144 && !rotated(p.output.hadamard_signs)) {
+        if (const auto* projection_weights =
+                std::get_if<ops::GgufProjectionWeights>(&p.projection)) {
+            const GdnStateRef state_pool = gdn_state(static_cast<std::uint32_t>(gidx));
+            ops::GdnPersistentState state;
+            state.action = ops::GdnPersistentStateAction::Record;
+            state.conv_states = state_pool.pool->layer_view(state_pool.local).conv;
+            state.recurrent_states = state_pool.pool->layer_view(state_pool.local).recurrent;
+            state.source_slots = *active_linear_state_source_slots_;
+            state.valid_columns = *active_valid_columns_;
+            state.records = replay_layer(static_cast<std::uint32_t>(gidx), active_sequence_batch_,
+                                         active_sequence_width_);
+            const bool executed = [&] {
+                auto scope = work_.scope();
+                WorkspaceArena scratch(work_.alloc_bytes(
+                    ops::gdn_persistent_mixer_workspace_bytes(active_sequence_width_)));
+                return ops::gdn_persistent_mixer(
+                    h, g, beta, *projection_weights, p.convolution, p.norm, p.output.weight,
+                    config_.rms_norm_eps, state, x, scratch, s);
+            }();
+            if (executed) { return; }
+        }
+    }
+#endif
 
     const auto projection = workspace::gdn_projection(work_, config_, T);
     Tensor z  = projection.output_gate.view({dimension(config_.gdn->linear_value_head_dim),
