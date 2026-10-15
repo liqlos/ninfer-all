@@ -1143,6 +1143,11 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     DeviceBuffer weight_device(host_blocks.size());
     weight_device.copy_from_host(host_blocks.data(), host_blocks.size());
     const Weight weight = gguf_weight(c.qtype, weight_device.p, rows, k);
+    DeviceBuffer unaligned_weight(host_blocks.size() + 4);
+    auto* shifted_bytes = static_cast<std::uint8_t*>(unaligned_weight.p) + 4;
+    check(cudaMemcpy(shifted_bytes, host_blocks.data(), host_blocks.size(), cudaMemcpyHostToDevice),
+          "copy MMQ alignment fallback weights");
+    const Weight shifted_weight = gguf_weight(c.qtype, shifted_bytes, rows, k);
 
     constexpr std::int32_t max_t = 1024;
     std::mt19937 activation_rng(seed + 1907);
@@ -1211,6 +1216,16 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                       << error.relative_max << " max_abs=" << error.max_absolute << '\n';
         }
         write_outputs(output_file, host);
+        if (t == 17) {
+            guarded.poison();
+            ops::linear(x, shifted_weight, out, ops::LinearPolicy::A16Only, workspace, nullptr);
+            check(cudaDeviceSynchronize(), "MMQ alignment fallback linear");
+            const auto shifted_host = guarded.read("read MMQ alignment fallback output");
+            if (std::memcmp(host.data(), shifted_host.data(), host.size() * sizeof(__nv_bfloat16)) != 0) {
+                throw std::runtime_error("MMQ alignment fallback changed exact BF16 output");
+            }
+            write_outputs(output_file, shifted_host);
+        }
         if (t == 130 || t == 1024) {
             check_graph_parity(
                 [&](cudaStream_t stream) {
