@@ -3,12 +3,20 @@
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
 option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
+option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
+if(NINFER_GGUF_Q6_STATIC_K)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF static Q6 experiment requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_STATIC_K=1)
+endif()
 if(NINFER_GGUF_Q6_STREAMING_LOADS)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF streaming weight experiments require sm_86")
   endif()
-  set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
-    PROPERTIES COMPILE_DEFINITIONS NINFER_GGUF_Q6_STREAMING_LOADS=1)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_STREAMING_LOADS=1)
 endif()
 if(NINFER_GGUF_Q4_STREAMING_LOADS)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")

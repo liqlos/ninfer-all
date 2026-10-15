@@ -581,6 +581,13 @@ void launch(const VecArgs& args, cudaStream_t stream) {
 
 template <ggml_type type, int T, bool Fused>
 void launch_k(const VecArgs& args, cudaStream_t stream) {
+#if defined(NINFER_GGUF_Q6_STATIC_K)
+    if constexpr (type == GGML_TYPE_Q6_K && !Fused && (T == 1 || T == 4)) {
+        if (args.k == 5120 && device_facts().cc == 860) {
+            return launch<type, T, Fused, 5120>(args, stream);
+        }
+    }
+#endif
     if constexpr (kVecStaticK<type>) {
         switch (args.k) {
         case 5120: return launch<type, T, Fused, 5120>(args, stream);
