@@ -224,6 +224,24 @@ struct Decoder<GGML_TYPE_Q6_K> {
         s.f[1]               = d * float(sc[2 * q + 1]);
         const std::uint8_t* ql = b + 64 * h + 32 * (q & 1);
         const std::uint8_t* qh = b + 128 + 32 * h;
+#if defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
+        const unsigned mask = __activemask();
+#pragma unroll
+        for (int base = 0; base < 8; base += 4) {
+            const std::uint32_t hi = u32_a2(qh + 4 * (base + q));
+            const std::uint32_t lo0 = u32_a2(ql + 4 * (base + (q >> 1)));
+            const std::uint32_t lo1 = u32_a2(ql + 4 * (base + 2 + (q >> 1)));
+#pragma unroll
+            for (int j = 0; j < 4; ++j) {
+                const std::uint32_t high = __shfl_sync(mask, hi, j, 4);
+                const std::uint32_t low = __shfl_sync(mask, j < 2 ? lo0 : lo1,
+                                                     (q & 1) + 2 * (j & 1), 4);
+                const std::uint32_t v = ((low >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                        (((high >> (2 * q)) << 4) & 0x30303030u);
+                s.w[base + j] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
+            }
+        }
+#else
 #pragma unroll
         for (int i = 0; i < 8; ++i) {
             const std::uint32_t v = ((load32(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
@@ -231,6 +249,7 @@ struct Decoder<GGML_TYPE_Q6_K> {
             // v - 32 per byte, v in [0, 64): flip the high bits by whether v is below 32.
             s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
         }
+#endif
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
         return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
