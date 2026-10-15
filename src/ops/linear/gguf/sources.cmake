@@ -6,6 +6,7 @@ option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K v
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
 option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Cooperatively load packed Q6_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
+option(NINFER_GGUF_Q4_ASYNC_PIPELINE "Pipeline SM86 GGUF Q4_K K5120 vector weight loads" OFF)
 option(NINFER_GGUF_SWIGLU_Q8_FUSION "Fuse GGUF SwiGLU output with exact BF16-rounded q8 activation packing" OFF)
 if(NINFER_GGUF_SWIGLU_Q8_FUSION)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
@@ -54,6 +55,16 @@ if(NINFER_GGUF_Q4_STREAMING_LOADS)
   endif()
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
     PROPERTIES COMPILE_DEFINITIONS NINFER_GGUF_Q4_STREAMING_LOADS=1)
+endif()
+if(NINFER_GGUF_Q4_ASYNC_PIPELINE)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF Q4 async pipeline requires sm_86")
+  endif()
+  if(NINFER_GGUF_Q4_STREAMING_LOADS)
+    message(FATAL_ERROR "GGUF Q4 async pipeline cannot use streaming global loads")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_ASYNC_PIPELINE=1)
 endif()
 add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"

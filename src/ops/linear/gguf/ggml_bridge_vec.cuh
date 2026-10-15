@@ -10,6 +10,7 @@
 // llama.cpp's vector kernels round integer scales (the 2- and 3-bit i-quants).
 
 #include "ggml_bridge_internal.cuh"
+#include "../../common/memory.cuh"
 
 #include <algorithm>
 
@@ -506,6 +507,10 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
     constexpr int kPerBlock = D::kBlockElems / 32;
     constexpr int kRows     = 2;
     __shared__ __align__(16) std::uint32_t table[kTable];
+#if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
+    constexpr int kQ4StageBytes = 4 * D::kBlockBytes;
+    __shared__ __align__(16) std::uint8_t q4_stage[2][kVecWarps][kRows][kQ4StageBytes];
+#endif
     if constexpr (D::kTableWords > 0) {
         const std::uint32_t* src = D::table();
         for (int i = threadIdx.x; i < D::kTableWords; i += kVecWarps * 32) { table[i] = src[i]; }
@@ -559,6 +564,65 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
             }
         };
+#if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
+        const auto staged_slice = [&](int it, int buffer) {
+            const int s = lane + 32 * it;
+            int a[T][8];
+            float d[T], sum[T];
+#pragma unroll
+            for (int j = 0; j < T; ++j) {
+                const float2 ds = __half22float2(p.ds[std::int64_t(j) * slices + s]);
+                d[j]            = ds.x;
+                sum[j]          = ds.y;
+                const auto* q   = reinterpret_cast<const int4*>(p.qs + std::int64_t(j) * k + 32 * s);
+                const int4 v0 = q[0], v1 = q[1];
+                a[j][0] = v0.x; a[j][1] = v0.y; a[j][2] = v0.z; a[j][3] = v0.w;
+                a[j][4] = v1.x; a[j][5] = v1.y; a[j][6] = v1.z; a[j][7] = v1.w;
+            }
+#pragma unroll
+            for (int r = 0; r < kRows; ++r) {
+                Slice sl;
+                D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
+#pragma unroll
+                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+            }
+        };
+        const auto prefetch = [&](int it, int buffer) {
+#pragma unroll
+            for (int r = 0; r < kRows; ++r) {
+                const auto* src = rowp[r] - lane_offset + it * kQ4StageBytes;
+                ninfer::ops::cp_async<16, ninfer::ops::Cache::cg>(
+                    q4_stage[buffer][warp][r] + 16 * lane, src + 16 * lane);
+                if (lane < 4) {
+                    ninfer::ops::cp_async<16, ninfer::ops::Cache::cg>(
+                        q4_stage[buffer][warp][r] + 16 * (32 + lane), src + 16 * (32 + lane));
+                }
+            }
+            ninfer::ops::cp_commit();
+        };
+#endif
+#if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
+        if constexpr (type == GGML_TYPE_Q4_K && KS == 5120) {
+            prefetch(0, 0);
+            ninfer::ops::cp_wait<0>();
+            __syncwarp();
+#pragma unroll
+            for (int it = 0; it < 5; ++it) {
+                if (it + 1 < 5) { prefetch(it + 1, (it + 1) & 1); }
+                staged_slice(it, it & 1);
+                if (it + 1 < 5) {
+                    ninfer::ops::cp_wait<0>();
+                    __syncwarp();
+                }
+            }
+        } else if constexpr (KS != 0) {
+            static_assert(KS % 1024 == 0);
+#pragma unroll
+            for (int it = 0; it < KS / 1024; ++it) { slice(it); }
+        } else {
+            for (int it = 0; lane + 32 * it < slices; ++it) { slice(it); }
+        }
+#else
         if constexpr (KS != 0) {
             static_assert(KS % 1024 == 0);
 #pragma unroll
@@ -566,6 +630,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
         } else {
             for (int it = 0; lane + 32 * it < slices; ++it) { slice(it); }
         }
+#endif
 #pragma unroll
         for (int r = 0; r < kRows; ++r) {
 #pragma unroll
