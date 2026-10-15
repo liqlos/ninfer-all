@@ -883,11 +883,55 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
             config_.rms_norm_eps, true, q8_activation, s);
     }
 #endif
+#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
+    const auto* gguf_mmq_projection = std::get_if<ops::GgufProjectionWeights>(&p.projection);
+    const bool fused_gguf_mmq = input_basis == InputBasis::Primal && gguf_mmq_projection != nullptr &&
+                                T > 8 && T <= 1024 && x.dtype == DType::BF16 && x.ne[0] == 5120 &&
+                                x.ne[1] == T && x.ne[2] == 1 && x.ne[3] == 1 &&
+                                x.is_contiguous() && x.data != nullptr &&
+                                (reinterpret_cast<std::uintptr_t>(x.data) &
+                                 (alignof(__nv_bfloat162) - 1)) == 0 &&
+                                w.input_norm.dtype == DType::BF16 && w.input_norm.ne[0] == 5120 &&
+                                w.input_norm.ne[1] == 1 && w.input_norm.ne[2] == 1 &&
+                                w.input_norm.ne[3] == 1 && w.input_norm.is_contiguous() &&
+                                w.input_norm.data != nullptr &&
+                                (reinterpret_cast<std::uintptr_t>(w.input_norm.data) &
+                                 (alignof(__nv_bfloat162) - 1)) == 0 &&
+                                !gguf_mmq_projection->parts.empty() &&
+                                ops::gguf::has_matrix_kernel(ops::detail::gguf_type(
+                                    gguf_mmq_projection->parts.front().weight.qtype)) &&
+                                std::all_of(gguf_mmq_projection->parts.begin(),
+                                            gguf_mmq_projection->parts.end(),
+                                            [&](const ops::GgufProjectionPart& part) {
+                                                return part.weight.input_columns == nullptr &&
+                                                       ops::gguf::has_matrix_kernel(
+                                                           ops::detail::gguf_type(part.weight.qtype)) &&
+                                                       ops::gguf::matrix_activation_layout(
+                                                           ops::detail::gguf_type(part.weight.qtype)) ==
+                                                           ops::gguf::matrix_activation_layout(
+                                                               ops::detail::gguf_type(
+                                                                   gguf_mmq_projection->parts.front()
+                                                                       .weight.qtype));
+                                            });
+    void* mmq_activation = nullptr;
+    if (fused_gguf_mmq) {
+        mmq_activation = work_.alloc_bytes(ops::gguf::matrix_activation_bytes(5120, T)).data;
+        ops::gguf::rmsnorm_q8_1_matrix_activation(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(w.input_norm.data), 5120, T,
+            config_.rms_norm_eps, true,
+            ops::detail::gguf_type(gguf_mmq_projection->parts.front().weight.qtype),
+            mmq_activation, s);
+    }
+#endif
     if (input_basis == InputBasis::Rotated) {
         ops::rmsnorm_hadamard(x, w.input_norm, config_.rms_norm_eps, true, input_signs, h, s);
     } else if (!fused_nvfp4
 #if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
                && !fused_gguf_q8
+#endif
+#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
+               && !fused_gguf_mmq
 #endif
     ) {
         ops::rmsnorm(x, w.input_norm, config_.rms_norm_eps, true, h, s);
@@ -913,6 +957,12 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
     } else if (fused_gguf_q8) {
         ops::attn_input_proj_q8_1_activation(5120, T, q8_activation, *gguf_projection,
                                              q_flat, gate_flat, k_flat, v_flat, s);
+#endif
+#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
+    } else if (fused_gguf_mmq) {
+        ops::attn_input_proj_matrix_q8_1_activation(
+            5120, T, gguf_mmq_projection->parts.front().weight.qtype, mmq_activation,
+            *gguf_mmq_projection, q_flat, gate_flat, k_flat, v_flat, work_, s);
 #endif
     } else {
         attention_projection(h, p, q_flat, gate_flat, k_flat, v_flat, work_, s, input_basis);
@@ -1153,6 +1203,36 @@ void TextContext::mlp_tail(const BlockParameters& weights, Tensor& x, Phase phas
             InputBasis::Rotated);
         return;
     }
+#if defined(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
+    const bool fused_ffn_q8 = phase != Phase::Verify && x.dtype == DType::BF16 &&
+                              x.ne[0] == 5120 && x.ne[1] >= 1 && x.ne[1] <= 8 &&
+                              x.ne[2] == 1 && x.ne[3] == 1 && x.is_contiguous() &&
+                              x.data != nullptr &&
+                              (reinterpret_cast<std::uintptr_t>(x.data) &
+                               (alignof(__nv_bfloat162) - 1)) == 0 &&
+                              weights.post_attention_norm.dtype == DType::BF16 &&
+                              weights.post_attention_norm.ne[0] == 5120 &&
+                              weights.post_attention_norm.ne[1] == 1 &&
+                              weights.post_attention_norm.ne[2] == 1 &&
+                              weights.post_attention_norm.ne[3] == 1 &&
+                              weights.post_attention_norm.is_contiguous() &&
+                              weights.post_attention_norm.data != nullptr &&
+                              (reinterpret_cast<std::uintptr_t>(weights.post_attention_norm.data) &
+                               (alignof(__nv_bfloat162) - 1)) == 0 &&
+                              h.data != nullptr &&
+                              (reinterpret_cast<std::uintptr_t>(h.data) &
+                               (alignof(__nv_bfloat162) - 1)) == 0 &&
+                              ffn_prequantized_q8_input_eligible(weights.ffn, x.ne[1]);
+    if (fused_ffn_q8) {
+        ops::gguf::rmsnorm_q8_1_vector_activation(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(weights.post_attention_norm.data), 5120, x.ne[1],
+            config_.rms_norm_eps, true, h.data, ctx_.stream);
+        ffn(x, weights.ffn, x, hints, work_, ctx_.stream, false, false, InputBasis::Primal,
+            h.data);
+        return;
+    }
+#endif
     ops::rmsnorm(x, weights.post_attention_norm, config_.rms_norm_eps, true, h, ctx_.stream);
     ffn(h, weights.ffn, x, hints, work_, ctx_.stream, false, phase == Phase::Verify);
 }

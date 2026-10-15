@@ -56,6 +56,9 @@ void quantize_vector_activation(const __nv_bfloat16* x, int k, int columns,
 void rmsnorm_q8_1_vector_activation(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
                                     int columns, float eps, bool unit_offset, void* out,
                                     cudaStream_t stream);
+void rmsnorm_q8_1_matrix_activation(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
+                                    int columns, float eps, bool unit_offset, GgmlType type,
+                                    void* out, cudaStream_t stream);
 
 enum class Epilogue : int {
     Store,       // out = y

@@ -52,8 +52,12 @@ ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
 
-if(NINFER_GGUF_PERSISTENT_FFN)
-  ninfer_add_op_test(ninfer_linear_persistent_ffn_test
+if(NINFER_GGUF_PERSISTENT_FFN OR NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
+  ninfer_add_op_test(ninfer_linear_ffn_q8_test
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_persistent_ffn.cpp"
     LIBRARIES ninfer_ops)
+  if(NINFER_GGUF_PERSISTENT_FFN)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_persistent_ffn.cpp" APPEND
+      PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_PERSISTENT_FFN=1)
+  endif()
 endif()

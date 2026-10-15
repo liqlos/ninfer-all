@@ -4,6 +4,7 @@
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/linear_add.h"
 #include "ninfer/ops/linear_swiglu.h"
+#include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
 #include "ops/linear/gguf/gguf_linear.h"
 
@@ -151,6 +152,105 @@ int run_persistent_ffn() {
             check(cudaGraphExecDestroy(executable), "destroy persistent graph executable");
             check(cudaGraphDestroy(graph), "destroy persistent graph");
             check(cudaStreamDestroy(stream), "destroy persistent graph stream");
+        }
+    }
+    std::vector<__nv_bfloat16> norm_host(k);
+    for (int i = 0; i < k; ++i) { norm_host[i] = __float2bfloat16(0.9f + float(i % 11) * 0.02f); }
+    Buffer norm_data(norm_host.size() * sizeof(__nv_bfloat16));
+    norm_data.copy_from(norm_host.data(), norm_data.bytes);
+    const Tensor norm(norm_data.p, DType::BF16, {k});
+    for (const int t : {1, 4}) {
+        std::vector<__nv_bfloat16> x_host(std::size_t(k) * t), residual_host(std::size_t(down_rows) * t);
+        for (std::size_t i = 0; i < x_host.size(); ++i) { x_host[i] = __float2bfloat16(float(int(i % 29) - 14) / 32.0f); }
+        for (std::size_t i = 0; i < residual_host.size(); ++i) { residual_host[i] = __float2bfloat16(float(int(i % 13) - 6) / 16.0f); }
+        Buffer x_data(x_host.size() * sizeof(__nv_bfloat16));
+        Buffer normalized(x_data.bytes), input_q8(ops::gguf::vector_activation_bytes(k, t));
+        Buffer expected(std::size_t(down_rows) * t * sizeof(__nv_bfloat16));
+        Buffer actual(expected.bytes), activation(std::size_t(intermediate) * t * sizeof(__nv_bfloat16));
+        x_data.copy_from(x_host.data(), x_data.bytes);
+        expected.copy_from(residual_host.data(), expected.bytes);
+        actual.copy_from(residual_host.data(), actual.bytes);
+        Tensor x(x_data.p, DType::BF16, {k, t});
+        Tensor normalized_tensor(normalized.p, DType::BF16, {k, t});
+        Tensor expect(expected.p, DType::BF16, {down_rows, t});
+        Tensor got(actual.p, DType::BF16, {down_rows, t});
+        Tensor intermediate_bf16(activation.p, DType::BF16, {intermediate, t});
+        const auto route = ops::detail::gguf_swiglu_linear_add_route(gate, nullptr, down, t);
+        const auto bytes = ops::detail::gguf_swiglu_linear_add_workspace_capacity_bytes(
+            gate, nullptr, down, t, t);
+        const auto baseline_bytes = std::max(
+            ops::linear_swiglu_workspace_capacity_bytes(gate.qtype, gate.n, gate.k,
+                                                        ops::LinearPolicy::A16Only, t, t),
+            ops::linear_add_workspace_capacity_bytes(down.qtype, down.n, down.k,
+                                                     ops::LinearPolicy::A16Only, t, t));
+        WorkspaceArena reference_workspace(std::max(bytes, baseline_bytes) + (1U << 20));
+        WorkspaceArena prepared_workspace(std::max(bytes, baseline_bytes) + (1U << 20));
+        ops::rmsnorm(x, norm, 1.0e-6f, true, normalized_tensor, nullptr);
+        ops::gguf::rmsnorm_q8_1_vector_activation(
+            static_cast<const __nv_bfloat16*>(x.data), static_cast<const __nv_bfloat16*>(norm.data),
+            k, t, 1.0e-6f, true, input_q8.p, nullptr);
+        ops::linear_swiglu(normalized_tensor, gate, intermediate_bf16,
+                           ops::LinearPolicy::A16Only, reference_workspace, nullptr);
+        ops::linear_add(intermediate_bf16, down, expect, ops::LinearPolicy::A16Only,
+                        reference_workspace, nullptr);
+        check(cudaDeviceSynchronize(), "prepared reference completion");
+        const bool selected = ops::detail::gguf_swiglu_linear_add_prequantized(
+            input_q8.p, k, t, gate, nullptr, down, got, prepared_workspace, nullptr);
+        if (selected != (route != ops::detail::GgufSwiGluRoute::Fallback)) {
+            throw std::runtime_error("prequantized FFN route differs from route query");
+        }
+        if (!selected) {
+            Tensor candidate_activation(activation.p, DType::BF16, {intermediate, t});
+            if (!ops::detail::gguf_swiglu_prequantized(input_q8.p, k, t, gate,
+                                                       candidate_activation, nullptr)) {
+                throw std::runtime_error("prepared BF16 SwiGLU route was rejected");
+            }
+            ops::linear_add(candidate_activation, down, got, ops::LinearPolicy::A16Only,
+                            prepared_workspace, nullptr);
+        }
+        check(cudaDeviceSynchronize(), "prepared candidate completion");
+        std::vector<__nv_bfloat16> expected_host(residual_host.size()), actual_host(residual_host.size());
+        expected.copy_to(expected_host.data(), expected.bytes);
+        actual.copy_to(actual_host.data(), actual.bytes);
+        if (std::memcmp(expected_host.data(), actual_host.data(), expected.bytes) != 0) {
+            throw std::runtime_error("RMSNorm-q8 FFN changed exact BF16 residual values");
+        }
+        if (t == 1) {
+            actual.copy_from(residual_host.data(), actual.bytes);
+            cudaStream_t stream = nullptr;
+            cudaGraph_t graph = nullptr;
+            cudaGraphExec_t executable = nullptr;
+            check(cudaStreamCreate(&stream), "create prepared FFN graph stream");
+            check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
+                  "begin prepared FFN graph capture");
+            ops::gguf::rmsnorm_q8_1_vector_activation(
+                static_cast<const __nv_bfloat16*>(x.data),
+                static_cast<const __nv_bfloat16*>(norm.data), k, t, 1.0e-6f, true,
+                input_q8.p, stream);
+            Tensor graph_output(actual.p, DType::BF16, {down_rows, t});
+            const bool graph_selected = ops::detail::gguf_swiglu_linear_add_prequantized(
+                input_q8.p, k, t, gate, nullptr, down, graph_output, prepared_workspace, stream);
+            if (!graph_selected) {
+                Tensor graph_activation(activation.p, DType::BF16, {intermediate, t});
+                if (!ops::detail::gguf_swiglu_prequantized(
+                        input_q8.p, k, t, gate, graph_activation, stream)) {
+                    throw std::runtime_error("prepared graph SwiGLU route was rejected");
+                }
+                ops::linear_add(graph_activation, down, graph_output, ops::LinearPolicy::A16Only,
+                                prepared_workspace, stream);
+            }
+            check(cudaStreamEndCapture(stream, &graph), "end prepared FFN graph capture");
+            check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
+                  "instantiate prepared FFN graph");
+            check(cudaGraphLaunch(executable, stream), "launch prepared FFN graph");
+            check(cudaStreamSynchronize(stream), "wait for prepared FFN graph");
+            actual.copy_to(actual_host.data(), actual.bytes);
+            if (std::memcmp(expected_host.data(), actual_host.data(), expected.bytes) != 0) {
+                throw std::runtime_error("prepared FFN graph replay changed exact BF16 residual values");
+            }
+            check(cudaGraphExecDestroy(executable), "destroy prepared FFN graph executable");
+            check(cudaGraphDestroy(graph), "destroy prepared FFN graph");
+            check(cudaStreamDestroy(stream), "destroy prepared FFN graph stream");
         }
     }
     auto gathered = down;

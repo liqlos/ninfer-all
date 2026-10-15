@@ -301,6 +301,48 @@ void gguf_project_q8_1_activation(int k, int columns, const void* activation,
     }
 }
 
+void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_format,
+                                         const void* activation,
+                                         std::span<const GgufProduct> products,
+                                         WorkspaceArena& workspace, cudaStream_t stream) {
+    if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > 1024 || activation == nullptr ||
+        (reinterpret_cast<std::uintptr_t>(activation) & (alignof(std::uint32_t) - 1)) != 0 ||
+        products.empty()) {
+        throw std::invalid_argument("gguf prepared matrix activation: unsupported geometry");
+    }
+    const auto prepared_type = gguf_type(activation_format);
+    if (!gguf::has_matrix_kernel(prepared_type)) {
+        throw std::invalid_argument("gguf prepared matrix activation: unsupported format");
+    }
+    const int prepared_layout = gguf::matrix_activation_layout(prepared_type);
+    const Tensor input(nullptr, DType::BF16, {k, columns});
+    std::int32_t plane_rows = 0;
+    for (const GgufProduct& p : products) {
+        require_gguf(*p.weight, "gguf prepared matrix product");
+        require_product(input, p);
+        const auto type = gguf_type(p.weight->qtype);
+        if (!matrix_kernel(*p.weight) || p.weight->input_columns != nullptr ||
+            gguf::matrix_activation_layout(type) != prepared_layout) {
+            throw std::invalid_argument("gguf prepared matrix activation: incompatible product");
+        }
+        plane_rows = std::max(plane_rows, p.weight->n);
+    }
+    auto scope = workspace.scope();
+    auto* plane = static_cast<float*>(
+        workspace.alloc_bytes(std::size_t(plane_rows) * columns * sizeof(float)).data);
+    void* fixup = workspace.alloc_bytes(fixup_bound()).data;
+    for (const GgufProduct& p : products) {
+        const Weight& w = *p.weight;
+        const auto type = gguf_type(w.qtype);
+        const bool direct = p.f32 != nullptr && p.epilogue == GgufEpilogue::Store;
+        float* out = direct ? p.f32 + p.row : plane;
+        const std::int64_t stride = direct ? p.f32_rows : w.n;
+        gguf::matrix_product(type, w.qdata, row_bytes(w), w.n, k, activation, columns, out,
+                             stride, fixup, stream);
+        if (!direct) { gguf::store_plane(plane, w.n, w.n, columns, output(p, 0), stream); }
+    }
+}
+
 void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& workspace,
                  cudaStream_t stream) {
     const GgufProduct product{&w, &out, 0, GgufEpilogue::Store};
@@ -412,6 +454,73 @@ bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* u
     (void)stream;
     return false;
 #endif
+}
+
+bool gguf_swiglu_linear_add_prequantized(const void* activation, int k, int columns,
+                                         const Weight& gate, const Weight* up,
+                                         const Weight& down, Tensor& residual,
+                                         WorkspaceArena& workspace, cudaStream_t stream) {
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION) || defined(NINFER_GGUF_PERSISTENT_FFN)
+    if (activation == nullptr || k != gate.k || gate.input_columns != nullptr || columns < 1 ||
+        columns > 8 || !fused_swiglu_q8_weights_admit(gate, up, down, columns, columns) ||
+        down.n <= 0 || down.n != residual.ne[0] || residual.ne[1] != columns ||
+        residual.ne[2] != 1 || residual.ne[3] != 1 || residual.dtype != DType::BF16 ||
+        !residual.is_contiguous() || residual.data == nullptr ||
+        (reinterpret_cast<std::uintptr_t>(activation) & (alignof(int4) - 1)) != 0) {
+        return false;
+    }
+    auto scope = workspace.scope();
+    const std::int32_t rows = gate.n / 2;
+    void* output = workspace.alloc_bytes(gguf::vector_activation_bytes(rows, columns)).data;
+    const auto route = gguf_swiglu_linear_add_route(gate, up, down, columns);
+    if (route == GgufSwiGluRoute::PersistentFfn) {
+        return gguf::persistent_swiglu_q8_add(
+            gguf_type(gate.qtype), gate.qdata, row_bytes(gate), rows, gate.k, activation,
+            gguf_type(down.qtype), down.qdata, row_bytes(down), down.n, down.k, output,
+            static_cast<__nv_bfloat16*>(residual.data), residual.ne[0], columns, stream);
+    }
+    if (route != GgufSwiGluRoute::ProducerQ8) { return false; }
+#if defined(NINFER_GGUF_SWIGLU_Q8_FUSION)
+    gguf::vector_swiglu_q8(gguf_type(gate.qtype), gate.qdata, row_bytes(gate), rows, gate.k,
+                           activation, columns, output, stream, NINFER_GGUF_SWIGLU_Q8_WARPS);
+#else
+    return false;
+#endif
+    gguf::VectorOutput destination;
+    destination.bf16 = static_cast<__nv_bfloat16*>(residual.data);
+    destination.column_stride = residual.ne[0];
+    destination.epilogue = gguf::Epilogue::Accumulate;
+    gguf::vector_product(gguf_type(down.qtype), down.qdata, row_bytes(down), down.n, down.k,
+                         output, columns, destination, stream);
+    return true;
+#else
+    (void)activation;
+    (void)k;
+    (void)columns;
+    (void)gate;
+    (void)up;
+    (void)down;
+    (void)residual;
+    (void)workspace;
+    (void)stream;
+    return false;
+#endif
+}
+
+bool gguf_swiglu_prequantized(const void* activation, int k, int columns,
+                              const Weight& gate, Tensor& output, cudaStream_t stream) {
+    if (activation == nullptr || gate.qtype != QType::GGUF_Q4_K || gate.k != k || k != 5120 ||
+        gate.n != 34816 || gate.layout != QuantLayout::GgufBlocks || gate.qdata == nullptr ||
+        gate.input_columns != nullptr || columns < 1 || columns > gguf::kMaxVectorColumns ||
+        output.dtype != DType::BF16 || !output.is_contiguous() || output.ne[0] != gate.n / 2 ||
+        output.ne[1] != columns || output.ne[2] != 1 || output.ne[3] != 1 || output.data == nullptr ||
+        (reinterpret_cast<std::uintptr_t>(activation) & (alignof(int4) - 1)) != 0) {
+        return false;
+    }
+    gguf::vector_swiglu(gguf_type(gate.qtype), gate.qdata, row_bytes(gate), gate.n / 2, k,
+                        activation, columns, static_cast<__nv_bfloat16*>(output.data),
+                        output.ne[0], stream);
+    return true;
 }
 
 std::size_t gguf_swiglu_workspace_bytes(const GgufShape& gate, const GgufShape* up,
