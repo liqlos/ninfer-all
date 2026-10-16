@@ -154,9 +154,28 @@ struct Decoder<GGML_TYPE_Q4_K> {
     __device__ static const std::uint32_t* table() { return nullptr; }
     __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
                                                   const std::uint32_t*, Slice& s) {
+#if defined(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD) && __CUDA_ARCH__ == 860
+        const uint4 header = *reinterpret_cast<const uint4*>(b);
+        const float2 dm = __half22float2(*reinterpret_cast<const half2*>(&header.x));
+        int sc, m;
+        if (u < 4) {
+            const std::uint32_t scale = (header.y >> (8 * u)) & 0xFFu;
+            const std::uint32_t minimum = (header.z >> (8 * u)) & 0xFFu;
+            sc = int(scale & 63u);
+            m = int(minimum & 63u);
+        } else {
+            const int byte = u - 4;
+            const std::uint32_t packed = (header.w >> (8 * byte)) & 0xFFu;
+            const std::uint32_t scale_high = (header.y >> (8 * byte)) & 0xFFu;
+            const std::uint32_t minimum_high = (header.z >> (8 * byte)) & 0xFFu;
+            sc = int((packed & 0xFu) | ((scale_high >> 6) << 4));
+            m = int((packed >> 4) | ((minimum_high >> 6) << 4));
+        }
+#else
         const float2 dm = __half22float2(*reinterpret_cast<const half2*>(b));
         int sc, m;
         scale_min_k4(b + 4, u, sc, m);
+#endif
         s.f[0]              = dm.x * float(sc);
         s.f[1]              = dm.y * float(m);
         const uint4* qs     = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
