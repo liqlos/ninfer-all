@@ -5,6 +5,7 @@ option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K v
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
 option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Cooperatively load packed Q6_K blocks across SM86 warp lanes" OFF)
+option(NINFER_GGUF_Q6_PACKED_SCALE_LOAD "Load each Q6_K scale pair with one aligned SM86 word transaction" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD "Load the aligned Q4_K vector block header in one SM86 vector transaction" OFF)
 option(NINFER_GGUF_Q4_SPLIT_DP4A "Split SM86 Q4_K vector dots into independent DP4A chains" OFF)
@@ -138,6 +139,16 @@ if(NINFER_GGUF_Q6_COOPERATIVE_DECODE)
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_COOPERATIVE_DECODE=1)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_COOPERATIVE_DECODE=1)
+endif()
+if(NINFER_GGUF_Q6_PACKED_SCALE_LOAD)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Packed GGUF Q6_K scale loads require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_persistent_ffn.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_gdn_persistent.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_PACKED_SCALE_LOAD=1)
 endif()
 if(NINFER_GGUF_Q4_COOPERATIVE_DECODE)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")

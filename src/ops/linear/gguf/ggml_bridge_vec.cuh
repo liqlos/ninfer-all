@@ -257,8 +257,16 @@ struct Decoder<GGML_TYPE_Q6_K> {
         const int h = u / 4, q = u % 4;
         const float d        = half_at(b + 208);
         const auto* sc       = reinterpret_cast<const std::int8_t*>(b + 192 + 8 * h);
-        s.f[0]               = d * float(sc[2 * q]);
-        s.f[1]               = d * float(sc[2 * q + 1]);
+#if defined(NINFER_GGUF_Q6_PACKED_SCALE_LOAD) && __CUDA_ARCH__ == 860
+        const std::uint32_t packed_sc = *reinterpret_cast<const std::uint16_t*>(sc + 2 * q);
+        const int scale0 = static_cast<int>((packed_sc & 0xffu) ^ 0x80u) - 0x80;
+        const int scale1 = static_cast<int>(((packed_sc >> 8) & 0xffu) ^ 0x80u) - 0x80;
+#else
+        const int scale0 = sc[2 * q];
+        const int scale1 = sc[2 * q + 1];
+#endif
+        s.f[0]               = d * float(scale0);
+        s.f[1]               = d * float(scale1);
         const std::uint8_t* ql = b + 64 * h + 32 * (q & 1);
         const std::uint8_t* qh = b + 128 + 32 * h;
 #if defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
