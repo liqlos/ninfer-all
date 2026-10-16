@@ -629,6 +629,59 @@ bool matrix_product_bf16_store(GgmlType type, const void* weight, std::int64_t r
 #endif
 }
 
+bool matrix_bf16_gate_store_plan(GgmlType type, int rows, int columns,
+                                 MatrixBf16StorePlan& plan) {
+#if defined(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
+    if (type != GgmlType::Q4_K) { return false; }
+    int J = 0;
+    int I = 0;
+    bool stream_k = false;
+    try {
+        if (!detail::matrix_bf16_store_plan_impl<GGML_TYPE_Q4_K>(rows, columns, J, I,
+                                                                  stream_k)) {
+            return false;
+        }
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+    plan = {J, I, stream_k};
+    return true;
+#else
+    GGML_UNUSED(type);
+    GGML_UNUSED(rows);
+    GGML_UNUSED(columns);
+    GGML_UNUSED(plan);
+    return false;
+#endif
+}
+
+bool matrix_product_bf16_gate_store(
+    GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
+    const void* activation, int columns, __nv_bfloat16* out,
+    std::int64_t out_column_stride, const float* gate, std::int64_t gate_column_stride,
+    cudaStream_t stream) {
+#if defined(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
+    if (type != GgmlType::Q4_K) { return false; }
+    return detail::matrix_product_bf16_gate_store_impl<GGML_TYPE_Q4_K>(
+        weight, row_bytes, rows, k, activation, columns, out, out_column_stride, gate,
+        gate_column_stride, stream);
+#else
+    GGML_UNUSED(type);
+    GGML_UNUSED(weight);
+    GGML_UNUSED(row_bytes);
+    GGML_UNUSED(rows);
+    GGML_UNUSED(k);
+    GGML_UNUSED(activation);
+    GGML_UNUSED(columns);
+    GGML_UNUSED(out);
+    GGML_UNUSED(out_column_stride);
+    GGML_UNUSED(gate);
+    GGML_UNUSED(gate_column_stride);
+    GGML_UNUSED(stream);
+    return false;
+#endif
+}
+
 void store_plane(const float* in, std::int64_t in_column_stride, int rows, int columns,
                  const VectorOutput& out, cudaStream_t stream) {
     if ((out.bf16 == nullptr) == (out.f32 == nullptr) ||

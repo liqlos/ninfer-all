@@ -527,10 +527,12 @@ static __device__ __forceinline__ void ggml_cuda_mmq_write_back_mma(
     }
 }
 
-template<ggml_type type, int J, bool fallback, ggml_prec prec_src1, bool bf16_accumulate = false>
+template<ggml_type type, int J, bool fallback, ggml_prec prec_src1, bool bf16_accumulate = false,
+         bool bf16_gate_product = false>
 static __device__ __forceinline__ void ggml_cuda_mmq_write_back_bf16(
         const float * __restrict__ sum, const int * __restrict__ ids_dst,
-        __nv_bfloat16 * __restrict__ dst, const int stride, const int i_max, const int j_max) {
+        __nv_bfloat16 * __restrict__ dst, const int stride, const int i_max, const int j_max,
+        const float * __restrict__ gate, const int gate_stride) {
     if constexpr (ggml_cuda_mmq_get_config(type, J, fallback, prec_src1).use_mma_data_layout()) {
 #if defined(AMD_MFMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
         typedef tile<16, 16, int, DATA_LAYOUT_J_MAJOR> tile_C;
@@ -552,6 +554,10 @@ static __device__ __forceinline__ void ggml_cuda_mmq_write_back_bf16(
                     if (fallback && i > i_max) { continue; }
                     const int at = ids_dst[j] * stride + i;
                     float value = sum[(j0 / tile_C::J + n) * tile_C::ne + l];
+                    if constexpr (bf16_gate_product) {
+                        const float gate_value = gate[ids_dst[j] * gate_stride + i];
+                        value *= gate_value / (1.0f + expf(-gate_value));
+                    }
                     if constexpr (bf16_accumulate) { value += __bfloat162float(dst[at]); }
                     dst[at] = __float2bfloat16(value);
                 }
@@ -571,6 +577,10 @@ static __device__ __forceinline__ void ggml_cuda_mmq_write_back_bf16(
                 if (fallback && i > i_max) { continue; }
                 const int at = ids_dst[j] * stride + i;
                 float value = sum[(j0 / nwarps) * (I / warp_size) + i0 / warp_size];
+                if constexpr (bf16_gate_product) {
+                    const float gate_value = gate[ids_dst[j] * gate_stride + i];
+                    value *= gate_value / (1.0f + expf(-gate_value));
+                }
                 if constexpr (bf16_accumulate) { value += __bfloat162float(dst[at]); }
                 dst[at] = __float2bfloat16(value);
             }
@@ -941,7 +951,7 @@ static __device__ __forceinline__ void ggml_cuda_mmq_copy_y_async(int * dst, con
 #endif
 
 template <ggml_type type, int J, bool fallback, bool fixup, ggml_prec prec_src1 = GGML_PREC_Q8,
-          bool bf16_store = false, bool bf16_accumulate = false>
+          bool bf16_store = false, bool bf16_accumulate = false, bool bf16_gate_product = false>
 static __device__ __forceinline__ void mul_mat_q_process_tile(
         const char * __restrict__ x, const int offset_x, const int * __restrict__ y,
         const int * __restrict__ ids_dst, float * __restrict__ dst,
@@ -1152,9 +1162,10 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
         if (fixup) {
             write_back(sum, ids_dst, tmp_fixup + blockIdx.x*(J*I), y_scale, I, I, J);
         } else {
-            ggml_cuda_mmq_write_back_bf16<type, J, fallback, prec_src1, bf16_accumulate>(sum, ids_dst, dst_bf16,
-                                                                        stride_col_dst, tile_x_max_i,
-                                                                        tile_y_max_j);
+            ggml_cuda_mmq_write_back_bf16<type, J, fallback, prec_src1, bf16_accumulate,
+                                          bf16_gate_product>(
+                sum, ids_dst, dst_bf16, stride_col_dst, tile_x_max_i, tile_y_max_j, y_scale,
+                stride_channel_dst);
         }
     } else {
         if (fixup) {
@@ -1169,7 +1180,7 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 // The mul_mat_q kernel implements "stream-k" work partitioning as described in https://arxiv.org/abs/2301.03598
 
 template <ggml_type type, int J, bool fallback, ggml_prec prec_src1 = GGML_PREC_Q8,
-          bool bf16_store = false, bool bf16_accumulate = false>
+          bool bf16_store = false, bool bf16_accumulate = false, bool bf16_gate_product = false>
 __launch_bounds__(ggml_cuda_mmq_get_nthreads(type, J, fallback, prec_src1), ggml_cuda_mmq_get_occupancy(type, J, fallback, prec_src1))
 static __global__ void mul_mat_q(
         const char * __restrict__ x, const int * __restrict__ y, const int32_t * __restrict__ ids_dst,
@@ -1265,6 +1276,8 @@ static __global__ void mul_mat_q(
         if constexpr (type == GGML_TYPE_NVFP4) {
             offset_y_scale += col_low + jt*J;
             y_scale_tile = y_scale ? y_scale + offset_y_scale : nullptr;
+        } else if constexpr (bf16_gate_product) {
+            y_scale_tile = y_scale + jt * J * stride_channel_dst;
         }
 
         const int tile_x_max_i = nrows_x  - it*I - 1;
@@ -1282,7 +1295,8 @@ static __global__ void mul_mat_q(
         if constexpr (bf16_store) { tile_dst_bf16 = dst_bf16 + offset_dst; }
 
         constexpr bool fixup = false;
-        mul_mat_q_process_tile<type, J, fallback, fixup, prec_src1, bf16_store, bf16_accumulate>
+        mul_mat_q_process_tile<type, J, fallback, fixup, prec_src1, bf16_store, bf16_accumulate,
+                               bf16_gate_product>
             (x, offset_x, y + offset_y, ids_dst_shared, tile_dst,
              tile_dst_bf16, tmp_fixup, y_scale_tile,
              stride_row_x, ncols_y, stride_col_dst,
@@ -1369,6 +1383,8 @@ static __global__ void mul_mat_q(
         if constexpr (type == GGML_TYPE_NVFP4) {
             offset_y_scale += col_low + jt * J;
             y_scale_tile = y_scale ? y_scale + offset_y_scale : nullptr;
+        } else if constexpr (bf16_gate_product) {
+            y_scale_tile = y_scale + jt * J * stride_channel_dst;
         }
 
         const int tile_x_max_i = nrows_x  - it*I - 1;
@@ -1386,7 +1402,8 @@ static __global__ void mul_mat_q(
         if constexpr (bf16_store) { tile_dst_bf16 = dst_bf16 + offset_dst; }
 
         constexpr bool fixup = false; // All but (potentially) the last iterations write their data to dst rather than the fixup buffer.
-        mul_mat_q_process_tile<type, J, fallback, fixup, prec_src1, bf16_store, bf16_accumulate>
+        mul_mat_q_process_tile<type, J, fallback, fixup, prec_src1, bf16_store, bf16_accumulate,
+                               bf16_gate_product>
             (x, offset_x, y + offset_y, ids_dst_shared, tile_dst,
              tile_dst_bf16, tmp_fixup, y_scale_tile,
              stride_row_x, ncols_y, stride_col_dst,
@@ -1463,6 +1480,8 @@ static __global__ void mul_mat_q(
     if constexpr (type == GGML_TYPE_NVFP4) {
         offset_y_scale += col_low + jt * J;
         y_scale_tile = y_scale ? y_scale + offset_y_scale : nullptr;
+    } else if constexpr (bf16_gate_product) {
+        y_scale_tile = y_scale + jt * J * stride_channel_dst;
     }
 
     const int tile_x_max_i = nrows_x  - it*I - 1;
@@ -1480,7 +1499,8 @@ static __global__ void mul_mat_q(
     if constexpr (bf16_store) { tile_dst_bf16 = dst_bf16 + offset_dst; }
 
     constexpr bool fixup = true; // Last index writes its data to fixup buffer to avoid data races with other blocks.
-    mul_mat_q_process_tile<type, J, fallback, fixup, prec_src1, bf16_store, bf16_accumulate>
+    mul_mat_q_process_tile<type, J, fallback, fixup, prec_src1, bf16_store, bf16_accumulate,
+                           bf16_gate_product>
         (x, offset_x, y + offset_y, ids_dst_shared, tile_dst,
          tile_dst_bf16, tmp_fixup, y_scale_tile,
          stride_row_x, ncols_y, stride_col_dst,

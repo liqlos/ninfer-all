@@ -200,9 +200,11 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
 
 bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                   WorkspaceArena& workspace, cudaStream_t stream,
-                  bool* used_mmq_store, bool* used_dual_layout_mmq_pack) {
+                  bool* used_mmq_store, bool* used_dual_layout_mmq_pack,
+                  bool* used_mmq_gate_epilogue) {
     if (used_mmq_store != nullptr) { *used_mmq_store = false; }
     if (used_dual_layout_mmq_pack != nullptr) { *used_dual_layout_mmq_pack = false; }
+    if (used_mmq_gate_epilogue != nullptr) { *used_mmq_gate_epilogue = false; }
     require_activation(x, "gguf product");
     if (products.empty()) { return false; }
     for (const auto& p : products) { require_product(x, p); }
@@ -238,7 +240,8 @@ bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 }
             }
             return gguf_project_matrix_q8_1_activations(k, t, matrix_activations, products,
-                                                        workspace, stream, used_mmq_store);
+                                                        workspace, stream, used_mmq_store,
+                                                        used_mmq_gate_epilogue);
         }
     }
 #endif
@@ -373,6 +376,32 @@ bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 }
             }
 #endif
+#if defined(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
+            if (p.f32 == nullptr && p.epilogue == GgufEpilogue::GateProduct &&
+                p.out != nullptr && p.gate != nullptr && w.qtype == QType::GGUF_Q4_K &&
+                w.input_columns == nullptr) {
+                gguf::MatrixBf16StorePlan plan;
+                if (gguf::matrix_bf16_gate_store_plan(type, w.n, t, plan)) {
+                    const gguf::VectorOutput destination = output(p, 0);
+                    const auto gate_begin = reinterpret_cast<std::uintptr_t>(destination.gate);
+                    const auto gate_end = gate_begin + std::size_t(w.n) * t * sizeof(float);
+                    const auto out_begin = reinterpret_cast<std::uintptr_t>(destination.bf16);
+                    const auto out_end = out_begin +
+                        (std::size_t(t - 1) * destination.column_stride + w.n) *
+                            sizeof(__nv_bfloat16);
+                    if ((gate_end <= out_begin || out_end <= gate_begin) &&
+                        gguf::matrix_product_bf16_gate_store(
+                            type, w.qdata, row_bytes(w), w.n, k, found->data, t,
+                            destination.bf16, destination.column_stride, destination.gate,
+                            destination.gate_column_stride, stream)) {
+                        if (used_mmq_gate_epilogue != nullptr) {
+                            *used_mmq_gate_epilogue = true;
+                        }
+                        continue;
+                    }
+                }
+            }
+#endif
             gguf::matrix_product(type, w.qdata, row_bytes(w), w.n, k, found->data, t, out, stride,
                                  fixup, stream);
         } else if (t <= kDequantizedVectorColumns) {
@@ -431,8 +460,9 @@ void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_fo
 bool gguf_project_matrix_q8_1_activations(
     int k, int columns, std::span<const gguf::MatrixActivationPlane> activations,
     std::span<const GgufProduct> products, WorkspaceArena& workspace, cudaStream_t stream,
-    bool* used_mmq_store) {
+    bool* used_mmq_store, bool* used_mmq_gate_epilogue) {
     if (used_mmq_store != nullptr) { *used_mmq_store = false; }
+    if (used_mmq_gate_epilogue != nullptr) { *used_mmq_gate_epilogue = false; }
     if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > 1024 || products.empty() ||
         activations.empty()) {
         throw std::invalid_argument("gguf prepared matrix activation: unsupported geometry");
@@ -561,6 +591,31 @@ bool gguf_project_matrix_q8_1_activations(
                                                     destination.column_stride, stream,
                                                     p.epilogue == GgufEpilogue::Accumulate)) {
                     if (used_mmq_store != nullptr) { *used_mmq_store = true; }
+                    continue;
+                }
+            }
+        }
+#endif
+#if defined(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
+        if (p.f32 == nullptr && p.epilogue == GgufEpilogue::GateProduct &&
+            p.out != nullptr && p.gate != nullptr && w.qtype == QType::GGUF_Q4_K) {
+            gguf::MatrixBf16StorePlan plan;
+            if (gguf::matrix_bf16_gate_store_plan(type, w.n, columns, plan)) {
+                const gguf::VectorOutput destination = output(p, 0);
+                const auto gate_begin = reinterpret_cast<std::uintptr_t>(destination.gate);
+                const auto gate_end = gate_begin + std::size_t(w.n) * columns * sizeof(float);
+                const auto out_begin = reinterpret_cast<std::uintptr_t>(destination.bf16);
+                const auto out_end = out_begin +
+                    (std::size_t(columns - 1) * destination.column_stride + w.n) *
+                        sizeof(__nv_bfloat16);
+                if ((gate_end <= out_begin || out_end <= gate_begin) &&
+                    gguf::matrix_product_bf16_gate_store(
+                        type, w.qdata, row_bytes(w), w.n, k, activation->data, columns,
+                        destination.bf16, destination.column_stride, destination.gate,
+                        destination.gate_column_stride, stream)) {
+                    if (used_mmq_gate_epilogue != nullptr) {
+                        *used_mmq_gate_epilogue = true;
+                    }
                     continue;
                 }
             }

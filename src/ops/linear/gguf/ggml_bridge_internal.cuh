@@ -100,4 +100,10 @@ bool matrix_product_bf16_store_impl(const void* weight, std::int64_t row_bytes, 
                                     std::int64_t out_column_stride, cudaStream_t stream,
                                     bool accumulate);
 
+template <ggml_type type>
+bool matrix_product_bf16_gate_store_impl(
+    const void* weight, std::int64_t row_bytes, int rows, int k, const void* activation,
+    int columns, __nv_bfloat16* out, std::int64_t out_column_stride, const float* gate,
+    std::int64_t gate_column_stride, cudaStream_t stream);
+
 } // namespace ninfer::ops::gguf::detail

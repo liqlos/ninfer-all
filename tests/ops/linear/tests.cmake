@@ -83,6 +83,11 @@ if(NINFER_GGUF_MMQ_STORE_FUSION)
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
     LIBRARIES ninfer_ops)
 endif()
+if(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
+  ninfer_add_op_test(ninfer_linear_gguf_mmq_gate_epilogue_test
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_gate_epilogue.cu"
+    LIBRARIES ninfer_ops)
+endif()
 if(NINFER_GGUF_SM86_MMQ_TILE_CAP AND NINFER_GGUF_MMQ_STORE_FUSION)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_SM86_MMQ_MAX_J=${NINFER_GGUF_SM86_MMQ_MAX_J})
