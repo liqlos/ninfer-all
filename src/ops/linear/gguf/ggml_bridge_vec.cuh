@@ -11,6 +11,9 @@
 
 #include "ggml_bridge_internal.cuh"
 #include "../../common/memory.cuh"
+#if defined(NINFER_GGUF_Q4_T4_IMMA)
+#include "../../common/mma.cuh"
+#endif
 
 #include <algorithm>
 
@@ -546,6 +549,119 @@ constexpr int vector_rows_per_warp() {
 #endif
 }
 
+#if defined(NINFER_GGUF_Q4_T4_IMMA)
+__device__ __forceinline__ void q4_t4_imma_decode(const std::uint8_t* block, int u, Slice& slice) {
+    const float2 dm = __half22float2(*reinterpret_cast<const half2*>(block));
+    int scale, minimum;
+    scale_min_k4(block + 4, u, scale, minimum);
+    slice.f[0] = dm.x * float(scale);
+    slice.f[1] = dm.y * float(minimum);
+    const auto* packed = reinterpret_cast<const std::uint32_t*>(block + 16 + 32 * (u / 2));
+    const int shift = 4 * (u & 1);
+#pragma unroll
+    for (int i = 0; i < 8; ++i) { slice.w[i] = int((packed[i] >> shift) & 0x0F0F0F0Fu); }
+}
+
+template <int R, int J>
+__device__ __forceinline__ void q4_t4_imma_step(const VecArgs& p, int row0, int gid, int tig,
+                                                int t, float (&partial)[2][4][4]) {
+    using D = Decoder<GGML_TYPE_Q4_K>;
+    const int block = R + 4 * t;
+    const bool valid_row = row0 + gid < p.rows;
+    unsigned a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+    Slice even{}, odd{};
+    if (valid_row) {
+        const std::uint8_t* rowp = p.weight + std::int64_t(row0 + gid) * p.row_bytes +
+                                   block * D::kBlockBytes;
+        q4_t4_imma_decode(rowp, 2 * J, even);
+        q4_t4_imma_decode(rowp, 2 * J + 1, odd);
+        a0 = static_cast<unsigned>(even.w[tig]);
+        a1 = static_cast<unsigned>(odd.w[tig]);
+        a2 = static_cast<unsigned>(even.w[tig + 4]);
+        a3 = static_cast<unsigned>(odd.w[tig + 4]);
+    }
+    const int input_column = gid & 3;
+    const int input_u      = 2 * J + (gid >> 2);
+    const std::int64_t input = std::int64_t(input_column) * p.k + block * 256 + input_u * 32;
+    const auto* x = reinterpret_cast<const std::uint32_t*>(p.qs + input);
+    const unsigned b0 = x[tig];
+    const unsigned b1 = x[tig + 4];
+    int c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+    ninfer::ops::mma_s8(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
+    const bool upper = tig >= 2;
+    const int u      = 2 * J + int(upper);
+    const Slice& w   = upper ? odd : even;
+    const int token0 = 2 * (tig & 1);
+    if (upper) {
+        const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + block * 8 + u]);
+        const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + block * 8 + u]);
+        partial[0][J][R] += w.f[0] * ds0.x * float(c2) - w.f[1] * ds0.y;
+        partial[1][J][R] += w.f[0] * ds1.x * float(c3) - w.f[1] * ds1.y;
+    } else {
+        const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + block * 8 + u]);
+        const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + block * 8 + u]);
+        partial[0][J][R] += w.f[0] * ds0.x * float(c0) - w.f[1] * ds0.y;
+        partial[1][J][R] += w.f[0] * ds1.x * float(c1) - w.f[1] * ds1.y;
+    }
+}
+
+__launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_imma_5120(VecArgs p) {
+    const int warp = threadIdx.x >> 5;
+    const int lane = threadIdx.x & 31;
+    const int gid  = lane >> 2;
+    const int tig  = lane & 3;
+    for (int row0 = (blockIdx.x * kVecWarps + warp) * 8; row0 < p.rows;
+         row0 += gridDim.x * kVecWarps * 8) {
+        float partial[2][4][4];
+#pragma unroll
+        for (int s = 0; s < 2; ++s)
+#pragma unroll
+            for (int j = 0; j < 4; ++j)
+#pragma unroll
+                for (int r = 0; r < 4; ++r) partial[s][j][r] = 0.0f;
+        for (int t = 0; t < 5; ++t) {
+            q4_t4_imma_step<0, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<0, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<0, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<0, 3>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<1, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<1, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<1, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<1, 3>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<2, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<2, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<2, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<2, 3>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<3, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<3, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<3, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_imma_step<3, 3>(p, row0, gid, tig, t, partial);
+        }
+        float reduced[2];
+#pragma unroll
+        for (int s = 0; s < 2; ++s) {
+            const float u0 = (partial[s][0][0] + partial[s][0][2]) +
+                             (partial[s][0][1] + partial[s][0][3]);
+            const float u1 = (partial[s][1][0] + partial[s][1][2]) +
+                             (partial[s][1][1] + partial[s][1][3]);
+            const float u2 = (partial[s][2][0] + partial[s][2][2]) +
+                             (partial[s][2][1] + partial[s][2][3]);
+            const float u3 = (partial[s][3][0] + partial[s][3][2]) +
+                             (partial[s][3][1] + partial[s][3][3]);
+            reduced[s] = (u0 + u2) + (u1 + u3);
+        }
+        const int row = row0 + gid;
+#pragma unroll
+        for (int s = 0; s < 2; ++s) {
+            const float other = __shfl_xor_sync(0xFFFFFFFFu, reduced[s], 2);
+            if (tig < 2 && row < p.rows) {
+                vec_store(p.out, row, 2 * tig + s, reduced[s] + other);
+            }
+        }
+    }
+}
+#endif
+
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
 template <int KS>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(VecArgs p) {
@@ -807,7 +923,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 }
 
 template <ggml_type type, int T, bool Fused, int KS>
-void launch(const VecArgs& args, cudaStream_t stream) {
+void launch_baseline(const VecArgs& args, cudaStream_t stream) {
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
     if constexpr (type == GGML_TYPE_Q4_K && T == 4 && Fused) {
         static const int resident = [] {
@@ -838,6 +954,29 @@ void launch(const VecArgs& args, cudaStream_t stream) {
     kernel<type, T, Fused, KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
     check(cudaGetLastError(), "vector product launch");
     }
+}
+
+template <ggml_type type, int T, bool Fused, int KS>
+void launch(const VecArgs& args, cudaStream_t stream) {
+#if defined(NINFER_GGUF_Q4_T4_IMMA)
+    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Fused && KS == 5120) {
+        if (device_facts().cc == 860 && args.k == 5120) {
+            static const int resident = [] {
+                int blocks = 0;
+                check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &blocks, kernel_q4_t4_imma_5120, kVecWarps * 32, 0),
+                      "Q4_K T4 IMMA occupancy");
+                return std::max(blocks, 1);
+            }();
+            const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
+            const int blocks = std::min(groups, resident * device_facts().sm_count);
+            kernel_q4_t4_imma_5120<<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            check(cudaGetLastError(), "Q4_K T4 IMMA vector product launch");
+            return;
+        }
+    }
+#endif
+    launch_baseline<type, T, Fused, KS>(args, stream);
 }
 
 template <ggml_type type, int T, bool Fused>

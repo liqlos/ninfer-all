@@ -9,6 +9,7 @@ option(NINFER_GGUF_Q6_PACKED_SCALE_LOAD "Load each Q6_K scale pair with one alig
 option(NINFER_GGUF_Q6_T4_SINGLE_ROW "Assign one non-fused SM86 Q6_K T4 output row to each warp" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR "Assign adjacent SM86 Q4_K T4 fused gate/up rows to separate warps" OFF)
+option(NINFER_GGUF_Q4_T4_IMMA "Use exact-chain SM86 Q4_K T4 INT8 MMA for non-fused K5120 vector products" OFF)
 option(NINFER_GGUF_Q4_T4_SINGLE_ROW "Assign one non-fused SM86 Q4_K T4 output row to each warp" OFF)
 option(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD "Load the aligned Q4_K vector block header in one SM86 vector transaction" OFF)
 option(NINFER_GGUF_Q4_SPLIT_DP4A "Split SM86 Q4_K vector dots into independent DP4A chains" OFF)
@@ -185,6 +186,14 @@ if(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
   endif()
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR=1)
+endif()
+if(NINFER_GGUF_Q4_T4_IMMA)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q4_K T4 IMMA vector products require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_IMMA=1
+      NINFER_GGUF_Q4_T4_IMMA_TEST=1)
 endif()
 if(NINFER_GGUF_Q6_STATIC_K)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
