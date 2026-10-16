@@ -550,18 +550,6 @@ constexpr int vector_rows_per_warp() {
 }
 
 #if defined(NINFER_GGUF_Q4_T4_IMMA)
-__device__ __forceinline__ void q4_t4_imma_decode(const std::uint8_t* block, int u, Slice& slice) {
-    const float2 dm = __half22float2(*reinterpret_cast<const half2*>(block));
-    int scale, minimum;
-    scale_min_k4(block + 4, u, scale, minimum);
-    slice.f[0] = dm.x * float(scale);
-    slice.f[1] = dm.y * float(minimum);
-    const auto* packed = reinterpret_cast<const std::uint32_t*>(block + 16 + 32 * (u / 2));
-    const int shift = 4 * (u & 1);
-#pragma unroll
-    for (int i = 0; i < 8; ++i) { slice.w[i] = int((packed[i] >> shift) & 0x0F0F0F0Fu); }
-}
-
 template <int R, int J>
 __device__ __forceinline__ void q4_t4_imma_step(const VecArgs& p, int row0, int gid, int tig,
                                                 int t, float (&partial)[2][4][4]) {
@@ -569,16 +557,24 @@ __device__ __forceinline__ void q4_t4_imma_step(const VecArgs& p, int row0, int 
     const int block = R + 4 * t;
     const bool valid_row = row0 + gid < p.rows;
     unsigned a0 = 0, a1 = 0, a2 = 0, a3 = 0;
-    Slice even{}, odd{};
+    float weight_scale = 0.0f, weight_minimum = 0.0f;
+    const bool upper = tig >= 2;
+    const int u = 2 * J + int(upper);
     if (valid_row) {
         const std::uint8_t* rowp = p.weight + std::int64_t(row0 + gid) * p.row_bytes +
                                    block * D::kBlockBytes;
-        q4_t4_imma_decode(rowp, 2 * J, even);
-        q4_t4_imma_decode(rowp, 2 * J + 1, odd);
-        a0 = static_cast<unsigned>(even.w[tig]);
-        a1 = static_cast<unsigned>(odd.w[tig]);
-        a2 = static_cast<unsigned>(even.w[tig + 4]);
-        a3 = static_cast<unsigned>(odd.w[tig + 4]);
+        const float2 dm = __half22float2(*reinterpret_cast<const half2*>(rowp));
+        int scale, minimum;
+        scale_min_k4(rowp + 4, u, scale, minimum);
+        weight_scale = dm.x * float(scale);
+        weight_minimum = dm.y * float(minimum);
+        const auto* packed = reinterpret_cast<const std::uint32_t*>(rowp + 16 + 32 * J);
+        const unsigned lo = packed[tig];
+        const unsigned hi = packed[tig + 4];
+        a0 = lo & 0x0F0F0F0Fu;
+        a1 = (lo >> 4) & 0x0F0F0F0Fu;
+        a2 = hi & 0x0F0F0F0Fu;
+        a3 = (hi >> 4) & 0x0F0F0F0Fu;
     }
     const int input_column = gid & 3;
     const int input_u      = 2 * J + (gid >> 2);
@@ -588,20 +584,17 @@ __device__ __forceinline__ void q4_t4_imma_step(const VecArgs& p, int row0, int 
     const unsigned b1 = x[tig + 4];
     int c0 = 0, c1 = 0, c2 = 0, c3 = 0;
     ninfer::ops::mma_s8(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
-    const bool upper = tig >= 2;
-    const int u      = 2 * J + int(upper);
-    const Slice& w   = upper ? odd : even;
     const int token0 = 2 * (tig & 1);
     if (upper) {
         const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + block * 8 + u]);
         const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + block * 8 + u]);
-        partial[0][J][R] += w.f[0] * ds0.x * float(c2) - w.f[1] * ds0.y;
-        partial[1][J][R] += w.f[0] * ds1.x * float(c3) - w.f[1] * ds1.y;
+        partial[0][J][R] += weight_scale * ds0.x * float(c2) - weight_minimum * ds0.y;
+        partial[1][J][R] += weight_scale * ds1.x * float(c3) - weight_minimum * ds1.y;
     } else {
         const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + block * 8 + u]);
         const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + block * 8 + u]);
-        partial[0][J][R] += w.f[0] * ds0.x * float(c0) - w.f[1] * ds0.y;
-        partial[1][J][R] += w.f[0] * ds1.x * float(c1) - w.f[1] * ds1.y;
+        partial[0][J][R] += weight_scale * ds0.x * float(c0) - weight_minimum * ds0.y;
+        partial[1][J][R] += weight_scale * ds1.x * float(c1) - weight_minimum * ds1.y;
     }
 }
 
