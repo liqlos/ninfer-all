@@ -958,7 +958,8 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
         __nv_bfloat16 * __restrict__ dst_bf16, float * __restrict__ tmp_fixup,
         const float * __restrict__ y_scale,
         const int stride_row_x, const int ncols_y, const int stride_col_dst,
-        const int tile_x_max_i, const int tile_y_max_j, const int kb0_start, const int kb0_stop) {
+        const int tile_x_max_i, const int tile_y_max_j, const int kb0_start, const int kb0_stop,
+        const int gate_stride) {
 
     constexpr int              warp_size  = ggml_cuda_get_physical_warp_size();
     constexpr int              nwarps     = ggml_cuda_mmq_get_nthreads(type, J, fallback, prec_src1) / warp_size;
@@ -1165,7 +1166,7 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
             ggml_cuda_mmq_write_back_bf16<type, J, fallback, prec_src1, bf16_accumulate,
                                           bf16_gate_product>(
                 sum, ids_dst, dst_bf16, stride_col_dst, tile_x_max_i, tile_y_max_j, y_scale,
-                stride_channel_dst);
+                gate_stride);
         }
     } else {
         if (fixup) {
@@ -1277,7 +1278,7 @@ static __global__ void mul_mat_q(
             offset_y_scale += col_low + jt*J;
             y_scale_tile = y_scale ? y_scale + offset_y_scale : nullptr;
         } else if constexpr (bf16_gate_product) {
-            y_scale_tile = y_scale + jt * J * stride_channel_dst;
+            y_scale_tile = y_scale + jt * J * stride_channel_dst + it * I;
         }
 
         const int tile_x_max_i = nrows_x  - it*I - 1;
@@ -1300,7 +1301,7 @@ static __global__ void mul_mat_q(
             (x, offset_x, y + offset_y, ids_dst_shared, tile_dst,
              tile_dst_bf16, tmp_fixup, y_scale_tile,
              stride_row_x, ncols_y, stride_col_dst,
-             tile_x_max_i, tile_y_max_j, 0, blocks_per_ne00.z);
+             tile_x_max_i, tile_y_max_j, 0, blocks_per_ne00.z, stride_channel_dst);
         return;
     }
 
@@ -1384,7 +1385,7 @@ static __global__ void mul_mat_q(
             offset_y_scale += col_low + jt * J;
             y_scale_tile = y_scale ? y_scale + offset_y_scale : nullptr;
         } else if constexpr (bf16_gate_product) {
-            y_scale_tile = y_scale + jt * J * stride_channel_dst;
+            y_scale_tile = y_scale + jt * J * stride_channel_dst + it * I;
         }
 
         const int tile_x_max_i = nrows_x  - it*I - 1;
@@ -1407,7 +1408,7 @@ static __global__ void mul_mat_q(
             (x, offset_x, y + offset_y, ids_dst_shared, tile_dst,
              tile_dst_bf16, tmp_fixup, y_scale_tile,
              stride_row_x, ncols_y, stride_col_dst,
-             tile_x_max_i, tile_y_max_j, kb0_start, kb0_stop);
+             tile_x_max_i, tile_y_max_j, kb0_start, kb0_stop, stride_channel_dst);
 
         kbc += blocks_per_ne00.z;
         kbc -= fastmodulo(kbc, blocks_per_ne00);
@@ -1481,7 +1482,7 @@ static __global__ void mul_mat_q(
         offset_y_scale += col_low + jt * J;
         y_scale_tile = y_scale ? y_scale + offset_y_scale : nullptr;
     } else if constexpr (bf16_gate_product) {
-        y_scale_tile = y_scale + jt * J * stride_channel_dst;
+        y_scale_tile = y_scale + jt * J * stride_channel_dst + it * I;
     }
 
     const int tile_x_max_i = nrows_x  - it*I - 1;
@@ -1504,7 +1505,7 @@ static __global__ void mul_mat_q(
         (x, offset_x, y + offset_y, ids_dst_shared, tile_dst,
          tile_dst_bf16, tmp_fixup, y_scale_tile,
          stride_row_x, ncols_y, stride_col_dst,
-         tile_x_max_i, tile_y_max_j, kb0_start, kb0_stop);
+         tile_x_max_i, tile_y_max_j, kb0_start, kb0_stop, stride_channel_dst);
 }
 
 template <ggml_type type, int J, bool fallback, ggml_prec prec_src1 = GGML_PREC_Q8>
