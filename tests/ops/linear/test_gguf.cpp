@@ -1566,9 +1566,11 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
     constexpr std::int32_t fixture_rows = 257;
     constexpr std::int32_t widths[] = {9, 17, 40, 70, 127, 130, 1024};
     const auto type = ops::detail::gguf_type(c.qtype);
-    if (c.qtype != QType::GGUF_Q4_K || !ops::gguf::has_matrix_kernel(type)) {
-        throw std::runtime_error("MMQ real-shapes requires the Q4_K matrix route");
+    if ((c.qtype != QType::GGUF_Q4_K && c.qtype != QType::GGUF_Q6_K) ||
+        !ops::gguf::has_matrix_kernel(type)) {
+        throw std::runtime_error("MMQ real-shapes requires the Q4_K or Q6_K matrix route");
     }
+    const char* type_name = c.qtype == QType::GGUF_Q4_K ? "Q4_K" : "Q6_K";
 
     const auto block = gguf_block_shape(c.qtype);
     const std::size_t bytes = std::size_t(rows) * (k / block.elements) * block.bytes;
@@ -1654,12 +1656,12 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
         }
         const Error error = compare(sampled_got, sampled_want);
         if (!(error.relative_rms < 5e-2 && error.relative_max < 2e-1)) {
-            std::cerr << "FAIL MMQ Q4_K K=" << k << " T=" << t
+            std::cerr << "FAIL MMQ " << type_name << " K=" << k << " T=" << t
                       << " rms_rel=" << error.relative_rms << " max_rel="
                       << error.relative_max << " max_abs=" << error.max_absolute << '\n';
             ++failures;
         } else {
-            std::cout << "OK MMQ Q4_K K=" << k << " T=" << t << " rms_rel="
+            std::cout << "OK MMQ " << type_name << " K=" << k << " T=" << t << " rms_rel="
                       << std::setprecision(8) << error.relative_rms << " max_rel="
                       << error.relative_max << " max_abs=" << error.max_absolute << '\n';
         }
@@ -1680,10 +1682,11 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                     ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
                 },
                 guarded, host,
-                "MMQ Q4_K K=" + std::to_string(k) + " T=" + std::to_string(t), output_file);
+                "MMQ " + std::string(type_name) + " K=" + std::to_string(k) +
+                    " T=" + std::to_string(t), output_file);
         }
     }
-    std::cout << "MMQ source Q4_K K=" << k << " rows=" << rows
+    std::cout << "MMQ source " << type_name << " K=" << k << " rows=" << rows
               << " weights=" << source << '\n';
     return failures;
 }
@@ -1697,6 +1700,7 @@ int main(int argc, char** argv) {
     }
     bool real_shapes = false;
     bool mmq_real_shapes = false;
+    bool mmq_q6_real_shapes = false;
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
     bool rmsnorm_q8_fusion = false;
@@ -1712,6 +1716,8 @@ int main(int argc, char** argv) {
             real_shapes = true;
         } else if (argument == "--mmq-real-shapes" && !mmq_real_shapes) {
             mmq_real_shapes = true;
+        } else if (argument == "--mmq-q6-real-shapes" && !mmq_q6_real_shapes) {
+            mmq_q6_real_shapes = true;
         } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
@@ -1730,20 +1736,23 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
-    if ((output_specified && (!(real_shapes || mmq_real_shapes) || output_path.empty())) ||
-        (weight_directory_specified && (!(real_shapes || mmq_real_shapes) || weight_directory.empty())) ||
-        (real_shapes && mmq_real_shapes) ||
-        ((real_shapes || mmq_real_shapes) &&
+    if ((output_specified &&
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || output_path.empty())) ||
+        (weight_directory_specified &&
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || weight_directory.empty())) ||
+        (real_shapes && (mmq_real_shapes || mmq_q6_real_shapes)) ||
+        (mmq_real_shapes && mmq_q6_real_shapes) ||
+        ((real_shapes || mmq_real_shapes || mmq_q6_real_shapes) &&
          (swiglu_q8_fusion || rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion)) ||
         (rmsnorm_q8_fusion && (swiglu_q8_fusion || rmsnorm_mmq_q8_fusion)) ||
         (rmsnorm_mmq_q8_fusion && (swiglu_q8_fusion || dual_mmq_fusion)) ||
         (dual_mmq_fusion && (swiglu_q8_fusion || rmsnorm_q8_fusion))) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --real-shapes [--output <file>] "
+        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
@@ -1785,6 +1794,42 @@ int main(int argc, char** argv) {
                 if (!output_file) { throw std::runtime_error("failed flushing MMQ output file"); }
             }
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF MMQ real shapes\n";
+            return failures == 0 ? 0 : 1;
+        }
+        if (mmq_q6_real_shapes) {
+            std::ofstream output_file;
+            std::ofstream* output = nullptr;
+            if (output_specified) {
+                output_file.open(output_path, std::ios::binary | std::ios::trunc);
+                if (!output_file) {
+                    throw std::runtime_error("could not open Q6 MMQ output file: " +
+                                             output_path);
+                }
+                output = &output_file;
+            }
+            if (weight_directory_specified && !std::filesystem::is_directory(weight_directory)) {
+                throw std::runtime_error("--weight-dir is not a directory: " + weight_directory);
+            }
+            const auto all = cases();
+            const auto q6 = std::find_if(all.begin(), all.end(), [](const TypeCase& c) {
+                return c.qtype == QType::GGUF_Q6_K;
+            });
+            if (q6 == all.end()) { throw std::logic_error("Q6_K case is not registered"); }
+            std::size_t files_used = 0;
+            int failures = 0;
+            for (const std::int32_t k : {5120, 17408}) {
+                failures += run_mmq_real_shape(*q6, k, 39003 + k, output, weight_directory,
+                                                files_used);
+            }
+            if (weight_directory_specified && files_used == 0) {
+                throw std::runtime_error(
+                    "--weight-dir provided no q6-k5120.bin or q6-k17408.bin");
+            }
+            if (output != nullptr) {
+                output_file.flush();
+                if (!output_file) { throw std::runtime_error("failed flushing Q6 MMQ output file"); }
+            }
+            std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF Q6_K MMQ real shapes\n";
             return failures == 0 ? 0 : 1;
         }
         if (rmsnorm_q8_fusion) {
