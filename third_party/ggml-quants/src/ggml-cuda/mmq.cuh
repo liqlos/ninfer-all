@@ -938,7 +938,7 @@ static constexpr __device__ ggml_cuda_mmq_write_back_t ggml_cuda_mmq_get_write_b
 
 // ---------------------------------------------------------------------------------------------
 
-#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y) || defined(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
 template <int J, int nthreads>
 static __device__ __forceinline__ void ggml_cuda_mmq_copy_y_async(int * dst, const int * src) {
     static_assert(J % 8 == 0);
@@ -971,9 +971,20 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 
     extern __shared__ int data_mul_mat_q[];
     int * tile_y = data_mul_mat_q + J;
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y) || defined(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
+    constexpr bool async_y_for_type =
 #if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+        type == GGML_TYPE_Q4_K
+#endif
+#if defined(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+        ||
+#endif
+        type == GGML_TYPE_Q6_K
+#endif
+        ;
     int * tile_y_next = tile_y + GGML_PAD(J*MMQ_TILE_Y_K, nwarps*warp_size);
-    int * x_arena = type == GGML_TYPE_Q4_K
+    int * x_arena = async_y_for_type
         ? tile_y_next + GGML_PAD(J*MMQ_TILE_Y_K, nwarps*warp_size)
         : tile_y_next;
 #else
@@ -1093,8 +1104,8 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
     }
     if (!x_pipeline_used) {
 #endif
-#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
-        if constexpr (type == GGML_TYPE_Q4_K) {
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y) || defined(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
+        if constexpr (async_y_for_type) {
             if (kb0_start < kb0_stop) {
                 const int * by0 = y + ncols_y * (kb0_start * qk / ne_block) * sz;
                 ggml_cuda_mmq_copy_y_async<J, nwarps*warp_size>(tile_y, by0);
@@ -1664,6 +1675,11 @@ static size_t mmq_get_nbytes_shared(const ggml_cuda_mmq_config & config, const i
     size_t nbs_y_total = nbs_y_padded;
 #if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
     if (config.type == GGML_TYPE_Q4_K) {
+        nbs_y_total += nbs_y_padded;
+    }
+#endif
+#if defined(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
+    if (config.type == GGML_TYPE_Q6_K) {
         nbs_y_total += nbs_y_padded;
     }
 #endif
