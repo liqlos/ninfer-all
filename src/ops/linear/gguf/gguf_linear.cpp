@@ -463,7 +463,16 @@ bool gguf_project_matrix_q8_1_activations(
     bool* used_mmq_store, bool* used_mmq_gate_epilogue) {
     if (used_mmq_store != nullptr) { *used_mmq_store = false; }
     if (used_mmq_gate_epilogue != nullptr) { *used_mmq_gate_epilogue = false; }
-    if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > 1024 || products.empty() ||
+    int max_columns = 1024;
+#if defined(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
+    if (std::all_of(products.begin(), products.end(), [](const GgufProduct& product) {
+            return product.weight != nullptr && product.weight->qtype == QType::GGUF_Q4_K &&
+                   product.f32 == nullptr && product.epilogue == GgufEpilogue::GateProduct;
+        })) {
+        max_columns = gguf::kMaxGateMatrixColumns;
+    }
+#endif
+    if (k != 5120 || columns <= gguf::kMaxVectorColumns || columns > max_columns || products.empty() ||
         activations.empty()) {
         throw std::invalid_argument("gguf prepared matrix activation: unsupported geometry");
     }
