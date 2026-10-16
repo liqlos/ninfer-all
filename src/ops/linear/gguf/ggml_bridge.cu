@@ -10,6 +10,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <mutex>
 
 // ggml's GGML_ABORT/GGML_ASSERT land here; only the vendored headers' own invariants reach it.
@@ -166,6 +167,69 @@ __global__ void quantize_matrix_kernel(const __nv_bfloat16* __restrict__ x,
             y[ib].ds4[iqs / 32] = make_half2(d, sum);
         } else {
             y[ib].d4[iqs / 32] = d;
+        }
+    }
+}
+
+template <mmq_q8_1_ds_layout layout_a, mmq_q8_1_ds_layout layout_b>
+__global__ void quantize_matrix_activation_pair_kernel(
+    const __nv_bfloat16* __restrict__ x, const std::int32_t* __restrict__ input_columns,
+    block_q8_1_mmq* __restrict__ y_a, block_q8_1_mmq* __restrict__ y_b, int k, int columns) {
+    const std::int64_t i0 = (std::int64_t(blockDim.x) * blockIdx.y + threadIdx.x) * 4;
+    if (i0 >= k) { return; }
+    const int column = blockIdx.x;
+    const __nv_bfloat16* source = x + std::int64_t(column) * k;
+    float4 xi;
+    if (input_columns != nullptr) {
+        xi = make_float4(__bfloat162float(source[input_columns[i0 + 0]]),
+                         __bfloat162float(source[input_columns[i0 + 1]]),
+                         __bfloat162float(source[input_columns[i0 + 2]]),
+                         __bfloat162float(source[input_columns[i0 + 3]]));
+    } else {
+        const uint2 words = *reinterpret_cast<const uint2*>(source + i0);
+        const float2 lo = __bfloat1622float2(*reinterpret_cast<const __nv_bfloat162*>(&words.x));
+        const float2 hi = __bfloat1622float2(*reinterpret_cast<const __nv_bfloat162*>(&words.y));
+        xi = make_float4(lo.x, lo.y, hi.x, hi.y);
+    }
+
+    const std::int64_t k_block = i0 / QK8_1_MMQ;
+    const std::int64_t iqs = i0 % QK8_1_MMQ;
+    float amax = fabsf(xi.x);
+    amax = fmaxf(amax, fabsf(xi.y));
+    amax = fmaxf(amax, fabsf(xi.z));
+    amax = fmaxf(amax, fabsf(xi.w));
+#pragma unroll
+    for (int offset = 4; offset > 0; offset >>= 1) {
+        amax = fmaxf(amax, __shfl_xor_sync(0xFFFFFFFF, amax, offset, WARP_SIZE));
+    }
+    float sum = 0.0f;
+    if constexpr (layout_a == MMQ_Q8_1_DS_LAYOUT_DS4 || layout_b == MMQ_Q8_1_DS_LAYOUT_DS4) {
+        sum = xi.x + xi.y + xi.z + xi.w;
+#pragma unroll
+        for (int offset = 4; offset > 0; offset >>= 1) {
+            sum += __shfl_xor_sync(0xFFFFFFFF, sum, offset, WARP_SIZE);
+        }
+    }
+    const float d_inv = 127.0f / amax;
+    char4 q;
+    q.x = roundf(xi.x * d_inv);
+    q.y = roundf(xi.y * d_inv);
+    q.z = roundf(xi.z * d_inv);
+    q.w = roundf(xi.w * d_inv);
+    const float d = 1.0f / d_inv;
+    const std::int64_t ib = k_block * columns + column;
+    reinterpret_cast<char4*>(y_a[ib].qs)[iqs / 4] = q;
+    reinterpret_cast<char4*>(y_b[ib].qs)[iqs / 4] = q;
+    if (iqs % 32 == 0) {
+        if constexpr (layout_a == MMQ_Q8_1_DS_LAYOUT_DS4) {
+            y_a[ib].ds4[iqs / 32] = make_half2(d, sum);
+        } else {
+            y_a[ib].d4[iqs / 32] = d;
+        }
+        if constexpr (layout_b == MMQ_Q8_1_DS_LAYOUT_DS4) {
+            y_b[ib].ds4[iqs / 32] = make_half2(d, sum);
+        } else {
+            y_b[ib].d4[iqs / 32] = d;
         }
     }
 }
@@ -387,6 +451,65 @@ void quantize_matrix_activation(GgmlType type, const __nv_bfloat16* x, int k, in
         break;
     }
     detail::check(cudaGetLastError(), "matrix activation launch");
+}
+
+bool quantize_matrix_activation_pair(GgmlType type_a, GgmlType type_b,
+                                     const __nv_bfloat16* x, int k, int columns,
+                                     const std::int32_t* input_columns, void* out_a, void* out_b,
+                                     cudaStream_t stream) {
+    const bool q4_q6 = type_a == GgmlType::Q4_K && type_b == GgmlType::Q6_K;
+    const bool q6_q4 = type_a == GgmlType::Q6_K && type_b == GgmlType::Q4_K;
+    if ((!q4_q6 && !q6_q4) || x == nullptr || out_a == nullptr || out_b == nullptr ||
+        k <= 0 || k % (4 * detail::kMatrixQuantizeThreads) != 0 || columns <= 0 || out_a == out_b ||
+        (reinterpret_cast<std::uintptr_t>(out_a) & (alignof(std::uint32_t) - 1)) != 0 ||
+        (reinterpret_cast<std::uintptr_t>(out_b) & (alignof(std::uint32_t) - 1)) != 0 ||
+        (reinterpret_cast<std::uintptr_t>(x) & (alignof(__nv_bfloat16) - 1)) != 0 ||
+        (input_columns != nullptr &&
+         (reinterpret_cast<std::uintptr_t>(input_columns) & (alignof(std::int32_t) - 1)) != 0) ||
+        (input_columns == nullptr &&
+         (reinterpret_cast<std::uintptr_t>(x) & (alignof(uint2) - 1)) != 0)) {
+        return false;
+    }
+    const std::size_t plane_bytes = matrix_activation_bytes(k, columns);
+    const auto a = reinterpret_cast<std::uintptr_t>(out_a);
+    const auto b = reinterpret_cast<std::uintptr_t>(out_b);
+    const std::size_t input_bytes = std::size_t(k) * columns * sizeof(__nv_bfloat16);
+    const std::size_t gather_bytes = input_columns == nullptr ? 0 : std::size_t(k) * sizeof(std::int32_t);
+    const auto x_address = reinterpret_cast<std::uintptr_t>(x);
+    const auto gather_address = reinterpret_cast<std::uintptr_t>(input_columns);
+    const auto overlaps = [](std::uintptr_t lhs, std::size_t lhs_bytes, std::uintptr_t rhs,
+                             std::size_t rhs_bytes) {
+        if (lhs_bytes > std::numeric_limits<std::uintptr_t>::max() - lhs ||
+            rhs_bytes > std::numeric_limits<std::uintptr_t>::max() - rhs) {
+            return true;
+        }
+        return lhs < rhs + rhs_bytes && rhs < lhs + lhs_bytes;
+    };
+    if (overlaps(a, plane_bytes, b, plane_bytes) || overlaps(a, plane_bytes, x_address, input_bytes) ||
+        overlaps(b, plane_bytes, x_address, input_bytes) ||
+        (gather_bytes != 0 &&
+         (overlaps(a, plane_bytes, gather_address, gather_bytes) ||
+          overlaps(b, plane_bytes, gather_address, gather_bytes)))) {
+        return false;
+    }
+    const dim3 blocks(columns, (k + 4 * detail::kMatrixQuantizeThreads - 1) /
+                                   (4 * detail::kMatrixQuantizeThreads),
+                      1);
+    auto* y_a = static_cast<block_q8_1_mmq*>(out_a);
+    auto* y_b = static_cast<block_q8_1_mmq*>(out_b);
+    if (q4_q6) {
+        detail::quantize_matrix_activation_pair_kernel<MMQ_Q8_1_DS_LAYOUT_DS4,
+                                                       MMQ_Q8_1_DS_LAYOUT_D4>
+            <<<blocks, detail::kMatrixQuantizeThreads, 0, stream>>>(x, input_columns, y_a, y_b, k,
+                                                                    columns);
+    } else {
+        detail::quantize_matrix_activation_pair_kernel<MMQ_Q8_1_DS_LAYOUT_D4,
+                                                       MMQ_Q8_1_DS_LAYOUT_DS4>
+            <<<blocks, detail::kMatrixQuantizeThreads, 0, stream>>>(x, input_columns, y_a, y_b, k,
+                                                                    columns);
+    }
+    detail::check(cudaGetLastError(), "paired matrix activation launch");
+    return true;
 }
 
 std::size_t matrix_fixup_bytes(GgmlType type, int rows, int columns) {

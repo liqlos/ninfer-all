@@ -120,6 +120,9 @@ bool persistent_swiglu_q8_add(GgmlType gate_type, const void* gate_weight, std::
 [[nodiscard]] std::size_t matrix_activation_bytes(int k, int columns);
 void quantize_matrix_activation(GgmlType type, const __nv_bfloat16* x, int k, int columns,
                                 const std::int32_t* input_columns, void* out, cudaStream_t stream);
+[[nodiscard]] bool quantize_matrix_activation_pair(
+    GgmlType type_a, GgmlType type_b, const __nv_bfloat16* x, int k, int columns,
+    const std::int32_t* input_columns, void* out_a, void* out_b, cudaStream_t stream);
 
 // Bytes of the stream-k fixup plane the matrix kernel may need for this product on the current
 // device (zero when the tiles divide evenly across the machine).

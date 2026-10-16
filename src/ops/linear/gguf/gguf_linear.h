@@ -59,7 +59,8 @@ struct GgufShape {
 // (and once more per distinct input gather).
 bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                   WorkspaceArena& workspace, cudaStream_t stream,
-                  bool* used_mmq_store = nullptr);
+                  bool* used_mmq_store = nullptr,
+                  bool* used_dual_layout_mmq_pack = nullptr);
 void gguf_project_q8_1_activation(int k, int columns, const void* activation,
                                   std::span<const GgufProduct> products,
                                   cudaStream_t stream);

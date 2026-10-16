@@ -51,6 +51,11 @@ ninfer_add_op_test(ninfer_linear_bf16_a16_test
 ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
+if(NINFER_GGUF_DUAL_LAYOUT_MMQ_PACK)
+  ninfer_add_op_test(ninfer_linear_gguf_dual_layout_pack_test
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_dual_layout_mmq_pack.cu"
+    LIBRARIES ninfer_ops)
+endif()
 if(NINFER_GGUF_DUAL_MMQ_FUSION)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DUAL_MMQ_FUSION=1)
@@ -77,4 +82,11 @@ if(NINFER_GGUF_MMQ_STORE_FUSION)
   ninfer_add_op_test(ninfer_linear_gguf_mmq_store_test
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
     LIBRARIES ninfer_ops)
+endif()
+if(NINFER_GGUF_SM86_MMQ_TILE_CAP AND NINFER_GGUF_MMQ_STORE_FUSION)
+  ninfer_add_op_test(ninfer_linear_mmq_tile_cap_test
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_mmq_tile_cap.cu"
+    LIBRARIES ninfer_ops)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_mmq_tile_cap.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_SM86_MMQ_MAX_J=${NINFER_GGUF_SM86_MMQ_MAX_J})
 endif()

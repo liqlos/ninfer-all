@@ -32,6 +32,13 @@ static MatrixLaunch select_matrix_launch(int rows, int columns) {
     MatrixLaunch best;
     int best_tiles = INT_MAX;
     for (const int J : kMatrixColumnTiles) {
+#if defined(NINFER_GGUF_SM86_MMQ_TILE_CAP)
+        if constexpr (type == GGML_TYPE_Q4_K || type == GGML_TYPE_Q6_K) {
+            if (device.cc == 860 && columns >= 64 && J > NINFER_GGUF_SM86_MMQ_MAX_J) {
+                continue;
+            }
+        }
+#endif
         const ggml_cuda_mmq_config config = ggml_cuda_mmq_get_config(type, J, false, device.cc);
         if (config.type == GGML_TYPE_COUNT) { continue; }
         const std::size_t shared = mmq_get_nbytes_shared(config, device.cc);

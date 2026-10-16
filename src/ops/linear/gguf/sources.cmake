@@ -9,6 +9,31 @@ option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks 
 option(NINFER_GGUF_Q4_ASYNC_PIPELINE "Pipeline SM86 GGUF Q4_K K5120 vector weight loads" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_X "Use SM86 cp.async raw-weight staging for GGUF Q4_K MMQ" OFF)
+option(NINFER_GGUF_SM86_MMQ_TILE_CAP "Limit the column tile of wide SM86 Q4_K/Q6_K MMQ products" OFF)
+set(NINFER_GGUF_SM86_MMQ_MAX_J "64" CACHE STRING "Maximum column tile for the SM86 MMQ experiment")
+set_property(CACHE NINFER_GGUF_SM86_MMQ_MAX_J PROPERTY STRINGS 32 64 128)
+if(NOT NINFER_GGUF_SM86_MMQ_MAX_J MATCHES "^(32|64|128)$")
+  message(FATAL_ERROR "SM86 MMQ maximum column tile must be 32, 64 or 128")
+endif()
+if(NINFER_GGUF_SM86_MMQ_TILE_CAP)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "SM86 MMQ column tile experiment requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_dual_q4_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_SM86_MMQ_TILE_CAP=1
+      NINFER_GGUF_SM86_MMQ_MAX_J=${NINFER_GGUF_SM86_MMQ_MAX_J})
+endif()
+option(NINFER_GGUF_DUAL_LAYOUT_MMQ_PACK "Produce exact D4 and DS4 GGUF MMQ activations in one pass" OFF)
+if(NINFER_GGUF_DUAL_LAYOUT_MMQ_PACK)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF dual-layout MMQ activation packing requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_bridge.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DUAL_LAYOUT_MMQ_PACK=1)
+endif()
 option(NINFER_GGUF_SWIGLU_Q8_FUSION "Fuse GGUF SwiGLU output with exact BF16-rounded q8 activation packing" OFF)
 option(NINFER_GGUF_PERSISTENT_FFN "Use a residency-bounded cooperative SM86 GGUF Q4/Q6 FFN kernel" OFF)
 option(NINFER_GGUF_SWIGLU_Q8_SEQUENTIAL_DECODE "Decode one SwiGLU operand at a time before q8 packing" OFF)

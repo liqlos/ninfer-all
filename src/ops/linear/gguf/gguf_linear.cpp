@@ -200,8 +200,9 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
 
 bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                   WorkspaceArena& workspace, cudaStream_t stream,
-                  bool* used_mmq_store) {
+                  bool* used_mmq_store, bool* used_dual_layout_mmq_pack) {
     if (used_mmq_store != nullptr) { *used_mmq_store = false; }
+    if (used_dual_layout_mmq_pack != nullptr) { *used_dual_layout_mmq_pack = false; }
     require_activation(x, "gguf product");
     if (products.empty()) { return false; }
     for (const auto& p : products) { require_product(x, p); }
@@ -287,7 +288,8 @@ bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
         scratch = workspace.alloc_bytes(kDequantizedScratchBytes).data;
     }
 
-    for (const auto& p : products) {
+    for (std::size_t product_index = 0; product_index < products.size(); ++product_index) {
+        const auto& p = products[product_index];
         const Weight& w  = *p.weight;
         const auto type  = gguf_type(w.qtype);
         const bool direct = p.f32 != nullptr && p.epilogue == GgufEpilogue::Store;
@@ -299,10 +301,59 @@ bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 return a.layout == layout && a.columns == w.input_columns;
             });
             if (found == activations.end()) {
-                void* data = workspace.alloc_bytes(gguf::matrix_activation_bytes(k, t)).data;
-                gguf::quantize_matrix_activation(type, xb, k, t, w.input_columns, data, stream);
-                activations.push_back({layout, w.input_columns, data});
-                found = activations.end() - 1;
+#if defined(NINFER_GGUF_DUAL_LAYOUT_MMQ_PACK)
+                const GgufProduct* partner = nullptr;
+                const bool q4_candidate = w.qtype == QType::GGUF_Q4_K;
+                const bool q6_candidate = w.qtype == QType::GGUF_Q6_K;
+                if (t > gguf::kMaxVectorColumns && (q4_candidate || q6_candidate)) {
+                    const QType partner_type = q4_candidate ? QType::GGUF_Q6_K : QType::GGUF_Q4_K;
+                    const auto partner_layout = gguf::matrix_activation_layout(gguf_type(partner_type));
+                    const bool partner_cached = std::any_of(
+                        activations.begin(), activations.end(), [&](const Activation& a) {
+                            return a.layout == partner_layout && a.columns == w.input_columns;
+                        });
+                    if (!partner_cached) {
+                        for (std::size_t candidate = product_index + 1; candidate < products.size();
+                             ++candidate) {
+                            const Weight& candidate_weight = *products[candidate].weight;
+                            if (candidate_weight.qtype == partner_type &&
+                                candidate_weight.input_columns == w.input_columns &&
+                                matrix_kernel(candidate_weight)) {
+                                partner = &products[candidate];
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (partner != nullptr) {
+                    void* current_data =
+                        workspace.alloc_bytes(gguf::matrix_activation_bytes(k, t)).data;
+                    void* partner_data =
+                        workspace.alloc_bytes(gguf::matrix_activation_bytes(k, t)).data;
+                    if (gguf::quantize_matrix_activation_pair(type, gguf_type(partner->weight->qtype),
+                                                              xb, k, t, w.input_columns, current_data,
+                                                              partner_data, stream)) {
+                        activations.push_back({layout, w.input_columns, current_data});
+                        const int partner_layout = gguf::matrix_activation_layout(
+                            gguf_type(partner->weight->qtype));
+                        activations.push_back({partner_layout, w.input_columns, partner_data});
+                        if (used_dual_layout_mmq_pack != nullptr) {
+                            *used_dual_layout_mmq_pack = true;
+                        }
+                        found = std::find_if(activations.begin(), activations.end(),
+                                             [&](const Activation& a) {
+                                                 return a.layout == layout &&
+                                                        a.columns == w.input_columns;
+                                             });
+                    }
+                }
+#endif
+                if (found == activations.end()) {
+                    void* data = workspace.alloc_bytes(gguf::matrix_activation_bytes(k, t)).data;
+                    gguf::quantize_matrix_activation(type, xb, k, t, w.input_columns, data, stream);
+                    activations.push_back({layout, w.input_columns, data});
+                    found = activations.end() - 1;
+                }
             }
 #if defined(NINFER_GGUF_MMQ_STORE_FUSION)
             if (p.f32 == nullptr &&
