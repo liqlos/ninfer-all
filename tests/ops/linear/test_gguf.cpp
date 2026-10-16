@@ -1136,6 +1136,127 @@ void run_dual_mmq_fusion() {
 }
 #endif
 
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
+void run_q4_t4_fused_warp_pair_case(std::int32_t rows, std::int32_t k,
+                                   std::uint32_t seed,
+                                   const std::vector<std::int32_t>& checked_rows) {
+    constexpr std::int32_t columns = 4;
+    const TypeCase type{QType::GGUF_Q4_K, "q4_k", {0, 2}};
+    std::mt19937 rng(seed);
+    std::normal_distribution<float> normal(0.0f, 0.4f);
+    const auto host_weights = random_blocks(type, 2 * rows, k, rng);
+    DeviceBuffer weights(host_weights.size());
+    weights.copy_from_host(host_weights.data(), host_weights.size());
+    const auto shape = gguf_block_shape(type.qtype);
+    const std::int64_t row_bytes = std::int64_t(k / shape.elements) * shape.bytes;
+
+    std::vector<__nv_bfloat16> host_x(std::size_t(k) * columns);
+    for (auto& value : host_x) { value = __float2bfloat16(normal(rng)); }
+    const auto input_bytes = cpu_quantize_vector_activation(host_x, k, columns);
+    DeviceBuffer input(input_bytes.size());
+    input.copy_from_host(input_bytes.data(), input_bytes.size());
+
+    for (std::size_t index = 0; index < checked_rows.size(); ++index) {
+        const std::int32_t row = checked_rows[index];
+        if (row < 0 || row >= rows) {
+            throw std::runtime_error("Q4_K fused warp-pair oracle row is out of range");
+        }
+    }
+    const std::size_t activation_scales = (std::size_t(k) * columns + 15) / 16 * 16;
+    const auto q8_dot = [&](std::int32_t row, std::int32_t column) {
+        const std::uint8_t* row_data = host_weights.data() + std::size_t(row) * row_bytes;
+        double result = 0.0;
+        for (std::int32_t group = 0; group < k / 32; ++group) {
+            const std::int32_t block_index = group / 8;
+            const std::int32_t subblock = group % 8;
+            const std::uint8_t* quant_block = row_data + std::size_t(block_index) * shape.bytes;
+            const std::uint8_t* scales = quant_block + 4;
+            int scale;
+            int minimum;
+            if (subblock < 4) {
+                scale = scales[subblock] & 63;
+                minimum = scales[subblock + 4] & 63;
+            } else {
+                scale = (scales[subblock + 4] & 0x0f) |
+                        ((scales[subblock - 4] >> 6) << 4);
+                minimum = (scales[subblock + 4] >> 4) |
+                          ((scales[subblock] >> 6) << 4);
+            }
+            const std::uint8_t* quants = quant_block + 16 + (subblock / 2) * 32;
+            const int shift = 4 * (subblock & 1);
+            std::int64_t integer_dot = 0;
+            for (std::int32_t lane = 0; lane < 32; ++lane) {
+                const int weight_q = (quants[lane] >> shift) & 0x0f;
+                const std::uint8_t activation_byte =
+                    input_bytes[std::size_t(column) * k + group * 32 + lane];
+                const int activation_q = activation_byte < 128
+                                             ? activation_byte
+                                             : int(activation_byte) - 256;
+                integer_dot += std::int64_t(weight_q) * activation_q;
+            }
+            const std::size_t scale_at = activation_scales +
+                (std::size_t(column) * (k / 32) + group) * sizeof(__half2);
+            const double activation_d = half_to_float(input_bytes.data() + scale_at);
+            const double activation_sum =
+                half_to_float(input_bytes.data() + scale_at + sizeof(__half));
+            const double weight_d = half_to_float(quant_block);
+            const double weight_dmin = half_to_float(quant_block + 2);
+            result += (weight_d * scale) * activation_d * double(integer_dot) -
+                      (weight_dmin * minimum) * activation_sum;
+        }
+        return result;
+    };
+    std::vector<double> want(checked_rows.size() * columns);
+    for (std::int32_t column = 0; column < columns; ++column) {
+        for (std::size_t index = 0; index < checked_rows.size(); ++index) {
+            const double gate = q8_dot(checked_rows[index], column);
+            const double up = q8_dot(rows + checked_rows[index], column);
+            want[std::size_t(column) * checked_rows.size() + index] =
+                gate / (1.0 + std::exp(-gate)) * up;
+        }
+    }
+
+    GuardedOutput actual(std::size_t(rows) * columns);
+    actual.poison();
+    ops::gguf::vector_swiglu(ops::gguf::GgmlType::Q4_K, weights.p, row_bytes, rows, k,
+                             input.p, columns, static_cast<__nv_bfloat16*>(actual.data()), rows,
+                             nullptr);
+    check(cudaDeviceSynchronize(), "Q4_K fused warp-pair regression");
+    const auto eager = actual.read("read Q4_K fused warp-pair output");
+    const bool finite = std::all_of(eager.begin(), eager.end(), [](__nv_bfloat16 value) {
+        return std::isfinite(__bfloat162float(value));
+    });
+    std::vector<float> got(checked_rows.size() * columns);
+    for (std::int32_t column = 0; column < columns; ++column) {
+        for (std::size_t index = 0; index < checked_rows.size(); ++index) {
+            got[std::size_t(column) * checked_rows.size() + index] = __bfloat162float(
+                eager[std::size_t(column) * rows + checked_rows[index]]);
+        }
+    }
+    const Error error = compare(got, want);
+    if (!finite || !(error.relative_rms < 3.5e-3 && error.relative_max < 5e-3)) {
+        throw std::runtime_error("Q4_K fused warp-pair output differs from the FP64 oracle");
+    }
+    check_graph_parity(
+        [&](cudaStream_t stream) {
+            ops::gguf::vector_swiglu(ops::gguf::GgmlType::Q4_K, weights.p, row_bytes, rows, k,
+                                     input.p, columns,
+                                     static_cast<__nv_bfloat16*>(actual.data()), rows, stream);
+        },
+        actual, eager, "Q4_K fused warp-pair grid-stride graph", nullptr);
+}
+
+int run_q4_t4_fused_warp_pair_regression() {
+    constexpr std::int32_t rows = 8193;
+    std::vector<std::int32_t> all_rows(rows);
+    for (std::int32_t row = 0; row < rows; ++row) { all_rows[row] = row; }
+    run_q4_t4_fused_warp_pair_case(rows, 256, 87031, all_rows);
+    run_q4_t4_fused_warp_pair_case(rows, 5120, 87032,
+                                  {0, 1, 257, 1023, 2048, 4095, 4096, 6143, 8191, 8192});
+    return 0;
+}
+#endif
+
 int run_swiglu_q8_fusion(std::uint32_t seed, bool test_route) {
     constexpr std::int32_t k = 5120;
     constexpr std::int32_t rows[] = {32, 64, 17408};
@@ -1706,6 +1827,9 @@ int main(int argc, char** argv) {
     bool rmsnorm_q8_fusion = false;
     bool rmsnorm_mmq_q8_fusion = false;
     bool dual_mmq_fusion = false;
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
+    bool q4_t4_fused_warp_pair_regression = false;
+#endif
     bool output_specified = false;
     bool weight_directory_specified = false;
     std::string output_path;
@@ -1729,6 +1853,11 @@ int main(int argc, char** argv) {
             rmsnorm_mmq_q8_fusion = true;
         } else if (argument == "--dual-mmq-fusion" && !dual_mmq_fusion) {
             dual_mmq_fusion = true;
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
+        } else if (argument == "--q4-t4-fused-warp-pair-regression" &&
+                   !q4_t4_fused_warp_pair_regression) {
+            q4_t4_fused_warp_pair_regression = true;
+#endif
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
             output_path = argv[++i];
@@ -1751,12 +1880,27 @@ int main(int argc, char** argv) {
          (swiglu_q8_fusion || rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion)) ||
         (rmsnorm_q8_fusion && (swiglu_q8_fusion || rmsnorm_mmq_q8_fusion)) ||
         (rmsnorm_mmq_q8_fusion && (swiglu_q8_fusion || dual_mmq_fusion)) ||
-        (dual_mmq_fusion && (swiglu_q8_fusion || rmsnorm_q8_fusion))) {
+        (dual_mmq_fusion && (swiglu_q8_fusion || rmsnorm_q8_fusion))
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
+        || (q4_t4_fused_warp_pair_regression &&
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
+             rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
+             weight_directory_specified))
+#endif
+        ) {
         std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
     try {
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
+        if (q4_t4_fused_warp_pair_regression) {
+            const int failures = run_q4_t4_fused_warp_pair_regression();
+            std::cout << (failures == 0 ? "OK" : "FAIL")
+                      << " GGUF Q4_K T4 fused warp-pair regression\n";
+            return failures == 0 ? 0 : 1;
+        }
+#endif
         if (swiglu_q8_fusion) {
             const int failures = run_swiglu_q8_fusion(28001, !swiglu_q8_benchmark);
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF SwiGLU q8 fusion\n";
