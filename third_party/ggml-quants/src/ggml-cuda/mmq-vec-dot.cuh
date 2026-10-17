@@ -485,6 +485,7 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
             }
         }
     }
+    }
 #endif // defined(AMD_MFMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
 }
 
