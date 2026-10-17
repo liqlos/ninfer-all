@@ -2908,9 +2908,9 @@ int main(int argc, char** argv) {
             int failures = run_mmq_real_shape(*q4, 5120, 49203, output, weight_directory,
                                               files_used, true, 17408, 17408);
             failures += run_mmq_real_shape(*q4, 5120, 49204, output, weight_directory,
-                                           files_used, true, 257, 17408);
+                                           files_used, true, 384, 17408);
             if (weight_directory_specified && files_used != 2) {
-                throw std::runtime_error("--weight-dir must provide q4-k5120.bin with 17408 and 257 rows");
+                throw std::runtime_error("--weight-dir must provide q4-k5120.bin with 17408 and 384 rows");
             }
             if (output != nullptr) {
                 output_file.flush();
