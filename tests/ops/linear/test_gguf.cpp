@@ -475,7 +475,7 @@ public:
         }
     }
 
-    std::vector<__nv_bfloat16> read(const char* label) const {
+    std::vector<__nv_bfloat16> read(const char* label, bool require_all_initialized = true) const {
         std::vector<std::uint8_t> bytes(storage_.bytes);
         check(cudaMemcpy(bytes.data(), storage_.p, storage_.bytes, cudaMemcpyDeviceToHost), label);
         for (std::size_t i = 0; i < 256; ++i) {
@@ -485,7 +485,7 @@ public:
         }
         std::vector<__nv_bfloat16> values(payload_bytes_ / sizeof(__nv_bfloat16));
         std::memcpy(values.data(), bytes.data() + 256, payload_bytes_);
-        if (std::any_of(values.begin(), values.end(), [](const __nv_bfloat16 value) {
+        if (require_all_initialized && std::any_of(values.begin(), values.end(), [](const __nv_bfloat16 value) {
                 std::uint16_t bits = 0;
                 std::memcpy(&bits, &value, sizeof(bits));
                 return bits == 0xffffU;
@@ -503,7 +503,7 @@ private:
 template <typename Launch>
 void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
                         const std::vector<__nv_bfloat16>& eager, const std::string& label,
-                        std::ofstream* output_file) {
+                        std::ofstream* output_file, bool require_all_initialized = true) {
     cudaStream_t stream = nullptr;
     cudaGraph_t graph = nullptr;
     cudaGraphExec_t executable = nullptr;
@@ -517,7 +517,7 @@ void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
         guarded.poison();
         check(cudaGraphLaunch(executable, stream), "launch graph");
         check(cudaStreamSynchronize(stream), "synchronize graph");
-        const auto replay = guarded.read("read graph output");
+        const auto replay = guarded.read("read graph output", require_all_initialized);
         write_outputs(output_file, replay);
         if (replay.size() != eager.size() ||
             std::memcmp(replay.data(), eager.data(), replay.size() * sizeof(__nv_bfloat16)) != 0) {
@@ -1138,7 +1138,7 @@ void run_dual_mmq_fusion() {
 #endif
 
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST) || defined(NINFER_GGUF_Q4_T4_IMMA_TEST) || \
-    defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
+    defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST) || defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
 double q4_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
                          std::int32_t columns, std::int32_t column,
                          const std::vector<std::uint8_t>& input_bytes) {
@@ -1181,6 +1181,59 @@ double q4_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
         const double weight_dmin = half_to_float(quant_block + 2);
         result += (weight_d * scale) * activation_d * double(integer_dot) -
                   (weight_dmin * minimum) * activation_sum;
+    }
+    return result;
+}
+#endif
+
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+int q6_k_value_cpu(const std::uint8_t* block, int u, int index) {
+    const int h = u / 4;
+    const int q = u % 4;
+    const int word = index / 4;
+    const int byte = index % 4;
+    const int low_offset = 64 * h + 32 * (q & 1) + 4 * word + byte;
+    const int high_offset = 128 + 32 * h + 4 * word + byte;
+    const int low = (block[low_offset] >> (4 * (q >> 1))) & 0x0f;
+    const int high = (block[high_offset] >> (2 * q)) & 0x03;
+    return (low | (high << 4)) - 32;
+}
+
+double q6_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
+                         std::int32_t columns, std::int32_t column,
+                         const std::vector<std::uint8_t>& input_bytes) {
+    const std::size_t activation_scales = (std::size_t(k) * columns + 15) / 16 * 16;
+    double result = 0.0;
+    for (std::int32_t group = 0; group < k / 32; ++group) {
+        const std::int32_t block_index = group / 8;
+        const std::int32_t u = group % 8;
+        const std::uint8_t* block = row_data + std::size_t(block_index) * 210;
+        const int h = u / 4;
+        const int q = u % 4;
+        const auto* scales = reinterpret_cast<const std::int8_t*>(block + 192 + 8 * h);
+        const double weight_d = half_to_float(block + 208);
+        std::int64_t dot0 = 0;
+        std::int64_t dot1 = 0;
+        for (int index = 0; index < 32; ++index) {
+            const std::uint8_t activation_byte =
+                input_bytes[std::size_t(column) * k + group * 32 + index];
+            const int activation_q = activation_byte < 128
+                                         ? activation_byte
+                                         : int(activation_byte) - 256;
+            const std::int64_t term =
+                std::int64_t(q6_k_value_cpu(block, u, index)) * activation_q;
+            if (index < 16) {
+                dot0 += term;
+            } else {
+                dot1 += term;
+            }
+        }
+        const std::size_t scale_at = activation_scales +
+            (std::size_t(column) * (k / 32) + group) * sizeof(__half2);
+        const double activation_d = half_to_float(input_bytes.data() + scale_at);
+        const double weight_scale0 = weight_d * int(scales[2 * q]);
+        const double weight_scale1 = weight_d * int(scales[2 * q + 1]);
+        result += activation_d * (weight_scale0 * double(dot0) + weight_scale1 * double(dot1));
     }
     return result;
 }
@@ -1505,7 +1558,7 @@ void run_q4_t4_fused_imma_case(std::int32_t rows, std::uint32_t seed,
     constexpr std::int32_t columns = 4;
     constexpr std::int64_t base_row_bytes = std::int64_t(k / 256) * 144;
     constexpr std::int64_t row_bytes = base_row_bytes + 144;
-    constexpr std::int64_t output_stride = rows + 5;
+    const std::int64_t output_stride = rows + 5;
     const TypeCase type{QType::GGUF_Q4_K, "q4_k", {0, 2}};
     std::mt19937 rng(seed);
     std::normal_distribution<float> normal(0.0f, 0.4f);
