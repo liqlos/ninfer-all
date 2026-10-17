@@ -93,6 +93,9 @@ __device__ __forceinline__ void scale_min_k4(const std::uint8_t* s, int j, int& 
 template <ggml_type type>
 struct Decoder;
 
+template <ggml_type type>
+struct BaselineDecoder : Decoder<type> {};
+
 template <>
 struct Decoder<GGML_TYPE_Q8_0> {
     static constexpr int kBlockElems = 32, kBlockBytes = 34, kTableWords = 0;
