@@ -66,6 +66,18 @@ __device__ __forceinline__ int dot4(const int* w, const int* a, int acc) {
     return acc;
 }
 
+__device__ __forceinline__ int dot4_short_chain(const int* w, const int* a, int acc) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+    int even = ggml_cuda_dp4a(w[0], a[0], 0);
+    int odd = ggml_cuda_dp4a(w[1], a[1], 0);
+    even = ggml_cuda_dp4a(w[2], a[2], even);
+    odd = ggml_cuda_dp4a(w[3], a[3], odd);
+    return acc + even + odd;
+#else
+    return dot4(w, a, acc);
+#endif
+}
+
 __device__ __forceinline__ int sum4(const int* a) {
     int acc = 0;
 #pragma unroll
@@ -211,11 +223,11 @@ struct Decoder<GGML_TYPE_Q4_K> {
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float sum) {
 #if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
-        const int dot_lo = dot4(s.w, a, 0);
-        const int dot_hi = dot4(s.w + 4, a + 4, 0);
+        const int dot_lo = dot4_short_chain(s.w, a, 0);
+        const int dot_hi = dot4_short_chain(s.w + 4, a + 4, 0);
         return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
 #else
-        return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
+        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4, dot4_short_chain(s.w, a, 0))) - s.f[1] * sum;
 #endif
     }
 };
@@ -339,7 +351,7 @@ struct Decoder<GGML_TYPE_Q6_K> {
 #endif
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
-        return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
+        return d * (s.f[0] * float(dot4_short_chain(s.w, a, 0)) + s.f[1] * float(dot4_short_chain(s.w + 4, a + 4, 0)));
     }
 };
 

@@ -1,6 +1,18 @@
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
+option(NINFER_GGUF_DP4A_SHORT_CHAINS "Split Q4_K/Q6_K vector dot4 into two integer dependency chains on SM86" OFF)
+if(NINFER_GGUF_DP4A_SHORT_CHAINS)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF short DP4A chains require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_persistent_ffn.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_gdn_persistent.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DP4A_SHORT_CHAINS=1)
+endif()
 option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
