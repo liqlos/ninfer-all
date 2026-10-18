@@ -223,11 +223,23 @@ struct Decoder<GGML_TYPE_Q4_K> {
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float sum) {
 #if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
+        const int dot_lo = dot4(s.w, a, 0);
+        const int dot_hi = dot4(s.w + 4, a + 4, 0);
+        return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
+#else
+        return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
+#endif
+    }
+    __device__ __forceinline__ static float dot_short_chain(const Slice& s, const int* a, float d,
+                                                            float sum) {
+#if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
         const int dot_lo = dot4_short_chain(s.w, a, 0);
         const int dot_hi = dot4_short_chain(s.w + 4, a + 4, 0);
         return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
 #else
-        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4, dot4_short_chain(s.w, a, 0))) - s.f[1] * sum;
+        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4,
+                                                    dot4_short_chain(s.w, a, 0))) -
+               s.f[1] * sum;
 #endif
     }
 };
@@ -351,7 +363,7 @@ struct Decoder<GGML_TYPE_Q6_K> {
 #endif
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
-        return d * (s.f[0] * float(dot4_short_chain(s.w, a, 0)) + s.f[1] * float(dot4_short_chain(s.w + 4, a + 4, 0)));
+        return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
     }
 };
 
@@ -1146,7 +1158,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
@@ -1187,7 +1209,15 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int r = 0; r < kRows; ++r) {
 #pragma unroll
                     for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Baseline) {
+                            acc[r][j] += D::dot_short_chain(staged[it & 1][r], a[j], d[j], sum[j]);
+                        } else {
+                            acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+                        }
+#else
                         acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+#endif
                     }
                 }
             }
@@ -1213,7 +1243,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
         const auto prefetch = [&](int it, int buffer) {
