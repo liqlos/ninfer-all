@@ -2,12 +2,15 @@
 
 #include "artifact/framing.h"
 #include "artifact/transcode.h"
+#include "artifact/q6_fields.h"
+#include "artifact/q4_fields.h"
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <string_view>
 
 namespace ninfer::artifact {
 
@@ -214,9 +217,52 @@ MaterializationPlan Binder::finish(std::uint64_t evictable_alignment) && {
     plan.object_count      = demands_.size();
     plan.prior_read_bytes  = read_bytes_;
     plan.owned_value_bytes = owned_value_bytes_;
+    std::vector<std::optional<WeightGeometry>> q6_geometries(demands_.size());
+    std::vector<std::optional<WeightGeometry>> q4_geometries(demands_.size());
+    if (q6_fields_mode_enabled()) {
+        for (std::size_t index = 0; index < demands_.size(); ++index) {
+            const auto& demand = demands_[index];
+            if (!demand.device || demand.transcode || demand.host) { continue; }
+            const ObjectHandle handle{index};
+            const auto& stored = reader_.geometry(handle);
+            if (stored.format != QType::GGUF_Q6_K) { continue; }
+            const auto raw = reader_.read_object(handle);
+            plan.prior_read_bytes = checked_add(plan.prior_read_bytes, raw.size(), "Q6 field plan reads");
+            q6_geometries[index] = describe_q6_fields(stored, raw);
+        }
+    }
+    if (q4_fields_mode_enabled()) {
+        const auto has_text_projection_binding = [&](std::size_t index, std::string_view suffix) {
+            for (const auto& [name, binding] : reader_.directory().bindings) {
+                const std::string_view parameter{name};
+                if (!parameter.starts_with("text/layers/") || !parameter.ends_with(suffix) ||
+                    binding.parts.size() != 1) { continue; }
+                const auto& part = binding.parts.front();
+                if (part.object.index == index && part.begin == 0 &&
+                    part.end == reader_.geometry(part.object).elements) { return true; }
+            }
+            return false;
+        };
+        for (std::size_t index = 0; index < demands_.size(); ++index) {
+            const auto& demand = demands_[index];
+            if (!demand.device || demand.transcode || demand.host) { continue; }
+            const ObjectHandle handle{index};
+            const auto& stored = reader_.geometry(handle);
+            if (stored.format != QType::GGUF_Q4_K || stored.shape.size() != 2) { continue; }
+            const bool gdn = stored.shape[0] == 16384 && stored.shape[1] == 5120;
+            const bool down = stored.shape[0] == 5120 && stored.shape[1] == 17408 &&
+                              has_text_projection_binding(index, "/mlp/down");
+            if (!gdn && !down) { continue; }
+            const auto raw = reader_.read_object(handle);
+            plan.prior_read_bytes = checked_add(plan.prior_read_bytes, raw.size(), "Q4 field plan reads");
+            q4_geometries[index] = describe_q4_fields(stored, raw);
+        }
+    }
     const auto device_bytes = [&](std::size_t index) {
         const ObjectHandle handle{index};
         const auto& demand = demands_[index];
+        if (q6_geometries[index]) { return q6_geometries[index]->bytes; }
+        if (q4_geometries[index]) { return q4_geometries[index]->bytes; }
         return demand.transcode ? weight_geometry(*demand.transcode, QuantLayout::RowSplit,
                                                   reader_.directory().tensor(handle).shape)
                                       .bytes
@@ -236,7 +282,8 @@ MaterializationPlan Binder::finish(std::uint64_t evictable_alignment) && {
         auto& capacity      = plan.device_capacity_by_rank[rank];
         const auto offset   = align_up(capacity, demand.alignment, "device offset");
         plan.device_objects.push_back(
-            {ObjectHandle{index}, offset, bytes, demand.alignment, demand.transcode, rank});
+            {ObjectHandle{index}, offset, bytes, demand.alignment, demand.transcode, rank,
+             q6_geometries[index], q4_geometries[index]});
         capacity = checked_add(offset, bytes, "device capacity");
     };
     std::vector<std::size_t> evictable;

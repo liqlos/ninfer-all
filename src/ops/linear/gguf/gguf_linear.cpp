@@ -1,8 +1,12 @@
 #include "ops/linear/gguf/gguf_linear.h"
 
 #include "core/layout.h"
+#include "core/q4_fields.h"
+#include "ops/linear/gguf/ggml_bridge_q6_mmq.h"
+#include "ops/linear/gguf/ggml_bridge_q4_mmq.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -17,6 +21,7 @@ constexpr std::size_t kDequantizedScratchBytes = std::size_t{16} << 20;
 constexpr std::int32_t kDequantizedVectorColumns = 64;
 // The widest stream-k fixup plane any launch can ask for: one 128 x 128 FP32 tile per SM.
 constexpr std::size_t kFixupTileBytes = 128 * 128 * sizeof(float);
+constexpr std::size_t kQ4FieldsRawScratchBytes = std::size_t{48} << 20;
 
 std::int64_t row_bytes(const Weight& w) {
     const auto block = gguf_block_shape(w.qtype);
@@ -24,6 +29,16 @@ std::int64_t row_bytes(const Weight& w) {
 }
 
 bool matrix_kernel(const Weight& w) { return gguf::has_matrix_kernel(gguf_type(w.qtype)); }
+
+bool q4_matrix_fields_supported(const Weight& w) {
+    const auto& fields = w.q4_fields;
+    return (w.k == 5120 && fields.d_width == 12 && fields.d_exponent_base == 0 &&
+            fields.d_exponent_bits == 2 && fields.dmin_width == 13 &&
+            fields.dmin_exponent_base == 2 && fields.dmin_exponent_bits == 3) ||
+           (w.k == 17408 && fields.d_width == 13 && fields.d_exponent_base == 0 &&
+            fields.d_exponent_bits == 3 && fields.dmin_width == 13 &&
+            fields.dmin_exponent_base == 2 && fields.dmin_exponent_bits == 3);
+}
 
 gguf::Epilogue bridge_epilogue(GgufEpilogue epilogue) {
     switch (epilogue) {
@@ -108,7 +123,8 @@ gguf::GgmlType gguf_type(QType format) {
 
 void require_gguf(const Weight& w, const char* label) {
     const auto block = gguf_block_shape(w.qtype);
-    if (!is_gguf(w.qtype) || w.layout != QuantLayout::GgufBlocks || w.qdata == nullptr ||
+    if (!is_gguf(w.qtype) || (w.layout != QuantLayout::GgufBlocks && w.layout != QuantLayout::GgufQ6Fields &&
+        w.layout != QuantLayout::GgufQ4Fields) || w.qdata == nullptr ||
         w.n <= 0 || w.k <= 0 || w.k % block.elements != 0 || w.k % 512 != 0) {
         throw std::invalid_argument(std::string(label) +
                                     ": expected a resident GGUF matrix over 512-column groups");
@@ -124,6 +140,8 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
     std::vector<int> layouts;
     std::size_t rows = 0;
     bool dequantized = false;
+    bool q4_fields = false;
+    const auto* lossless_mode = std::getenv("NINFER_LOSSLESS_MODE");
     for (const GgufShape& shape : shapes) {
         const auto block = gguf_block_shape(shape.qtype);
         if (!is_gguf(shape.qtype) || shape.rows <= 0 || shape.k != k || k <= 0 ||
@@ -131,6 +149,8 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
             throw std::invalid_argument("gguf workspace: unsupported product geometry");
         }
         const auto type = gguf_type(shape.qtype);
+        q4_fields |= lossless_mode && shape.qtype == QType::GGUF_Q4_K &&
+                     std::string(lossless_mode) == "q4q6-fields";
         if (gguf::has_matrix_kernel(type)) {
             const int layout = gguf::matrix_activation_layout(type);
             if (std::find(layouts.begin(), layouts.end(), layout) == layouts.end()) {
@@ -157,6 +177,7 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
         WorkspaceLayoutBuilder layout;
         (void)layout.alloc_bytes(rows * t * sizeof(float));
         (void)layout.alloc_bytes(fixup_bound());
+        if (q4_fields) { (void)layout.alloc_bytes(kQ4FieldsRawScratchBytes); }
         if (dequantized) {
             (void)layout.alloc_bytes(gguf::vector_activation_bytes(k, gguf::kMaxVectorColumns));
             (void)layout.alloc_bytes(kDequantizedScratchBytes);
@@ -196,8 +217,14 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 activations.push_back({w.input_columns, data});
                 found = activations.end() - 1;
             }
-            gguf::vector_product(gguf_type(w.qtype), w.qdata, row_bytes(w), w.n, k, found->data,
-                                 t, output(p, 0), stream);
+            if (w.layout == QuantLayout::GgufQ6Fields) {
+                gguf::vector_q6_fields(w, found->data, t, output(p, 0), stream);
+            } else if (w.layout == QuantLayout::GgufQ4Fields) {
+                gguf::vector_q4_fields(w, found->data, t, output(p, 0), stream);
+            } else {
+                gguf::vector_product(gguf_type(w.qtype), w.qdata, row_bytes(w), w.n, k, found->data,
+                                     t, output(p, 0), stream);
+            }
         }
         return;
     }
@@ -217,6 +244,11 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
     auto* plane = static_cast<float*>(
         workspace.alloc_bytes(std::size_t(plane_rows) * t * sizeof(float)).data);
     void* fixup = workspace.alloc_bytes(fixup_bound()).data;
+    void* q4_raw = nullptr;
+    if (std::any_of(products.begin(), products.end(), [](const auto& product) {
+        return product.weight->layout == QuantLayout::GgufQ4Fields &&
+               !q4_matrix_fields_supported(*product.weight);
+    })) { q4_raw = workspace.alloc_bytes(kQ4FieldsRawScratchBytes).data; }
     void* vector_activation = nullptr;
     void* scratch           = nullptr;
     if (dequantized) {
@@ -242,7 +274,24 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 activations.push_back({layout, w.input_columns, data});
                 found = activations.end() - 1;
             }
-            gguf::matrix_product(type, w.qdata, row_bytes(w), w.n, k, found->data, t, out, stride,
+            const void* matrix_weight = w.qdata;
+            if (w.layout == QuantLayout::GgufQ6Fields) {
+                gguf::matrix_q6_fields(w, found->data, t, out, stride, fixup, stream);
+                if (!direct) { gguf::store_plane(plane, w.n, w.n, t, output(p, 0), stream); }
+                continue;
+            } else if (w.layout == QuantLayout::GgufQ4Fields) {
+                if (q4_matrix_fields_supported(w)) {
+                    gguf::matrix_q4_fields(w, found->data, t, out, stride, fixup, stream);
+                    if (!direct) { gguf::store_plane(plane, w.n, w.n, t, output(p, 0), stream); }
+                    continue;
+                }
+                if (std::uint64_t(w.n) * row_bytes(w) > kQ4FieldsRawScratchBytes) {
+                    throw std::invalid_argument("selected Q4 fields exceed bounded raw MMQ scratch");
+                }
+                unpack_q4_fields(w, 0, w.n, q4_raw, stream);
+                matrix_weight = q4_raw;
+            }
+            gguf::matrix_product(type, matrix_weight, row_bytes(w), w.n, k, found->data, t, out, stride,
                                  fixup, stream);
         } else if (t <= kDequantizedVectorColumns) {
             for (std::int32_t first = 0; first < t; first += gguf::kMaxVectorColumns) {
@@ -307,7 +356,8 @@ void gguf_swiglu(const Tensor& x, const Weight& gate, const Weight* up, Tensor& 
     Weight up_rows;
     if (up == nullptr) {
         if (gate.n != 2 * rows) { throw std::invalid_argument("gguf swiglu: parent is not [gate; up]"); }
-        if (t <= gguf::kMaxVectorColumns) {
+        if (t <= gguf::kMaxVectorColumns && gate.layout != QuantLayout::GgufQ6Fields &&
+            gate.layout != QuantLayout::GgufQ4Fields) {
             void* activation =
                 workspace.alloc_bytes(gguf::vector_activation_bytes(gate.k, t)).data;
             gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(x.data), gate.k, t,
@@ -320,7 +370,14 @@ void gguf_swiglu(const Tensor& x, const Weight& gate, const Weight* up, Tensor& 
         gate_rows.n = rows;
         up_rows     = gate;
         up_rows.n   = rows;
-        up_rows.qdata = static_cast<const std::byte*>(gate.qdata) + std::int64_t(rows) * row_bytes(gate);
+        const auto stride = gate.layout == QuantLayout::GgufQ6Fields ? std::int64_t(gate.k / 256) * 208 :
+                            gate.layout == QuantLayout::GgufQ4Fields ? std::int64_t(gate.k / 256) * 128 : row_bytes(gate);
+        up_rows.qdata = static_cast<const std::byte*>(gate.qdata) + std::int64_t(rows) * stride;
+        up_rows.q6_field_row_begin += rows;
+        if (gate.layout == QuantLayout::GgufQ4Fields) {
+            up_rows.scales = static_cast<const std::byte*>(gate.scales) + std::int64_t(rows) * (gate.k / 256) * 12;
+            up_rows.q4_field_row_begin += rows;
+        }
     } else {
         require_gguf(*up, "gguf swiglu up");
         if (gate.n != rows || up->n != rows || up->k != gate.k) {
@@ -343,6 +400,9 @@ void gguf_swiglu(const Tensor& x, const Weight& gate, const Weight* up, Tensor& 
 
 void gguf_embedding(const Weight& table, const Tensor& ids, Tensor& out, cudaStream_t stream) {
     require_gguf(table, "gguf embedding");
+    if (table.layout == QuantLayout::GgufQ6Fields || table.layout == QuantLayout::GgufQ4Fields) {
+        throw std::invalid_argument("lossless fields embedding is not enabled for this experiment");
+    }
     if (ids.dtype != DType::I32 || !ids.is_contiguous() || out.dtype != DType::BF16 ||
         !out.is_contiguous() || out.ne[0] != table.k || out.numel() != std::int64_t(table.k) * ids.numel()) {
         throw std::invalid_argument("gguf embedding: expected I32 ids and BF16 [K, ids]");

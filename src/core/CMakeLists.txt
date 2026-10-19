@@ -16,6 +16,8 @@ add_library(ninfer_core STATIC
   layout.cpp
   tensor.cpp
   weight_view.cpp
+  q6_fields.cu
+  q4_fields.cu
   decode_graph.cpp
   evictable_kv_pool.cu
   evictable_weight_pool.cu

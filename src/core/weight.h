@@ -81,6 +81,25 @@ enum class QuantLayout : std::uint16_t {
     RowSplitPanel = 4,
     // Rows of whole ggml blocks, as a GGUF stores them.
     GgufBlocks = 5,
+    GgufQ6Fields = 6,
+    GgufQ4Fields = 7,
+};
+
+struct Q6FieldEncoding {
+    std::uint8_t width = 0;
+    std::uint8_t exponent_base = 0;
+    std::uint8_t exponent_bits = 0;
+    std::uint8_t sign_variable = 0;
+    std::uint8_t sign_value = 0;
+};
+
+struct Q4FieldEncoding {
+    std::uint8_t d_width = 0;
+    std::uint8_t dmin_width = 0;
+    std::uint8_t d_exponent_base = 0;
+    std::uint8_t d_exponent_bits = 0;
+    std::uint8_t dmin_exponent_base = 0;
+    std::uint8_t dmin_exponent_bits = 0;
 };
 
 // Rows per stored panel. Four 32-byte records is exactly one 128-byte line, which is all the
@@ -133,6 +152,12 @@ struct Weight {
     // INT32 [K] input gather of a GGUF matrix whose stored columns are a permutation of its
     // input's: column c multiplies input element input_columns[c]. Null for every other matrix.
     const std::int32_t* input_columns = nullptr;
+    Q6FieldEncoding q6_fields;
+    std::uint64_t q6_field_row_begin = 0;
+    Q4FieldEncoding q4_fields;
+    const void* q4_d = nullptr;
+    const void* q4_dmin = nullptr;
+    std::uint64_t q4_field_row_begin = 0;
 };
 
 } // namespace ninfer

@@ -6,6 +6,7 @@
 
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
+#include "core/weight.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -74,6 +75,10 @@ struct VectorOutput {
 void vector_product(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
                     const void* activation, int columns, const VectorOutput& out,
                     cudaStream_t stream);
+void vector_q6_fields(const Weight& weight, const void* activation, int columns,
+                      const VectorOutput& out, cudaStream_t stream);
+void vector_q4_fields(const Weight& weight, const void* activation, int columns,
+                      const VectorOutput& out, cudaStream_t stream);
 
 // out[r, c] = silu(gate_r . x_c) * (up_r . x_c) where gate row r and up row r are rows r and
 // rows + r of one parent of this type.

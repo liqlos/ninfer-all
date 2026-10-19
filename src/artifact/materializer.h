@@ -27,6 +27,8 @@ struct DevicePlacement {
     // Which pipeline rank's device arena holds the object; `offset` is relative to that arena.
     // Rank 0 is the primary device, and is the only rank a single-device load ever uses.
     std::size_t rank = 0;
+    std::optional<WeightGeometry> q6_fields;
+    std::optional<WeightGeometry> q4_fields;
 };
 
 // Offset inside the one page-locked Host block (Residency::Pinned).

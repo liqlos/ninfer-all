@@ -2,6 +2,9 @@
 // activation quantizers follow ggml's q8_1, reading BF16 and optionally gathering the input columns.
 
 #include "ggml_bridge_internal.cuh"
+#include "vector_snapshot.cuh"
+#include "q6_fields.cuh"
+#include "q4_fields.cuh"
 
 #include "ggml-cuda/dequantize.cuh"
 
@@ -339,6 +342,7 @@ void vector_product(GgmlType type, const void* weight, std::int64_t row_bytes, i
     }
     const detail::VecStore store{out.bf16,     out.f32,  out.column_stride,
                                  out.epilogue, out.gate, out.gate_column_stride};
+    detail::capture_vector_snapshot(int(type), detail::vector_args(weight, row_bytes, rows, k, activation, columns, store), columns, false, stream);
     detail::vector_launch(type)(
         detail::vector_args(weight, row_bytes, rows, k, activation, columns, store), columns,
         false, stream);
@@ -348,9 +352,71 @@ void vector_swiglu(GgmlType type, const void* weight, std::int64_t row_bytes, in
                    const void* activation, int columns, __nv_bfloat16* out,
                    std::int64_t out_column_stride, cudaStream_t stream) {
     const detail::VecStore store{out, nullptr, out_column_stride, Epilogue::Store, nullptr, 0};
+    detail::capture_vector_snapshot(int(type), detail::vector_args(weight, row_bytes, rows, k, activation, columns, store), columns, true, stream);
     detail::vector_launch(type)(
         detail::vector_args(weight, row_bytes, rows, k, activation, columns, store), columns,
         true, stream);
+}
+
+void vector_q6_fields(const Weight& weight, const void* activation, int columns,
+                      const VectorOutput& out, cudaStream_t stream) {
+    if ((out.bf16 == nullptr) == (out.f32 == nullptr) ||
+        (out.epilogue == Epilogue::GateProduct && out.gate == nullptr)) {
+        throw std::invalid_argument("Q6 field vector product: invalid output");
+    }
+    const detail::VecStore store{out.bf16, out.f32, out.column_stride,
+                                 out.epilogue, out.gate, out.gate_column_stride};
+    const auto args = detail::vector_args(weight.qdata, std::int64_t(weight.k / 256) * 208,
+                                          weight.n, weight.k, activation, columns, store);
+    const auto& fields = weight.q6_fields;
+    const auto launch = [&]<int T>() {
+        detail::q6_fields::launch<T, false, true>(args,
+            static_cast<const std::uint8_t*>(weight.scales), fields.width, fields.exponent_base,
+            fields.exponent_bits, fields.sign_variable, fields.sign_value,
+            std::uint32_t(weight.q6_field_row_begin), stream);
+    };
+    switch (columns) {
+    case 1: launch.template operator()<1>(); return;
+    case 2: launch.template operator()<2>(); return;
+    case 3: launch.template operator()<3>(); return;
+    case 4: launch.template operator()<4>(); return;
+    case 5: launch.template operator()<5>(); return;
+    case 6: launch.template operator()<6>(); return;
+    case 7: launch.template operator()<7>(); return;
+    case 8: launch.template operator()<8>(); return;
+    default: throw std::invalid_argument("Q6 field vector columns must be 1..8");
+    }
+}
+
+void vector_q4_fields(const Weight& weight, const void* activation, int columns,
+                      const VectorOutput& out, cudaStream_t stream) {
+    if (weight.layout != QuantLayout::GgufQ4Fields || weight.qtype != QType::GGUF_Q4_K ||
+        (out.bf16 == nullptr) == (out.f32 == nullptr) ||
+        (out.epilogue == Epilogue::GateProduct && out.gate == nullptr)) {
+        throw std::invalid_argument("Q4 field vector product: invalid weight or output");
+    }
+    const detail::VecStore store{out.bf16, out.f32, out.column_stride,
+                                 out.epilogue, out.gate, out.gate_column_stride};
+    const auto args = detail::vector_args(weight.qdata, std::int64_t(weight.k / 256) * 128,
+                                          weight.n, weight.k, activation, columns, store);
+    const detail::q4_fields::Metadata metadata{
+        static_cast<const std::uint8_t*>(weight.scales), weight.q4_fields};
+    const auto launch = [&]<int T>() {
+        detail::q4_fields::launch<T>(args, metadata,
+            static_cast<const std::uint8_t*>(weight.q4_d),
+            static_cast<const std::uint8_t*>(weight.q4_dmin), weight.q4_field_row_begin, stream);
+    };
+    switch (columns) {
+    case 1: launch.template operator()<1>(); return;
+    case 2: launch.template operator()<2>(); return;
+    case 3: launch.template operator()<3>(); return;
+    case 4: launch.template operator()<4>(); return;
+    case 5: launch.template operator()<5>(); return;
+    case 6: launch.template operator()<6>(); return;
+    case 7: launch.template operator()<7>(); return;
+    case 8: launch.template operator()<8>(); return;
+    default: throw std::invalid_argument("Q4 field vector columns must be 1..8");
+    }
 }
 
 int matrix_activation_layout(GgmlType type) {
