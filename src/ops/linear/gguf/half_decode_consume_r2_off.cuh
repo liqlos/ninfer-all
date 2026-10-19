@@ -17,7 +17,21 @@
 
 #include <algorithm>
 
-namespace ninfer::ops::gguf::detail::off_probe {
+#if defined(NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME)
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ != 860
+#error Q6_K T4 half-decode consumption requires sm_86
+#endif
+#if !defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE)
+#error Q6_K T4 half-decode consumption requires cooperative Q6 decode
+#endif
+#if defined(NINFER_GGUF_Q6_STATIC_K) || defined(NINFER_GGUF_VECTOR_PREFETCH2) || \
+    defined(NINFER_GGUF_Q6_T4_SINGLE_ROW) || defined(NINFER_GGUF_Q6_T4_IMMA) || \
+    defined(NINFER_GGUF_Q6_PACKED_SCALE_LOAD) || defined(NINFER_GGUF_Q6_STREAMING_LOADS)
+#error Q6_K T4 half-decode consumption requires the generic two-row cooperative route
+#endif
+#endif
+
+namespace ninfer::ops::gguf::detail::half_decode_consume_r2_off_probe {
 
 // Types whose vector kernels are also built for the static K of the 27B text matrices.
 template <ggml_type type>
@@ -64,6 +78,18 @@ __device__ __forceinline__ int dot4(const int* w, const int* a, int acc) {
 #pragma unroll
     for (int i = 0; i < 4; ++i) { acc = ggml_cuda_dp4a(w[i], a[i], acc); }
     return acc;
+}
+
+__device__ __forceinline__ int dot4_short_chain(const int* w, const int* a, int acc) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+    int even = ggml_cuda_dp4a(w[0], a[0], 0);
+    int odd = ggml_cuda_dp4a(w[1], a[1], 0);
+    even = ggml_cuda_dp4a(w[2], a[2], even);
+    odd = ggml_cuda_dp4a(w[3], a[3], odd);
+    return acc + even + odd;
+#else
+    return dot4(w, a, acc);
+#endif
 }
 
 __device__ __forceinline__ int sum4(const int* a) {
@@ -218,6 +244,18 @@ struct Decoder<GGML_TYPE_Q4_K> {
         return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
 #endif
     }
+    __device__ __forceinline__ static float dot_short_chain(const Slice& s, const int* a, float d,
+                                                            float sum) {
+#if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
+        const int dot_lo = dot4_short_chain(s.w, a, 0);
+        const int dot_hi = dot4_short_chain(s.w + 4, a + 4, 0);
+        return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
+#else
+        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4,
+                                                    dot4_short_chain(s.w, a, 0))) -
+               s.f[1] * sum;
+#endif
+    }
 };
 
 template <>
@@ -325,11 +363,7 @@ struct Decoder<GGML_TYPE_Q6_K> {
                                                      (q & 1) + 2 * (j & 1), 4);
                 const std::uint32_t v = ((low >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
                                         (((high >> (2 * q)) << 4) & 0x30303030u);
-                #if defined(NINFER_GGUF_Q6_CENTER_BIAS_ADD) && __CUDA_ARCH__ == 860
-                s.w[base + j] = int((v + 0x60606060u) ^ 0x80808080u);
-#else
                 s.w[base + j] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
-#endif
             }
         }
 #else
@@ -338,11 +372,7 @@ struct Decoder<GGML_TYPE_Q6_K> {
             const std::uint32_t v = ((load32(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
                                     (((load32(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
             // v - 32 per byte, v in [0, 64): flip the high bits by whether v is below 32.
-            #if defined(NINFER_GGUF_Q6_CENTER_BIAS_ADD) && __CUDA_ARCH__ == 860
-            s.w[i] = int((v + 0x60606060u) ^ 0x80808080u);
-#else
             s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
-#endif
         }
 #endif
     }
@@ -350,6 +380,49 @@ struct Decoder<GGML_TYPE_Q6_K> {
         return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
     }
 };
+
+#if defined(NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME) && __CUDA_ARCH__ == 860
+struct Q6HalfDecodeSlice {
+    const std::uint8_t* ql;
+    const std::uint8_t* qh;
+    int q;
+    unsigned mask;
+    float f[2];
+
+    __device__ __forceinline__ static Q6HalfDecodeSlice load(const std::uint8_t* b, int u) {
+        Q6HalfDecodeSlice s;
+        const int h = u / 4;
+        s.q = u % 4;
+        const float d = half_at(b + 208);
+        const auto* sc = reinterpret_cast<const std::int8_t*>(b + 192 + 8 * h);
+        const int scale0 = sc[2 * s.q];
+        const int scale1 = sc[2 * s.q + 1];
+        s.f[0] = d * float(scale0);
+        s.f[1] = d * float(scale1);
+        s.ql = b + 64 * h + 32 * (s.q & 1);
+        s.qh = b + 128 + 32 * h;
+        s.mask = __activemask();
+        return s;
+    }
+
+    template <int Base>
+    __device__ __forceinline__ void decode(int* w) const {
+        static_assert(Base == 0 || Base == 4);
+        const std::uint32_t hi = u32_a2(qh + 4 * (Base + q));
+        const std::uint32_t lo0 = u32_a2(ql + 4 * (Base + (q >> 1)));
+        const std::uint32_t lo1 = u32_a2(ql + 4 * (Base + 2 + (q >> 1)));
+#pragma unroll
+        for (int j = 0; j < 4; ++j) {
+            const std::uint32_t high = __shfl_sync(mask, hi, j, 4);
+            const std::uint32_t low = __shfl_sync(mask, j < 2 ? lo0 : lo1,
+                                                 (q & 1) + 2 * (j & 1), 4);
+            const std::uint32_t v = ((low >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                    (((high >> (2 * q)) << 4) & 0x30303030u);
+            w[j] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
+        }
+    }
+};
+#endif
 
 template <>
 struct BaselineDecoder<GGML_TYPE_Q6_K> {
@@ -1083,6 +1156,11 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true,
           bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
+#if defined(NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME) && __CUDA_ARCH__ == 860
+    static_assert(type != GGML_TYPE_Q6_K || T != 4 || Fused || Baseline ||
+                  (KS == 0 && Rows == 2),
+                  "Q6_K T4 half-decode consumption requires generic K and two rows");
+#endif
     using D = std::conditional_t<Baseline, BaselineDecoder<type>, Decoder<type>>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
     constexpr int kPerBlock = D::kBlockElems / 32;
@@ -1139,10 +1217,42 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
             }
 #pragma unroll
             for (int r = 0; r < kRows; ++r) {
-                Slice sl;
-                D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub, table, sl);
+#if defined(NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME) && __CUDA_ARCH__ == 860
+                if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused && !Baseline &&
+                              KS == 0 && Rows == 2) {
+                    const auto sl = Q6HalfDecodeSlice::load(
+                        rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub);
+                    int w[4];
+                    int lower[T];
+                    sl.decode<0>(w);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                    for (int j = 0; j < T; ++j) { lower[j] = dot4(w, a[j], 0); }
+                    sl.decode<4>(w);
+#pragma unroll
+                    for (int j = 0; j < T; ++j) {
+                        const int upper = dot4(w, a[j] + 4, 0);
+                        const float upper_scaled = __fmul_rn(sl.f[1], __int2float_rn(upper));
+                        const float inner = __fmaf_rn(sl.f[0], __int2float_rn(lower[j]), upper_scaled);
+                        acc[r][j] = __fmaf_rn(d[j], inner, acc[r][j]);
+                    }
+                } else
+#endif
+                {
+                    Slice sl;
+                    D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub, table, sl);
+#pragma unroll
+                    for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                            acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                        } else {
+                            acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                        }
+#else
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                    }
+                }
             }
         };
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
@@ -1183,7 +1293,15 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int r = 0; r < kRows; ++r) {
 #pragma unroll
                     for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                            acc[r][j] += D::dot_short_chain(staged[it & 1][r], a[j], d[j], sum[j]);
+                        } else {
+                            acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+                        }
+#else
                         acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+#endif
                     }
                 }
             }
@@ -1209,7 +1327,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
         const auto prefetch = [&](int it, int buffer) {
