@@ -5,11 +5,12 @@ option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K v
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
 option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Cooperatively load packed Q6_K blocks across SM86 warp lanes" OFF)
+option(NINFER_GGUF_Q6_PACKED_SCALE_LOAD "Load each Q6_K scale pair with one aligned SM86 word transaction" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
+option(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD "Load the aligned Q4_K vector block header in one SM86 vector transaction" OFF)
 option(NINFER_GGUF_Q4_ASYNC_PIPELINE "Pipeline SM86 GGUF Q4_K K5120 vector weight loads" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_X "Use SM86 cp.async raw-weight staging for GGUF Q4_K MMQ" OFF)
-option(NINFER_GGUF_Q6_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q6_K MMQ" OFF)
 option(NINFER_GGUF_SM86_MMQ_TILE_CAP "Limit the column tile of wide SM86 Q4_K/Q6_K MMQ products" OFF)
 set(NINFER_GGUF_SM86_MMQ_MAX_J "64" CACHE STRING "Maximum column tile for the SM86 MMQ experiment")
 set_property(CACHE NINFER_GGUF_SM86_MMQ_MAX_J PROPERTY STRINGS 32 64 128)
@@ -137,6 +138,16 @@ if(NINFER_GGUF_Q6_COOPERATIVE_DECODE)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_COOPERATIVE_DECODE=1)
 endif()
+if(NINFER_GGUF_Q6_PACKED_SCALE_LOAD)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Packed GGUF Q6_K scale loads require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_persistent_ffn.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_gdn_persistent.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_PACKED_SCALE_LOAD=1)
+endif()
 if(NINFER_GGUF_Q4_COOPERATIVE_DECODE)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF cooperative Q4 decode requires sm_86")
@@ -163,12 +174,22 @@ if(NINFER_GGUF_Q6_STREAMING_LOADS)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_STREAMING_LOADS=1)
 endif()
+if(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF Q4_K vector header loads require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_persistent_ffn.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_gdn_persistent.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_VECTOR_HEADER_LOAD=1)
+endif()
 if(NINFER_GGUF_Q4_STREAMING_LOADS)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF streaming weight experiments require sm_86")
   endif()
-  set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
-    PROPERTIES COMPILE_DEFINITIONS NINFER_GGUF_Q4_STREAMING_LOADS=1)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_STREAMING_LOADS=1)
 endif()
 if(NINFER_GGUF_Q4_ASYNC_PIPELINE)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
@@ -197,13 +218,6 @@ if(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
   endif()
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_ASYNC_Y=1)
-endif()
-if(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "GGUF Q6 MMQ async activation staging requires sm_86")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_ASYNC_Y=1)
 endif()
 if(NINFER_GGUF_Q4_MMQ_ASYNC_X)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")

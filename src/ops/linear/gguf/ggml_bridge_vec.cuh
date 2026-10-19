@@ -154,9 +154,28 @@ struct Decoder<GGML_TYPE_Q4_K> {
     __device__ static const std::uint32_t* table() { return nullptr; }
     __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
                                                   const std::uint32_t*, Slice& s) {
+#if defined(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD) && __CUDA_ARCH__ == 860
+        const uint4 header = *reinterpret_cast<const uint4*>(b);
+        const float2 dm = __half22float2(*reinterpret_cast<const half2*>(&header.x));
+        int sc, m;
+        if (u < 4) {
+            const std::uint32_t scale = (header.y >> (8 * u)) & 0xFFu;
+            const std::uint32_t minimum = (header.z >> (8 * u)) & 0xFFu;
+            sc = int(scale & 63u);
+            m = int(minimum & 63u);
+        } else {
+            const int byte = u - 4;
+            const std::uint32_t packed = (header.w >> (8 * byte)) & 0xFFu;
+            const std::uint32_t scale_high = (header.y >> (8 * byte)) & 0xFFu;
+            const std::uint32_t minimum_high = (header.z >> (8 * byte)) & 0xFFu;
+            sc = int((packed & 0xFu) | ((scale_high >> 6) << 4));
+            m = int((packed >> 4) | ((minimum_high >> 6) << 4));
+        }
+#else
         const float2 dm = __half22float2(*reinterpret_cast<const half2*>(b));
         int sc, m;
         scale_min_k4(b + 4, u, sc, m);
+#endif
         s.f[0]              = dm.x * float(sc);
         s.f[1]              = dm.y * float(m);
         const uint4* qs     = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
@@ -232,8 +251,16 @@ struct Decoder<GGML_TYPE_Q6_K> {
         const int h = u / 4, q = u % 4;
         const float d        = half_at(b + 208);
         const auto* sc       = reinterpret_cast<const std::int8_t*>(b + 192 + 8 * h);
-        s.f[0]               = d * float(sc[2 * q]);
-        s.f[1]               = d * float(sc[2 * q + 1]);
+#if defined(NINFER_GGUF_Q6_PACKED_SCALE_LOAD) && __CUDA_ARCH__ == 860
+        const std::uint32_t packed_sc = *reinterpret_cast<const std::uint16_t*>(sc + 2 * q);
+        const int scale0 = static_cast<int>((packed_sc & 0xffu) ^ 0x80u) - 0x80;
+        const int scale1 = static_cast<int>(((packed_sc >> 8) & 0xffu) ^ 0x80u) - 0x80;
+#else
+        const int scale0 = sc[2 * q];
+        const int scale1 = sc[2 * q + 1];
+#endif
+        s.f[0]               = d * float(scale0);
+        s.f[1]               = d * float(scale1);
         const std::uint8_t* ql = b + 64 * h + 32 * (q & 1);
         const std::uint8_t* qh = b + 128 + 32 * h;
 #if defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
