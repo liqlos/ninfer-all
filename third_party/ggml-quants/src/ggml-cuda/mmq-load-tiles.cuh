@@ -1113,8 +1113,8 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 
 #if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
 #if defined(NINFER_GGUF_Q6_MMQ_X_BANK_SWIZZLE) && __CUDA_ARCH__ == 860
-        const int destination0 = J == 128 ? kq0 ^ ((kq0 & 32) >> 1) : kq0;
-        const int destination1 = J == 128 ? kq1 ^ ((kq1 & 32) >> 1) : kq1;
+        const int destination0 = J == 128 ? txi + 2 * (txi & (QI6_K/2)) : kq0;
+        const int destination1 = J == 128 ? txi + QI6_K/2 : kq1;
         x_qs[i*sram_stride + destination0] = __vsubss4(ql0 | qh0, 0x20202020);
         x_qs[i*sram_stride + destination1] = __vsubss4(ql1 | qh1, 0x20202020);
 #else

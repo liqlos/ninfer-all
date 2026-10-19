@@ -1,4 +1,4 @@
-bool q6_mmq_x_bank_swizzle_layout_test();
+bool q6_mmq_x_bank_direct_layout_test();
 #include "probe_api.h"
 
 #include "ggml-cuda/common.cuh"
@@ -114,7 +114,7 @@ void call_variant(bool on, const Q6MmqProbePlan& plan, const char* weights, int 
     const int row_blocks = k / 256;
     const int stride_row_blocks = row_blocks;
     if (on) {
-        q6_mmq_x_bank_swizzle_on_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
+        q6_mmq_x_bank_direct_on_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
                               out, bf16, stride, fixup, stream);
     } else {
         q6_mmq_a_x4_off_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
@@ -227,7 +227,7 @@ void run_case(const Case& c, int columns, std::ostream& jsonl) {
     Q6MmqProbePlan off_plan{};
     Q6MmqProbePlan on_plan{};
     if (!q6_mmq_a_x4_off_plan(c.rows, columns, &off_plan) ||
-        !q6_mmq_x_bank_swizzle_on_plan(c.rows, columns, &on_plan)) {
+        !q6_mmq_x_bank_direct_on_plan(c.rows, columns, &on_plan)) {
         throw std::runtime_error("native Q6 MMQ plan unavailable");
     }
     if (off_plan.J != 128 || on_plan.J != 128 || off_plan.I != on_plan.I ||
@@ -362,8 +362,8 @@ int main(int argc, char** argv) {
         jsonl << "{\"kind\":\"environment\",\"device\":\"" << json_string(properties.name)
               << "\",\"compute_capability\":\"8.6\",\"sm_count\":" << properties.multiProcessorCount
               << ",\"free_bytes_before\":" << free_bytes << ",\"total_bytes\":" << total_bytes
-              << ",\"feature\":\"Q6_MMQ_X_BANK_SWIZZLE\",\"store_fusion\":true}\n";
-        if (!q6_mmq_x_bank_swizzle_layout_test()) throw std::runtime_error("Q6 shared X bank-swizzle layout mismatch");
+              << ",\"feature\":\"Q6_MMQ_X_BANK_DIRECT\",\"store_fusion\":true}\n";
+        if (!q6_mmq_x_bank_direct_layout_test()) throw std::runtime_error("Q6 shared X bank-swizzle layout mismatch");
         jsonl << "{\"kind\":\"layout_mapping\",\"status\":\"PASS\",\"lanes\":32,\"row_groups\":8,\"k_groups\":16}\n";
         const std::array<Case, 2> cases{{
             {"q6-full-k17408", "/extra/q6-full-k17408.bin", 5120, 17408},

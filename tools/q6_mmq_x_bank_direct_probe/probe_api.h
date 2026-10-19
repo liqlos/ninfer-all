@@ -19,12 +19,12 @@ struct Q6MmqProbePlan {
 };
 
 bool q6_mmq_a_x4_off_plan(int rows, int columns, Q6MmqProbePlan* plan);
-bool q6_mmq_x_bank_swizzle_on_plan(int rows, int columns, Q6MmqProbePlan* plan);
+bool q6_mmq_x_bank_direct_on_plan(int rows, int columns, Q6MmqProbePlan* plan);
 void q6_mmq_a_x4_off_run(const Q6MmqProbePlan* plan, const char* weight,
                             int stride_row_blocks, int rows, int k, const int* activation,
                             int columns, float* out, __nv_bfloat16* out_bf16,
                             std::int64_t output_column_stride, float* fixup, cudaStream_t stream);
-void q6_mmq_x_bank_swizzle_on_run(const Q6MmqProbePlan* plan, const char* weight,
+void q6_mmq_x_bank_direct_on_run(const Q6MmqProbePlan* plan, const char* weight,
                            int stride_row_blocks, int rows, int k, const int* activation,
                            int columns, float* out, __nv_bfloat16* out_bf16,
                            std::int64_t output_column_stride, float* fixup, cudaStream_t stream);
