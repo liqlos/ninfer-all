@@ -1,3 +1,5 @@
+option(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM "Load Q6_K SM86 MMQ A fragments at each K step" OFF)
+option(NINFER_GGUF_Q6_MMQ_Y_LDMATRIX "Use LDSM for Q6_K SM86 MMQ activation fragments" OFF)
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
@@ -387,14 +389,18 @@ target_link_libraries(ninfer_ggml_quants PRIVATE CUDA::cudart CUDA::cublas)
 target_link_libraries(ninfer_ops PRIVATE ninfer_ggml_quants)
 target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp")
 
-option(NINFER_GGUF_Q6_T4_HEAD_BOUND "Target five resident blocks for generic SM86 Q6 T4 K5120 only" OFF)
-if(NINFER_GGUF_Q6_T4_HEAD_BOUND)
+if(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "Q6 occupancy schedule requires sm_86")
+    message(FATAL_ERROR "Q6_K MMQ schedule requires sm_86")
   endif()
-  if(NINFER_GGUF_Q6_STATIC_K OR NINFER_GGUF_Q6_T4_SINGLE_ROW OR NINFER_GGUF_Q6_T4_IMMA OR NINFER_GGUF_VECTOR_PREFETCH2)
-    message(FATAL_ERROR "Q6 occupancy schedule requires the generic two-row vector route")
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM=1)
+endif()
+
+if(NINFER_GGUF_Q6_MMQ_Y_LDMATRIX)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q6_K MMQ schedule requires sm_86")
   endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
-    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_HEAD_BOUND=1)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_Y_LDMATRIX=1)
 endif()
