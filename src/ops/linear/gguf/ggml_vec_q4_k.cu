@@ -28,7 +28,13 @@ void q4_t4_fused_imma_baseline_for_test(const std::uint8_t* weight, std::int64_t
                                         cudaStream_t stream) {
     const VecStore store{static_cast<__nv_bfloat16*>(output), nullptr,
                          output_column_stride, Epilogue::Store, nullptr, 0};
-    const VecArgs args = vector_args(weight, row_bytes, rows, k, activation, 4, store);
+    const VecArgs args{weight,
+                       row_bytes,
+                       rows,
+                       k,
+                       reinterpret_cast<const std::int8_t*>(activation),
+                       reinterpret_cast<const half2*>(activation + vec_scales_offset(k, 4)),
+                       store};
     vec::launch_baseline<GGML_TYPE_Q4_K, 4, true, 5120>(args, stream);
 }
 #endif
