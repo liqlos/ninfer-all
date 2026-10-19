@@ -169,6 +169,31 @@ void speculative_select_accepted_hidden_launch(const Tensor& hidden, const Tenso
     CUDA_CHECK(cudaGetLastError());
 }
 
+void speculative_select_accepted_hidden_scatter_launch(const Tensor& hidden,
+                                                       const Tensor& selectors,
+                                                       const Tensor& destinations, Tensor& out,
+                                                       cudaStream_t stream) {
+    constexpr int kBlock = 256;
+    const int rows = hidden.ne[0];
+    const int batch = hidden.ne[2];
+    const auto hidden_address = reinterpret_cast<std::uintptr_t>(hidden.data);
+    const auto output_address = reinterpret_cast<std::uintptr_t>(out.data);
+    if ((rows % 8) == 0 && ((hidden_address | output_address) & 0xfU) == 0U) {
+        speculative_select_accepted_hidden_scatter_vector_kernel<<<batch, kBlock, 0, stream>>>(
+            static_cast<const uint4*>(hidden.data),
+            static_cast<const std::int32_t*>(selectors.data),
+            static_cast<const std::int32_t*>(destinations.data), static_cast<uint4*>(out.data),
+            rows / 8, hidden.ne[1], out.ne[1]);
+    } else {
+        speculative_select_accepted_hidden_scatter_scalar_kernel<<<batch, kBlock, 0, stream>>>(
+            static_cast<const __nv_bfloat16*>(hidden.data),
+            static_cast<const std::int32_t*>(selectors.data),
+            static_cast<const std::int32_t*>(destinations.data),
+            static_cast<__nv_bfloat16*>(out.data), rows, hidden.ne[1], out.ne[1]);
+    }
+    CUDA_CHECK(cudaGetLastError());
+}
+
 void proposal_remap_token_ids_launch(Tensor& proposal_tokens, const std::int32_t* id_map,
                                      std::int32_t n, cudaStream_t stream) {
     constexpr int kBlock = 256;
