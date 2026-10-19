@@ -1,0 +1,185 @@
+{
+  "schema": "ninfer-json32k-profile-v1",
+  "diagnostic_only": true,
+  "performance_claim": false,
+  "hardware": "RTX 3090 / SM86",
+  "nsys_version": "2025.4.1",
+  "runtime_source_commit": "eb82d92d37c7e3fd8dcaef74a4286158c66808f8",
+  "image": "sha256:0400a382e1b5ce533cd169379afe3c3b99f73c908b8168f9e554bb03616f0c5b",
+  "executable_sha256": "ff5effe98b81194b936171aff99cdcef2d5a70ba101f5b9382dfba98d6bde9ad",
+  "model_sha256": "57006def6105eb420606d3cfcf9e929c716076192dbab872c787aa6227f09b03",
+  "command": [
+    "/usr/local/bin/ninfer-serve",
+    "/model/jonathan-dflash2.ninfer",
+    "--host",
+    "0.0.0.0",
+    "--port",
+    "8080",
+    "--model-id",
+    "qwen3.8-27b",
+    "--max-context",
+    "65536",
+    "--kv-capacity",
+    "65536",
+    "--max-concurrency",
+    "1",
+    "--max-pending-requests",
+    "32",
+    "--pending-timeout-ms",
+    "600000",
+    "--kv-dtype",
+    "int8",
+    "--spec",
+    "mtp",
+    "--draft-tokens",
+    "3",
+    "--prefill-chunk",
+    "1024",
+    "--no-thinking",
+    "--structured-output",
+    "--vision",
+    "--vision-residency",
+    "overlay",
+    "--host-kv-mib",
+    "0",
+    "--host-state-slots",
+    "0",
+    "--request-log-jsonl",
+    "/results/json-r2-events.jsonl"
+  ],
+  "request_sha256": "c4c938dd6f19afb452df5e6eee7b6c94f8e21f91fe8d60c5dc3d4c33b1a8c993",
+  "usage": {
+    "completion_tokens": 512,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 32756,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 33268
+  },
+  "output_sha256": "aa955dd8bd1bbb66675bff91e59093da5c68c1f9a902dfc18b1e523d3368e116",
+  "equality_gate": "PASS",
+  "method": "Final contiguous outer prefill group and subsequent decode ranges. Startup and distinct warmup excluded. Counts cross-checked against request log. Fully contained GPU kernels only; boundary overlaps reported separately. Kernel sums and interval unions are not critical-path fractions or occupancy. Uncovered NVTX wall includes API, copies, synchronization and trace overhead; it is not necessarily removable host overhead.",
+  "phases": {
+    "prefill": {
+      "ranges": 27,
+      "start_ns": 98348777762,
+      "end_ns": 118422831331,
+      "nvtx_wall_seconds": 20.073958843,
+      "summed_kernel_seconds": 19.99022286,
+      "kernel_interval_union_seconds": 19.99022286,
+      "nvtx_wall_without_contained_kernels_seconds": 0.083735983,
+      "partially_overlapping_kernel_count": 0,
+      "partial_kernel_seconds": 0.0,
+      "families": {
+        "mmq_q4": {
+          "count": 9204,
+          "summed_seconds": 12.870897849,
+          "share_of_kernel_sum_pct": 64.38596477458181
+        },
+        "mmq_q6": {
+          "count": 1690,
+          "summed_seconds": 3.133719176,
+          "share_of_kernel_sum_pct": 15.676259329106848
+        },
+        "attention": {
+          "count": 486,
+          "summed_seconds": 1.994532424,
+          "share_of_kernel_sum_pct": 9.977539710130076
+        },
+        "gdn": {
+          "count": 5232,
+          "summed_seconds": 0.742372663,
+          "share_of_kernel_sum_pct": 3.713678772863866
+        },
+        "output_conversion": {
+          "count": 3026,
+          "summed_seconds": 0.500073331,
+          "share_of_kernel_sum_pct": 2.5015895745746577
+        },
+        "quantize_dequantize": {
+          "count": 8167,
+          "summed_seconds": 0.294567556,
+          "share_of_kernel_sum_pct": 1.4735581392112604
+        },
+        "other": {
+          "count": 9754,
+          "summed_seconds": 0.267906213,
+          "share_of_kernel_sum_pct": 1.3401862244171099
+        },
+        "gdn_convolution_support": {
+          "count": 2592,
+          "summed_seconds": 0.141574289,
+          "share_of_kernel_sum_pct": 0.7082176621616714
+        },
+        "gguf_vector": {
+          "count": 735,
+          "summed_seconds": 0.042497432,
+          "share_of_kernel_sum_pct": 0.21259108664084198
+        },
+        "mmq_fixup": {
+          "count": 114,
+          "summed_seconds": 0.002081927,
+          "share_of_kernel_sum_pct": 0.010414726311860637
+        }
+      }
+    },
+    "decode": {
+      "ranges": 131,
+      "start_ns": 118422832599,
+      "end_ns": 122443770562,
+      "nvtx_wall_seconds": 4.020704793,
+      "summed_kernel_seconds": 3.866697919,
+      "kernel_interval_union_seconds": 3.861983603,
+      "nvtx_wall_without_contained_kernels_seconds": 0.15872119,
+      "partially_overlapping_kernel_count": 0,
+      "partial_kernel_seconds": 0.0,
+      "families": {
+        "gguf_vector": {
+          "count": 49780,
+          "summed_seconds": 3.244262487,
+          "share_of_kernel_sum_pct": 83.90266203776856
+        },
+        "attention": {
+          "count": 4978,
+          "summed_seconds": 0.318669195,
+          "share_of_kernel_sum_pct": 8.241378087337472
+        },
+        "gdn": {
+          "count": 18995,
+          "summed_seconds": 0.178830866,
+          "share_of_kernel_sum_pct": 4.624898808910549
+        },
+        "quantize_dequantize": {
+          "count": 37728,
+          "summed_seconds": 0.067072549,
+          "share_of_kernel_sum_pct": 1.73462086785787
+        },
+        "other": {
+          "count": 23580,
+          "summed_seconds": 0.057862822,
+          "share_of_kernel_sum_pct": 1.4964401981255468
+        }
+      }
+    }
+  },
+  "setup_seconds_instrumented": {
+    "model_identity": 12.057081899998593,
+    "load_and_startup_instrumented": 80.30815799999982
+  },
+  "warmup_seconds_instrumented": 22.06679549999535,
+  "inference_seconds_instrumented": 25.144117499992717,
+  "production_config_unchanged": true,
+  "owned_resources_released": true,
+  "q4_fp32_launch_stage_seconds": {
+    "prefill.post_mixer": 7.161169421,
+    "prefill.gdn": 0.979234712,
+    "prefill.attention": 0.0191418,
+    "prefill.mtp_chunk": 9.9453e-05
+  },
+  "launch_stage_method": "Kernel correlationId to CUDA API, then smallest containing named NVTX stage on the same thread. Stage labels do not identify individual gate/up weight roles.",
+  "review": "Independent read-only review checked request isolation, counts, Q4/Q6 MMQ coverage and gap caveats. Causal-convolution support separated after review.",
+  "diagnostic_decision": "Prioritize Q4/MMQ. Screen a distinct FFN paired gate/up path only after checking historical FFN experiments and SM86 register/shared-memory feasibility. Attention pipeline lower priority. No new acceleration established."
+}
