@@ -4,13 +4,11 @@
 #include "core/tensor.h"
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/weight_input.h"
-#include "ops/linear/gguf/ggml_bridge.h"
 
 #include <cuda_runtime.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 namespace ninfer::ops {
 
@@ -148,19 +146,6 @@ void attn_input_proj(const Tensor& x, const Weight& query_key_value_weight, Tens
 void attn_input_proj(const Tensor& x, const GgufProjectionWeights& weights, Tensor& q,
                      Tensor& gate, Tensor& k, Tensor& v, WorkspaceArena& workspace,
                      cudaStream_t stream);
-
-void attn_input_proj_q8_1_activation(int input_rows, int columns, const void* activation,
-                                    const GgufProjectionWeights& weights, Tensor& q, Tensor& gate,
-                                    Tensor& k, Tensor& v, cudaStream_t stream);
-void attn_input_proj_matrix_q8_1_activation(int input_rows, int columns, QType activation_format,
-                                           const void* activation,
-                                           const GgufProjectionWeights& weights, Tensor& q,
-                                           Tensor& gate, Tensor& k, Tensor& v,
-                                           WorkspaceArena& workspace, cudaStream_t stream);
-void attn_input_proj_matrix_q8_1_activations(
-    int input_rows, int columns, std::span<const gguf::MatrixActivationPlane> activations,
-    const GgufProjectionWeights& weights, Tensor& q, Tensor& gate, Tensor& k, Tensor& v,
-    WorkspaceArena& workspace, cudaStream_t stream);
 
 [[nodiscard]] std::size_t attn_input_proj_workspace_capacity_bytes(
     const GgufProjectionWeights& weights, std::int32_t min_tokens, std::int32_t max_tokens);
