@@ -108,7 +108,11 @@ bool run_case(const Case& c, int columns, bool prepared, bool expect_fused) {
 
     gguf::MatrixBf16StorePlan plan;
     const bool plan_supported = gguf::matrix_bf16_store_plan(c.type, c.rows, columns, plan);
-    if (expect_fused && (!plan_supported || plan.J != 128 || plan.I != 128 || !plan.stream_k)) {
+    int expected_j = 128;
+#if defined(NINFER_GGUF_SM86_MMQ_MAX_J)
+    if (columns >= 64) { expected_j = NINFER_GGUF_SM86_MMQ_MAX_J; }
+#endif
+    if (expect_fused && (!plan_supported || plan.J != expected_j || plan.I != 128 || !plan.stream_k)) {
         throw std::runtime_error("native MMQ store plan did not select the expected J/I tile");
     }
     if (!expect_fused && plan_supported) {
@@ -268,11 +272,15 @@ int main() {
         cudaDeviceProp properties{};
         check(cudaGetDeviceProperties(&properties, device), "device properties");
         if (properties.major != 8 || properties.minor != 6) { return 77; }
+        bool expect_130_fused = false;
+#if defined(NINFER_GGUF_SM86_MMQ_MAX_J) && NINFER_GGUF_SM86_MMQ_MAX_J == 32
+        expect_130_fused = true;
+#endif
         if (!run_case(q4_case(), 1024, false, true) ||
             !run_case(q4_case(), 1024, true, true) ||
             !run_case(q4_case(), 1000, false, true) ||
             !run_case(q6_case(), 1024, false, true) ||
-            !run_case(q4_case(), 130, false, false) ||
+            !run_case(q4_case(), 130, false, expect_130_fused) ||
             !run_accumulate_graph_case()) {
             return 1;
         }
