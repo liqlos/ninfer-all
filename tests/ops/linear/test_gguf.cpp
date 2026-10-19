@@ -11,7 +11,9 @@
 #include "ninfer/ops/linear_swiglu.h"
 #include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
+#if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
 #include "ops/linear/gguf/ggml_bridge_test.h"
+#endif
 #include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
 #include "ops/linear/gguf/gguf_linear.h"
 
@@ -1567,208 +1569,6 @@ std::uint64_t checksum_value(std::uint64_t value) {
     return checksum;
 }
 
-struct VectorBenchCase {
-    QType qtype;
-    std::int32_t rows;
-    std::int32_t k;
-    std::int32_t columns;
-    bool fused;
-    std::uint32_t seed;
-};
-
-void launch_vector_candidate(const VectorBenchCase& c, const void* weights,
-                             std::int64_t row_bytes, const void* activation, void* output,
-                             cudaStream_t stream) {
-    const auto type = ops::detail::gguf_type(c.qtype);
-    if (c.fused) {
-        ops::gguf::vector_swiglu(type, weights, row_bytes, c.rows, c.k, activation, c.columns,
-                                 static_cast<__nv_bfloat16*>(output), c.rows, stream);
-    } else {
-        const ops::gguf::VectorOutput out{static_cast<__nv_bfloat16*>(output), nullptr, c.rows,
-                                           ops::gguf::Epilogue::Store, nullptr, 0};
-        ops::gguf::vector_product(type, weights, row_bytes, c.rows, c.k, activation, c.columns,
-                                  out, stream);
-    }
-}
-
-void launch_vector_baseline(const VectorBenchCase& c, const void* weights,
-                            std::int64_t row_bytes, const void* activation, void* output,
-                            cudaStream_t stream) {
-    if (c.qtype == QType::GGUF_Q4_K) {
-        ops::gguf::detail::q4_vector_baseline_for_test(
-            static_cast<const std::uint8_t*>(weights), row_bytes, c.rows, c.k,
-            static_cast<const std::uint8_t*>(activation), c.columns, output, c.rows, c.fused,
-            stream);
-    } else {
-        ops::gguf::detail::q6_vector_baseline_for_test(
-            static_cast<const std::uint8_t*>(weights), row_bytes, c.rows, c.k,
-            static_cast<const std::uint8_t*>(activation), c.columns, output, c.rows, c.fused,
-            stream);
-    }
-}
-
-void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
-                           const std::string& weight_directory, std::ostream& output) {
-    const TypeCase type_case{c.qtype, c.qtype == QType::GGUF_Q4_K ? "q4_k" : "q6_k",
-                             c.qtype == QType::GGUF_Q4_K ? std::vector<int>{0, 2}
-                                                         : std::vector<int>{208}};
-    const auto block_shape = gguf_block_shape(c.qtype);
-    const std::int64_t row_bytes =
-        std::int64_t(c.k / block_shape.elements) * block_shape.bytes;
-    const std::int32_t weight_rows = c.rows * (c.fused ? 2 : 1);
-    const std::size_t weight_bytes = std::size_t(weight_rows) * row_bytes;
-    std::vector<std::uint8_t> host_weights;
-    std::string fixture_label = "synthetic_seeded";
-    std::mt19937 rng(c.seed);
-    if (weight_directory.empty()) {
-        host_weights = random_blocks(type_case, weight_rows, c.k, rng);
-    } else {
-        constexpr std::int32_t fixture_rows = 257;
-        const std::string filename = c.fused ? "q4-swiglu-k5120.bin"
-                                             : std::string(c.qtype == QType::GGUF_Q4_K ? "q4" : "q6") +
-                                                   "-k" + std::to_string(c.k) + ".bin";
-        const std::size_t fixture_bytes =
-            std::size_t(fixture_rows * (c.fused ? 2 : 1)) * row_bytes;
-        std::vector<std::uint8_t> fixture;
-        if (!load_blocks(weight_directory, filename, fixture_bytes, fixture)) {
-            throw std::runtime_error("vector benchmark fixture is missing: " + filename);
-        }
-        host_weights.resize(weight_bytes);
-        for (std::int32_t row = 0; row < weight_rows; ++row) {
-            const std::int32_t source_row =
-                c.fused ? (row < c.rows ? row % fixture_rows
-                                        : fixture_rows + (row - c.rows) % fixture_rows)
-                        : row % fixture_rows;
-            std::memcpy(host_weights.data() + std::size_t(row) * row_bytes,
-                        fixture.data() + std::size_t(source_row) * row_bytes,
-                        static_cast<std::size_t>(row_bytes));
-        }
-        fixture_label = "pinned_fixture_repeated_257_rows:" + filename;
-    }
-    DeviceBuffer weight_device(host_weights.size());
-    weight_device.copy_from_host(host_weights.data(), host_weights.size());
-
-    std::normal_distribution<float> normal(0.0f, 0.4f);
-    std::vector<__nv_bfloat16> input_host(std::size_t(c.k) * c.columns);
-    for (auto& value : input_host) { value = __float2bfloat16(normal(rng)); }
-    const auto activation_host = cpu_quantize_vector_activation(input_host, c.k, c.columns);
-    DeviceBuffer activation_device(activation_host.size());
-    activation_device.copy_from_host(activation_host.data(), activation_host.size());
-    GuardedOutput baseline_output(std::size_t(c.rows) * c.columns);
-    GuardedOutput candidate_output(std::size_t(c.rows) * c.columns);
-    baseline_output.poison();
-    candidate_output.poison();
-
-    cudaStream_t stream = nullptr;
-    cudaEvent_t start = nullptr;
-    cudaEvent_t end = nullptr;
-    check(cudaStreamCreate(&stream), "create vector benchmark stream");
-    check(cudaEventCreate(&start), "create vector benchmark start event");
-    check(cudaEventCreate(&end), "create vector benchmark end event");
-    try {
-        launch_vector_baseline(c, weight_device.p, row_bytes, activation_device.p,
-                              baseline_output.data(), stream);
-        launch_vector_candidate(c, weight_device.p, row_bytes, activation_device.p,
-                               candidate_output.data(), stream);
-        check(cudaStreamSynchronize(stream), "synchronize vector benchmark exact-output pass");
-        const auto baseline_host = baseline_output.read("read vector benchmark baseline");
-        const auto candidate_host = candidate_output.read("read vector benchmark candidate");
-        if (baseline_host.size() != candidate_host.size() ||
-            std::memcmp(baseline_host.data(), candidate_host.data(),
-                        baseline_host.size() * sizeof(__nv_bfloat16)) != 0) {
-            throw std::runtime_error("vector benchmark candidate output differs from exact baseline");
-        }
-        for (int i = 0; i < 20; ++i) {
-            launch_vector_baseline(c, weight_device.p, row_bytes, activation_device.p,
-                                  baseline_output.data(), stream);
-            launch_vector_candidate(c, weight_device.p, row_bytes, activation_device.p,
-                                   candidate_output.data(), stream);
-        }
-        check(cudaStreamSynchronize(stream), "warm vector benchmark arms");
-
-        const std::string type_name = c.qtype == QType::GGUF_Q4_K ? "q4_k" : "q6_k";
-        const std::string shape = type_name + "_n" + std::to_string(c.rows) + "_k" +
-                                  std::to_string(c.k) + "_t" + std::to_string(c.columns) +
-                                  (c.fused ? "_fused" : "_product");
-        output << "{\"kind\":\"vector_event_case\",\"shape\":\"" << shape
-               << "\",\"weight_source\":\"" << fixture_label
-               << "\",\"synthetic\":" << (weight_directory.empty() ? "true" : "false")
-               << ",\"seed\":" << c.seed << ",\"order\":\"ABBA\",\"A\":\"explicit_baseline_route\""
-               << ",\"B\":\"public_candidate_route\",\"repeats_per_window\":" << repeats
-               << ",\"blocks\":" << blocks << ",\"exact_bf16_output_match\":true"
-               << ",\"timing_scope\":\"warm-cache CUDA-event operator only; not full-model latency\"}\n";
-        for (int block = 0; block < blocks; ++block) {
-            double elapsed_seconds[4]{};
-            for (int position = 0; position < 4; ++position) {
-                const bool baseline = position == 0 || position == 3;
-                check(cudaEventRecord(start, stream), "record vector benchmark start");
-                for (int i = 0; i < repeats; ++i) {
-                    if (baseline) {
-                        launch_vector_baseline(c, weight_device.p, row_bytes, activation_device.p,
-                                              baseline_output.data(), stream);
-                    } else {
-                        launch_vector_candidate(c, weight_device.p, row_bytes, activation_device.p,
-                                               candidate_output.data(), stream);
-                    }
-                }
-                check(cudaEventRecord(end, stream), "record vector benchmark end");
-                check(cudaEventSynchronize(end), "wait vector benchmark event");
-                float elapsed_ms = 0.0f;
-                check(cudaEventElapsedTime(&elapsed_ms, start, end), "read vector benchmark event");
-                elapsed_seconds[position] = double(elapsed_ms) / 1000.0;
-                output << "{\"kind\":\"vector_event_window\",\"shape\":\"" << shape
-                       << "\",\"block\":" << block << ",\"position\":" << position
-                       << ",\"arm\":\"" << (baseline ? "baseline" : "candidate")
-                       << "\",\"kernels\":" << repeats << ",\"seconds\":"
-                       << std::setprecision(10) << elapsed_seconds[position] << "}\n";
-            }
-            output << "{\"kind\":\"vector_event_pair\",\"shape\":\"" << shape
-                   << "\",\"block\":" << block << ",\"order\":\"ABBA\",\"baseline_seconds\":"
-                   << std::setprecision(10) << (elapsed_seconds[0] + elapsed_seconds[3]) / 2.0
-                   << ",\"candidate_seconds\":"
-                   << (elapsed_seconds[1] + elapsed_seconds[2]) / 2.0 << "}\n";
-        }
-    } catch (...) {
-        if (end != nullptr) { cudaEventDestroy(end); }
-        if (start != nullptr) { cudaEventDestroy(start); }
-        if (stream != nullptr) { cudaStreamDestroy(stream); }
-        throw;
-    }
-    check(cudaEventDestroy(end), "destroy vector benchmark end event");
-    check(cudaEventDestroy(start), "destroy vector benchmark start event");
-    check(cudaStreamDestroy(stream), "destroy vector benchmark stream");
-}
-
-int run_vector_event_benchmark(int blocks, int repeats, std::uint32_t seed,
-                               const std::string& weight_directory,
-                               const std::string& output_path) {
-    std::ofstream file;
-    std::ostream* output = &std::cout;
-    if (!output_path.empty()) {
-        file.open(output_path, std::ios::out | std::ios::trunc);
-        if (!file) { throw std::runtime_error("could not open vector benchmark output"); }
-        output = &file;
-    }
-    if (!weight_directory.empty() && !std::filesystem::is_directory(weight_directory)) {
-        throw std::runtime_error("vector benchmark weight directory does not exist");
-    }
-    const std::vector<VectorBenchCase> cases_to_run{
-        {QType::GGUF_Q4_K, 6144, 5120, 4, false, seed + 0},
-        {QType::GGUF_Q4_K, 1024, 5120, 4, false, seed + 1},
-        {QType::GGUF_Q4_K, 17408, 5120, 4, false, seed + 2},
-        {QType::GGUF_Q4_K, 17408, 5120, 4, true, seed + 3},
-        {QType::GGUF_Q6_K, 1024, 5120, 1, false, seed + 4},
-        {QType::GGUF_Q6_K, 1024, 5120, 2, false, seed + 5},
-        {QType::GGUF_Q6_K, 1024, 5120, 4, false, seed + 6},
-        {QType::GGUF_Q6_K, 5120, 17408, 4, false, seed + 7}};
-    for (const auto& c : cases_to_run) {
-        run_vector_event_case(c, blocks, repeats, weight_directory, *output);
-    }
-    output->flush();
-    if (!*output) { throw std::runtime_error("failed flushing vector benchmark output"); }
-    return 0;
-}
-
 int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                    std::uint64_t& total_checksum, std::ofstream* output_file,
                    const std::string& weight_directory, std::size_t& files_used) {
@@ -2115,7 +1915,6 @@ int main(int argc, char** argv) {
     bool mmq_q6_real_shapes = false;
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
-    bool vector_event_benchmark = false;
     bool rmsnorm_q8_fusion = false;
     bool rmsnorm_mmq_q8_fusion = false;
     bool dual_mmq_fusion = false;
@@ -2127,10 +1926,6 @@ int main(int argc, char** argv) {
 #endif
     bool output_specified = false;
     bool weight_directory_specified = false;
-    bool benchmark_options_specified = false;
-    int benchmark_blocks = 20;
-    int benchmark_repeats = 100;
-    std::uint32_t benchmark_seed = 37001;
     std::string output_path;
     std::string weight_directory;
     for (int i = 1; i < argc; ++i) {
@@ -2146,8 +1941,6 @@ int main(int argc, char** argv) {
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
             swiglu_q8_benchmark = true;
-        } else if (argument == "--vector-event-benchmark" && !vector_event_benchmark) {
-            vector_event_benchmark = true;
         } else if (argument == "--rmsnorm-q8-fusion" && !rmsnorm_q8_fusion) {
             rmsnorm_q8_fusion = true;
         } else if (argument == "--rmsnorm-mmq-q8-fusion" && !rmsnorm_mmq_q8_fusion) {
@@ -2169,34 +1962,16 @@ int main(int argc, char** argv) {
         } else if (argument == "--weight-dir" && !weight_directory_specified && i + 1 < argc) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
-        } else if ((argument == "--blocks" || argument == "--repeats" || argument == "--seed") &&
-                   i + 1 < argc) {
-            benchmark_options_specified = true;
-            try {
-                const int value = std::stoi(argv[++i]);
-                if (argument == "--blocks") { benchmark_blocks = value; }
-                else if (argument == "--repeats") { benchmark_repeats = value; }
-                else if (value >= 0) { benchmark_seed = static_cast<std::uint32_t>(value); }
-                else { throw std::invalid_argument("negative seed"); }
-            } catch (...) {
-                std::cerr << "benchmark option requires an integer\n";
-                return 2;
-            }
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--vector-event-benchmark [--blocks <n>] [--repeats <n>] [--seed <n>] [--weight-dir <dir>] [--output <file>] | --rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
     if ((output_specified &&
-         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes || vector_event_benchmark) || output_path.empty())) ||
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || output_path.empty())) ||
         (weight_directory_specified &&
-         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes || vector_event_benchmark) || weight_directory.empty())) ||
-        (benchmark_options_specified && !vector_event_benchmark) ||
-        (vector_event_benchmark && (real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
-                                    swiglu_q8_fusion || rmsnorm_q8_fusion ||
-                                    rmsnorm_mmq_q8_fusion || dual_mmq_fusion)) ||
-        (vector_event_benchmark && (benchmark_blocks <= 0 || benchmark_repeats <= 0)) ||
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || weight_directory.empty())) ||
         (real_shapes && (mmq_real_shapes || mmq_q6_real_shapes)) ||
         (mmq_real_shapes && mmq_q6_real_shapes) ||
         ((real_shapes || mmq_real_shapes || mmq_q6_real_shapes) &&
@@ -2206,18 +1981,18 @@ int main(int argc, char** argv) {
         (dual_mmq_fusion && (swiglu_q8_fusion || rmsnorm_q8_fusion))
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
         || (q4_t4_fused_warp_pair_regression &&
-            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || vector_event_benchmark || swiglu_q8_fusion ||
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
 #if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
         || (q4_t4_imma_regression &&
-            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || vector_event_benchmark || swiglu_q8_fusion ||
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
         ) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--vector-event-benchmark [--blocks <n>] [--repeats <n>] [--seed <n>] [--weight-dir <dir>] [--output <file>] | --rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
+        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
@@ -2238,10 +2013,6 @@ int main(int argc, char** argv) {
             return failures == 0 ? 0 : 1;
         }
 #endif
-        if (vector_event_benchmark) {
-            return run_vector_event_benchmark(benchmark_blocks, benchmark_repeats,
-                                              benchmark_seed, weight_directory, output_path);
-        }
         if (swiglu_q8_fusion) {
             const int failures = run_swiglu_q8_fusion(28001, !swiglu_q8_benchmark);
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF SwiGLU q8 fusion\n";

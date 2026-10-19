@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-17",
+  "status": "STOPPED_AFTER_PRIMARY_FRAGMENT_AND_EXACT_WORK_MAPPING_REVIEW_NO_SOURCE_PROTOTYPE",
+  "worktree": "C:/AI/tuning/ninfer-lab-20261015/work-target16-q4-m8",
+  "source_head": "5817c5564e668638fd281eceb337a12cafda40f0",
+  "request": "Assess and, only if shape math supports a plausible improvement, implement an OFF-default SM86 Q4_K T4 K5120 m8n8k16 integer-MMA variant preserving the existing exact numerical contract. No build/configure/Docker/GPU/probe/test while screen PID 23976 is active.",
+  "decision": {
+    "result": "No credible shape-level reduction remains after preserving the current independent M halves, K32 dot, T4 output mapping, Q4 subgroup correction, and FP32 chain/reduction contract. Per instruction, stopped before speculative code.",
+    "reason": "The current m16n8k32 integer MMA yields four s32 accumulator fragment values per lane, covering M=16,N=8,K=32. PTX m8n8k16 yields two s32 accumulator values, covering M=8,N=8,K=16. To preserve both independent M halves and K32 for the same T4 case requires 2 M halves times 2 K halves = 4 m8 MMA instructions per present m16 instruction. Aggregate nominal integer multiply slots are unchanged: 4*(8*8*16)=16*8*32=4096. Both shapes retain N=8 for four real token columns, so token-axis padding is not reduced. The exact scale/minimum correction remains separate for each Q4_K subgroup and cannot be folded across subgroups without changing FP32 update/chain behavior.",
+    "potential_resource_effect": "The m8 operands and accumulator fragments are smaller per instruction, but would require four serial instructions per current MMA. Existing exported m16 candidate reports zero stack, local, and shared bytes, so there is no spill or staging cost that this proposal demonstrably removes. A register reduction is possible in theory but cannot be established without compiling; it does not justify an untested code path given the fourfold instruction issue count.",
+    "numerical_contract": "Current source keeps partial[2][4][4] FP32 accumulation chains, with per-chain t increasing and a fixed reduction followed by a lane xor reduction. The task explicitly requires retaining these 32 FP32 partial values and the same reduction. A combined m8 K-half integer result can preserve one subgroup's exact int32 dot, but separate M-half/subgroup outputs still need independent output chains before the original FP32 scaling and reduction.",
+    "hypothesis_status": "m8 could reduce fragment register live ranges, but no source-level argument supports a total shape-work reduction or a likely latency win; this remains an untested possibility and was intentionally not coded."
+  },
+  "primary_documentation": [
+    {
+      "url": "https://docs.nvidia.com/cuda/archive/11.6.0/parallel-thread-execution/index.html",
+      "sections": [
+        "9.7.13.4.3 Matrix Fragments for mma.m8n8k16: one b32 A fragment with four s8/u8 values, one b32 B fragment with four values, two s32 accumulator values; groupID=lane>>2, threadID=lane%4; A row=groupID, B column=groupID, accumulator columns=2*threadID+i.",
+        "9.7.13.4.10 Matrix Fragments for mma.m16n8k32: four b32 A fragments, two b32 B fragments, four s32 accumulator values; A includes row groupID and groupID+8, accumulator includes row groupID and groupID+8.",
+        "9.7.13.4.14 integer mma.sync syntax and examples confirm m8n8k16 s8*s8 to s32 and m16n8k32 s8*s8 to s32.",
+        "target ISA notes: integer m8n8k16 requires sm_75+ and m16n8k32 requires sm_80+; this proves availability, not relative performance."
+      ],
+      "claim_boundary": "PTX documents formats, layouts, and architecture support. The no-benefit decision is arithmetic-shape accounting from those documented shapes and the local required chain mapping, not an NVIDIA performance claim."
+    }
+  ],
+  "local_source_mapping": {
+    "mma_s8": "src/ops/common/mma.cuh: integer helper uses mma.sync.aligned.m16n8k32.row.col.s32.s8.s8.s32 with four accumulator values.",
+    "candidate_kernel": "src/ops/linear/gguf/ggml_bridge_vec.cuh: q4_t4_imma_step selects lower/upper subgroup through tig>=2, keeps per-output partial[2][4][4], and kernel_q4_t4_imma_5120 reduces J/R then xor-shuffles lane pairs.",
+    "test_contract": "tests/ops/linear/test_gguf.cpp: existing Q4 T4 IMMA CLI fixture includes padded row stride, odd row tail, exact BF16 buffer comparison against baseline, independent Q8_1 FP64 oracle, and CUDA graph parity; tests/ops/linear/tests.cmake registers it under its OFF-default option.",
+    "op_development_contract": "docs/maintainer/op-development.md: numerical qualification uses an independent oracle and semantic cast boundaries; kernel implementation freedom does not relax the task-specific stricter exact output and partial-chain requirements."
+  },
+  "raw_sha256": {
+    "src/ops/common/mma.cuh": "4f3f05cfb7ecce39a650cf53588587997a9e8bee4faf992e23564cf8c696d94d",
+    "src/ops/linear/gguf/ggml_bridge_vec.cuh": "b7bd1a8a715c18c7a8c229b05011942024bd439ead50a8d32e078e2862014f65",
+    "src/ops/linear/gguf/ggml_vec_q4_k.cu": "6cbb460728974c08df51087dafcec5a1d4fa08157e83c2e1b276dc06e5642a7a",
+    "src/ops/linear/gguf/sources.cmake": "227accf3d05db42f7a37c07d8e5f2a55b7400bc42b90dce4e63c64770e3b7fe4",
+    "tests/ops/linear/test_gguf.cpp": "6d3f107778cafa521256844be7ca835ed4d776c3df97e9e3b60e4071cf2959cf",
+    "tests/ops/linear/tests.cmake": "1b9d1ab0c47a770993e0f1a523c2a7f06dea7fb61d8715df248463fd0a22fff8",
+    "docs/maintainer/op-development.md": "00394775103cd95085478f44e9a912360d1a200afd1930f13577ec909e281fd6",
+    "AGENTS.md": "74c1d543bbb20be66295aa21ed861ea8e30f73cbe79076e5de497ef1d94ea196",
+    "pinned_input": "7f1072db9437f53cf0046406df42eee8f043a2056bb5e945be4ddd8e7d34f17b",
+    "current_resource_receipt": "4f7c6ee101b6322791c9e8b1fa4f1b9f9de1929974cbaaf3dafa6cb1f0e7accea"
+  },
+  "execution": {
+    "source_or_registry_edits": false,
+    "build_or_configure": false,
+    "GPU_or_Docker": false,
+    "tests_or_probes": false,
+    "large_trace_scan": false,
+    "code_comments_added": false,
+    "worktree_source_diff": false
+  }
+}

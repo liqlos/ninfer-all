@@ -16,7 +16,6 @@
 #endif
 
 #include <algorithm>
-#include <type_traits>
 
 namespace ninfer::ops::gguf::detail {
 
@@ -93,9 +92,6 @@ __device__ __forceinline__ void scale_min_k4(const std::uint8_t* s, int j, int& 
 // the sum of its unquantized values.
 template <ggml_type type>
 struct Decoder;
-
-template <ggml_type type>
-struct BaselineDecoder : Decoder<type> {};
 
 template <>
 struct Decoder<GGML_TYPE_Q8_0> {
@@ -221,41 +217,6 @@ struct Decoder<GGML_TYPE_Q4_K> {
 };
 
 template <>
-struct BaselineDecoder<GGML_TYPE_Q4_K> {
-    static constexpr int kBlockElems = 256, kBlockBytes = 144, kTableWords = 0;
-    __device__ static const std::uint32_t* table() { return nullptr; }
-    __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
-                                                  const std::uint32_t*, Slice& s) {
-        const float2 dm = __half22float2(*reinterpret_cast<const half2*>(b));
-        int sc, m;
-        scale_min_k4(b + 4, u, sc, m);
-        s.f[0] = dm.x * float(sc);
-        s.f[1] = dm.y * float(m);
-        const uint4* qs = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
-#if defined(NINFER_GGUF_Q4_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
-        const uint4 own = qs[u & 1];
-        const unsigned mask = __activemask();
-        const uint4 peer = make_uint4(__shfl_xor_sync(mask, own.x, 1, 8),
-                                      __shfl_xor_sync(mask, own.y, 1, 8),
-                                      __shfl_xor_sync(mask, own.z, 1, 8),
-                                      __shfl_xor_sync(mask, own.w, 1, 8));
-        const uint4 a0 = (u & 1) ? peer : own;
-        const uint4 a1 = (u & 1) ? own : peer;
-#else
-        const uint4 a0 = qs[0];
-        const uint4 a1 = qs[1];
-#endif
-        const int shift = 4 * (u & 1);
-        const std::uint32_t v[8] = {a0.x, a0.y, a0.z, a0.w, a1.x, a1.y, a1.z, a1.w};
-#pragma unroll
-        for (int i = 0; i < 8; ++i) { s.w[i] = int((v[i] >> shift) & 0x0F0F0F0Fu); }
-    }
-    __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float sum) {
-        return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
-    }
-};
-
-template <>
 struct Decoder<GGML_TYPE_Q5_K> {
     static constexpr int kBlockElems = 256, kBlockBytes = 176, kTableWords = 0;
     __device__ static const std::uint32_t* table() { return nullptr; }
@@ -340,53 +301,6 @@ struct Decoder<GGML_TYPE_Q6_K> {
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
         return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
-    }
-};
-
-template <>
-struct BaselineDecoder<GGML_TYPE_Q6_K> {
-    static constexpr int kBlockElems = 256, kBlockBytes = 210, kTableWords = 0;
-    __device__ static const std::uint32_t* table() { return nullptr; }
-    __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
-                                                  const std::uint32_t*, Slice& s) {
-        const int h = u / 4, q = u % 4;
-        const float d = half_at(b + 208);
-        const auto* scales = reinterpret_cast<const std::int8_t*>(b + 192 + 8 * h);
-        const int scale0 = scales[2 * q];
-        const int scale1 = scales[2 * q + 1];
-        s.f[0] = d * float(scale0);
-        s.f[1] = d * float(scale1);
-        const std::uint8_t* ql = b + 64 * h + 32 * (q & 1);
-        const std::uint8_t* qh = b + 128 + 32 * h;
-#if defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
-        const unsigned mask = __activemask();
-#pragma unroll
-        for (int base = 0; base < 8; base += 4) {
-            const std::uint32_t hi = u32_a2(qh + 4 * (base + q));
-            const std::uint32_t lo0 = u32_a2(ql + 4 * (base + (q >> 1)));
-            const std::uint32_t lo1 = u32_a2(ql + 4 * (base + 2 + (q >> 1)));
-#pragma unroll
-            for (int j = 0; j < 4; ++j) {
-                const std::uint32_t high = __shfl_sync(mask, hi, j, 4);
-                const std::uint32_t low = __shfl_sync(mask, j < 2 ? lo0 : lo1,
-                                                       (q & 1) + 2 * (j & 1), 4);
-                const std::uint32_t v = ((low >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
-                                        (((high >> (2 * q)) << 4) & 0x30303030u);
-                s.w[base + j] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
-            }
-        }
-#else
-#pragma unroll
-        for (int i = 0; i < 8; ++i) {
-            const std::uint32_t v = ((u32_a2(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
-                                    (((u32_a2(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
-            s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
-        }
-#endif
-    }
-    __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
-        return d * (s.f[0] * float(dot4(s.w, a, 0)) +
-                    s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
     }
 };
 
@@ -825,18 +739,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
-template <ggml_type type, int T, bool Fused, int KS, bool Baseline = false,
-          int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
+template <ggml_type type, int T, bool Fused, int KS,
+          int Rows = vector_rows_per_warp<type, T, Fused>()>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
-    using D = std::conditional_t<Baseline, BaselineDecoder<type>, Decoder<type>>;
+    using D                 = Decoder<type>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
     constexpr int kPerBlock = D::kBlockElems / 32;
     constexpr int kRows = Rows;
     __shared__ __align__(16) std::uint32_t table[kTable];
 #if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
-    constexpr int kQ4StageBytes = Baseline ? 1 : 4 * D::kBlockBytes;
-    __shared__ __align__(16) std::uint8_t q4_stage[Baseline ? 1 : 2][kVecWarps][kRows]
-                                                        [kQ4StageBytes];
+    constexpr int kQ4StageBytes = 4 * D::kBlockBytes;
+    __shared__ __align__(16) std::uint8_t q4_stage[2][kVecWarps][kRows][kQ4StageBytes];
 #endif
     if constexpr (D::kTableWords > 0) {
         const std::uint32_t* src = D::table();
@@ -929,7 +842,6 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
         };
 #endif
 #if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
-        if constexpr (!Baseline) {
         if constexpr (type == GGML_TYPE_Q4_K && KS == 5120) {
             prefetch(0, 0);
             ninfer::ops::cp_wait<0>();
@@ -966,15 +878,6 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
             for (int it = 0; it < KS / 1024; ++it) { slice(it); }
         } else {
             for (int it = 0; lane + 32 * it < slices; ++it) { slice(it); }
-        }
-        } else {
-            if constexpr (KS != 0) {
-                static_assert(KS % 1024 == 0);
-#pragma unroll
-                for (int it = 0; it < KS / 1024; ++it) { slice(it); }
-            } else {
-                for (int it = 0; lane + 32 * it < slices; ++it) { slice(it); }
-            }
         }
 #else
         if constexpr (KS != 0) {
@@ -1013,40 +916,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 }
 
 template <ggml_type type, int T, bool Fused, int KS>
-void launch_fallback(const VecArgs& args, cudaStream_t stream) {
-    static const int resident = [] {
-        int blocks = 0;
-        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kernel<type, T, Fused, KS>,
-                                                            kVecWarps * 32, 0),
-              "vector occupancy");
-        return std::max(blocks, 1);
-    }();
-    constexpr int per_block = kVecWarps * (Fused ? 1 : vector_rows_per_warp<type, T, Fused>());
-    const int groups = (args.rows + per_block - 1) / per_block;
-    const int blocks = std::min(groups, resident * device_facts().sm_count);
-    kernel<type, T, Fused, KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
-    check(cudaGetLastError(), "vector product launch");
-}
-
-template <ggml_type type, int T, bool Fused, int KS>
 void launch_baseline(const VecArgs& args, cudaStream_t stream) {
-    static const int resident = [] {
-        int blocks = 0;
-        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                  &blocks, kernel<type, T, Fused, KS, true, 2>,
-                                                            kVecWarps * 32, 0),
-              "vector occupancy");
-        return std::max(blocks, 1);
-    }();
-    constexpr int per_block = kVecWarps * (Fused ? 1 : 2);
-    const int groups    = (args.rows + per_block - 1) / per_block;
-    const int blocks    = std::min(groups, resident * device_facts().sm_count);
-    kernel<type, T, Fused, KS, true, 2><<<blocks, kVecWarps * 32, 0, stream>>>(args);
-    check(cudaGetLastError(), "vector product launch");
-}
-
-template <ggml_type type, int T, bool Fused, int KS>
-void launch(const VecArgs& args, cudaStream_t stream) {
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
     if constexpr (type == GGML_TYPE_Q4_K && T == 4 && Fused) {
         static const int resident = [] {
@@ -1060,9 +930,27 @@ void launch(const VecArgs& args, cudaStream_t stream) {
         const int blocks = std::min(groups, resident * device_facts().sm_count);
         kernel_q4_t4_fused_warp_pair<KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
         check(cudaGetLastError(), "Q4_K fused vector product launch");
-        return;
-    }
+    } else {
+#else
+    {
 #endif
+    static const int resident = [] {
+        int blocks = 0;
+        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kernel<type, T, Fused, KS>,
+                                                            kVecWarps * 32, 0),
+              "vector occupancy");
+        return std::max(blocks, 1);
+    }();
+    constexpr int per_block = kVecWarps * (Fused ? 1 : vector_rows_per_warp<type, T, Fused>());
+    const int groups    = (args.rows + per_block - 1) / per_block;
+    const int blocks    = std::min(groups, resident * device_facts().sm_count);
+    kernel<type, T, Fused, KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+    check(cudaGetLastError(), "vector product launch");
+    }
+}
+
+template <ggml_type type, int T, bool Fused, int KS>
+void launch(const VecArgs& args, cudaStream_t stream) {
 #if defined(NINFER_GGUF_Q4_T4_IMMA)
     if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Fused && KS == 5120) {
         if (device_facts().cc == 860 && args.k == 5120) {
@@ -1081,7 +969,7 @@ void launch(const VecArgs& args, cudaStream_t stream) {
         }
     }
 #endif
-    launch_fallback<type, T, Fused, KS>(args, stream);
+    launch_baseline<type, T, Fused, KS>(args, stream);
 }
 
 template <ggml_type type, int T, bool Fused>
