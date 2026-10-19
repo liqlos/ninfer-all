@@ -51,6 +51,12 @@ ninfer_add_op_test(ninfer_linear_bf16_a16_test
 ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
+if(NINFER_GGUF_Q4_MMQ_K_STREAM)
+  add_test(NAME ninfer_linear_gguf_q4_mmq_k_stream_test
+    COMMAND ninfer_tests ninfer_linear_gguf_test --q4-mmq-k-stream-regression)
+  set_tests_properties(ninfer_linear_gguf_q4_mmq_k_stream_test PROPERTIES
+    SKIP_RETURN_CODE 77)
+endif()
 if(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST=1)

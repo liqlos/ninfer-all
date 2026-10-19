@@ -1773,10 +1773,14 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 
 int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                        std::ofstream* output_file, const std::string& weight_directory,
-                       std::size_t& files_used) {
-    constexpr std::int32_t rows = 256;
-    constexpr std::int32_t fixture_rows = 257;
-    constexpr std::int32_t widths[] = {9, 17, 40, 70, 127, 130, 1024};
+                       std::size_t& files_used, bool k_stream_regression = false,
+                       std::int32_t requested_rows = 0,
+                       std::int32_t requested_fixture_rows = 0) {
+    const std::int32_t rows = requested_rows == 0 ? 256 : requested_rows;
+    const std::int32_t fixture_rows = requested_fixture_rows == 0 ? 257 : requested_fixture_rows;
+    const std::vector<std::int32_t> widths = k_stream_regression
+        ? std::vector<std::int32_t>{1280, 1281}
+        : std::vector<std::int32_t>{9, 17, 40, 70, 127, 130, 1024};
     const auto type = ops::detail::gguf_type(c.qtype);
     if ((c.qtype != QType::GGUF_Q4_K && c.qtype != QType::GGUF_Q6_K) ||
         !ops::gguf::has_matrix_kernel(type)) {
@@ -1811,7 +1815,7 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
           "copy MMQ alignment fallback weights");
     const Weight shifted_weight = gguf_weight(c.qtype, shifted_bytes, rows, k);
 
-    constexpr std::int32_t max_t = 1024;
+    const std::int32_t max_t = widths.back();
     std::mt19937 activation_rng(seed + 1907);
     std::normal_distribution<float> normal(0.0f, 0.35f);
     std::vector<__nv_bfloat16> x_host(std::size_t(k) * max_t);
@@ -1850,12 +1854,15 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
         std::vector<std::int32_t> samples{0, 1, t / 2, t - 2, t - 1};
         std::sort(samples.begin(), samples.end());
         samples.erase(std::unique(samples.begin(), samples.end()), samples.end());
+        const std::int32_t row_step = k_stream_regression && rows > 257
+            ? std::max<std::int32_t>(1, (rows + 127) / 128)
+            : 1;
         std::vector<float> sampled_got;
         std::vector<double> sampled_want;
-        sampled_got.reserve(samples.size() * rows);
-        sampled_want.reserve(samples.size() * rows);
+        sampled_got.reserve(samples.size() * ((rows + row_step - 1) / row_step));
+        sampled_want.reserve(samples.size() * ((rows + row_step - 1) / row_step));
         for (const std::int32_t col : samples) {
-            for (std::int32_t row = 0; row < rows; ++row) {
+            for (std::int32_t row = 0; row < rows; row += row_step) {
                 double acc = 0.0;
                 const float* wr = cpu_weights.data() + std::size_t(row) * k;
                 const float* xr = x_float.data() + std::size_t(col) * k;
@@ -1888,7 +1895,7 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             }
             write_outputs(output_file, shifted_host);
         }
-        if (t == 9 || t == 40 || t == 130 || t == 1024) {
+        if (k_stream_regression || t == 9 || t == 40 || t == 130 || t == 1024) {
             check_graph_parity(
                 [&](cudaStream_t stream) {
                     ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
@@ -1913,6 +1920,7 @@ int main(int argc, char** argv) {
     bool real_shapes = false;
     bool mmq_real_shapes = false;
     bool mmq_q6_real_shapes = false;
+    bool q4_mmq_k_stream_regression = false;
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
     bool rmsnorm_q8_fusion = false;
@@ -1936,6 +1944,9 @@ int main(int argc, char** argv) {
             mmq_real_shapes = true;
         } else if (argument == "--mmq-q6-real-shapes" && !mmq_q6_real_shapes) {
             mmq_q6_real_shapes = true;
+        } else if (argument == "--q4-mmq-k-stream-regression" &&
+                   !q4_mmq_k_stream_regression) {
+            q4_mmq_k_stream_regression = true;
         } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
@@ -1963,36 +1974,41 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --q4-mmq-k-stream-regression | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
     if ((output_specified &&
-         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || output_path.empty())) ||
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
+            q4_mmq_k_stream_regression) || output_path.empty())) ||
         (weight_directory_specified &&
-         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || weight_directory.empty())) ||
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
+            q4_mmq_k_stream_regression) || weight_directory.empty())) ||
+        (q4_mmq_k_stream_regression && (real_shapes || mmq_real_shapes || mmq_q6_real_shapes)) ||
         (real_shapes && (mmq_real_shapes || mmq_q6_real_shapes)) ||
         (mmq_real_shapes && mmq_q6_real_shapes) ||
-        ((real_shapes || mmq_real_shapes || mmq_q6_real_shapes) &&
+        ((real_shapes || mmq_real_shapes || mmq_q6_real_shapes || q4_mmq_k_stream_regression) &&
          (swiglu_q8_fusion || rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion)) ||
         (rmsnorm_q8_fusion && (swiglu_q8_fusion || rmsnorm_mmq_q8_fusion)) ||
         (rmsnorm_mmq_q8_fusion && (swiglu_q8_fusion || dual_mmq_fusion)) ||
         (dual_mmq_fusion && (swiglu_q8_fusion || rmsnorm_q8_fusion))
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
         || (q4_t4_fused_warp_pair_regression &&
-            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
+             q4_mmq_k_stream_regression || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
 #if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
         || (q4_t4_imma_regression &&
-            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
+             q4_mmq_k_stream_regression || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
         ) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
+        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --q4-mmq-k-stream-regression | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
@@ -2086,6 +2102,43 @@ int main(int argc, char** argv) {
                 if (!output_file) { throw std::runtime_error("failed flushing Q6 MMQ output file"); }
             }
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF Q6_K MMQ real shapes\n";
+            return failures == 0 ? 0 : 1;
+        }
+        if (q4_mmq_k_stream_regression) {
+            std::ofstream output_file;
+            std::ofstream* output = nullptr;
+            if (output_specified) {
+                output_file.open(output_path, std::ios::binary | std::ios::trunc);
+                if (!output_file) {
+                    throw std::runtime_error("could not open Q4 MMQ K-stream output file: " +
+                                             output_path);
+                }
+                output = &output_file;
+            }
+            if (weight_directory_specified && !std::filesystem::is_directory(weight_directory)) {
+                throw std::runtime_error("--weight-dir is not a directory: " + weight_directory);
+            }
+            const auto all = cases();
+            const auto q4 = std::find_if(all.begin(), all.end(), [](const TypeCase& c) {
+                return c.qtype == QType::GGUF_Q4_K;
+            });
+            if (q4 == all.end()) { throw std::logic_error("Q4_K case is not registered"); }
+            std::size_t files_used = 0;
+            int failures = run_mmq_real_shape(*q4, 5120, 49203, output,
+                                              weight_directory, files_used, true, 17408, 17408);
+            failures += run_mmq_real_shape(*q4, 5120, 49204, output,
+                                           weight_directory, files_used, true, 257, 17408);
+            if (weight_directory_specified && files_used != 2) {
+                throw std::runtime_error("--weight-dir must provide q4-k5120.bin with 17408 and 257 rows");
+            }
+            if (output != nullptr) {
+                output_file.flush();
+                if (!output_file) {
+                    throw std::runtime_error("failed flushing Q4 MMQ K-stream output file");
+                }
+            }
+            std::cout << (failures == 0 ? "OK" : "FAIL")
+                      << " GGUF Q4 MMQ K-stream regression\n";
             return failures == 0 ? 0 : 1;
         }
         if (rmsnorm_q8_fusion) {
