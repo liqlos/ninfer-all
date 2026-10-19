@@ -71,8 +71,7 @@ otherwise; each number's setup and the full tables are in the
   [GGUF block formats](docs/gguf.md).
 - **Device route profiles for every GPU.** Which kernel schedule serves each operation and width
   is looked up in the card's measured profile before the compiled tables, which were tuned on one
-  card. Profiles measured on the RTX 3090, 4090, 5090 and all three RTX PRO 6000 Blackwell editions
-  (Workstation, Max-Q, Server) are built in; any other GPU is calibrated
+  card. Profiles measured on the RTX 3090, 4090 and 5090 are built in; any other GPU is calibrated
   once at first start (20 to 40 seconds) and the result is saved, and `ninfer-calibrate`
   re-measures on demand. On the RTX 3090 the profile makes the `rk4v4` verify attention at 262K
   3.2 times faster; on all three it turns on FP16 accumulation of P·V (15 to 17% less time in that
@@ -227,10 +226,11 @@ From other forks:
 - **Rolling retention.** `--context-cache-policy rolling` lets one long conversation keep rolling
   its cached frontier forward (IMGillusion).
 - **NVFP4 expert banks on Blackwell** (upstream PRs #286-#290 by Mykhailo Dementii). The published
-  Qwen3.6-35B-A3B NVFP4 checkpoint converts with `--recipe qwen3_6_35b_a3b_nvfp4` and runs on any
-  `120a` build: on an RTX 5090 (native build, `-DNINFER_SM120_NATIVE=ON`) the 20.6 GB text
-  artifact prefilled 27,663 tok/s at 4K and decoded 397 tok/s. Its prefill quantizes activations
-  to four bits for W4A4, which only Blackwell has, so sm_8x builds refuse the banks.
+  Qwen3.6-35B-A3B NVFP4 checkpoint converts with `--recipe qwen3_6_35b_a3b_nvfp4` and runs on a
+  native build (`-DCMAKE_CUDA_ARCHITECTURES=120a -DNINFER_SM120_NATIVE=ON`): on an RTX 5090 the
+  20.6 GB text artifact prefilled 27,663 tok/s at 4K and decoded 397 tok/s. Its prefill
+  quantizes activations to four bits for W4A4, which only Blackwell has, so builds on the
+  compatibility path (sm_8x, and sm_120a without `NINFER_SM120_NATIVE`) refuse the banks.
 - **Engine and serving fixes**: out-of-memory recovery of the worker (Gideon Zenz's, ported by
   Ian Ranson), `--kv-headroom-mib`, `--cuda-graph-allowance-mib`, `--thinking-budget-message` (Ian
   Ranson); the WebUI's MCP traffic relayed behind `--webui-mcp-proxy`, E8 root codes decoded from

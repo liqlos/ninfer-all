@@ -80,6 +80,28 @@ def test_row_values_are_ggml_dequantization(tmp_path):
         assert torch.equal(source.rows(3, 5), torch.from_numpy((codes * scales).reshape(2, 64)))
 
 
+def test_q4_k_control_projection_decodes_then_restores_grouped_rows(tmp_path):
+    gguf = pytest.importorskip("gguf")
+    rng = np.random.default_rng(17)
+    blocks = rng.integers(0, 256, size=(48, 20, 144), dtype=np.uint8)
+    scales = (np.arange(1, 49, dtype=np.float16) / 1000).view(np.uint8).reshape(48, 1, 2)
+    blocks[:, :, :2] = scales
+    blocks[:, :, 2:4] = np.array([0, 0], dtype=np.uint8)
+    path = tmp_path / "control.gguf"
+    write_gguf(path, {"general.architecture": "qwen35"}, [("w", (48, 5120), 12, blocks.tobytes())])
+    with GGUFFile(path) as source:
+        projection = gguf_blocks._control_projection(source, "w")
+        reference = gguf.quants.dequantize(
+            np.ascontiguousarray(source.read_blocks("w")), gguf.GGMLQuantizationType.Q4_K
+        ).reshape(48, 5120)
+        heads = np.arange(48)
+        order = (heads % 3) * 16 + heads // 3
+        expected = torch.from_numpy(reference[order].copy()).to(torch.bfloat16)
+        assert projection.shape == (48, 5120)
+        assert projection.rows(0, 48).dtype == torch.bfloat16
+        assert torch.equal(projection.rows(0, 48), expected)
+
+
 def test_output_projection_columns_read_the_grouped_value_heads():
     columns = gguf_blocks.tiled_input_columns()
     assert sorted(columns.tolist()) == list(range(6144))

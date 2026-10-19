@@ -13,6 +13,8 @@
 #include "models/qwen3_5/program/vision_control.h"
 #include "ninfer/ops/argmax.h"
 #include "ninfer/ops/attn_input_proj.h"
+#include "ops/linear/gguf/ggml_bridge.h"
+#include "ops/linear/gguf/gguf_linear.h"
 #include "ninfer/ops/causal_conv1d_silu.h"
 #include "ninfer/ops/embedding.h"
 #include "ninfer/ops/gated_delta_net.h"
@@ -21,6 +23,9 @@
 #include "ninfer/ops/gdn_gating.h"
 #include "ninfer/ops/gdn_gating_proj.h"
 #include "ninfer/ops/gdn_input_proj.h"
+#if defined(NINFER_GDN_PERSISTENT_MIXER)
+#include "ninfer/ops/gdn_persistent_mixer.h"
+#endif
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/kv_cache_append.h"
 #include "ninfer/ops/speculative_round.h"
@@ -42,6 +47,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -855,9 +861,98 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
     const bool fused_nvfp4 = input_basis == InputBasis::Primal && single != nullptr &&
                              ops::attn_input_proj_fused_rmsnorm_nvfp4_eligible(single->weight,
                                                                                single->policy, T);
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+    const auto* gguf_projection = std::get_if<ops::GgufProjectionWeights>(&p.projection);
+    const bool fused_gguf_q8 = input_basis == InputBasis::Primal && gguf_projection != nullptr &&
+                               T <= 8 && x.dtype == DType::BF16 && x.ne[0] == 5120 &&
+                               x.ne[1] == T && x.ne[2] == 1 && x.ne[3] == 1 && x.is_contiguous() &&
+                               x.data != nullptr &&
+                               (reinterpret_cast<std::uintptr_t>(x.data) &
+                                (alignof(__nv_bfloat162) - 1)) == 0 &&
+                               w.input_norm.dtype == DType::BF16 && w.input_norm.ne[0] == 5120 &&
+                               w.input_norm.ne[1] == 1 && w.input_norm.ne[2] == 1 &&
+                               w.input_norm.ne[3] == 1 && w.input_norm.is_contiguous() &&
+                               w.input_norm.data != nullptr &&
+                               (reinterpret_cast<std::uintptr_t>(w.input_norm.data) &
+                                (alignof(__nv_bfloat162) - 1)) == 0 &&
+                               std::all_of(gguf_projection->parts.begin(), gguf_projection->parts.end(),
+                                           [](const ops::GgufProjectionPart& part) {
+                                               return part.weight.input_columns == nullptr;
+                                           });
+    void* q8_activation = nullptr;
+    if (fused_gguf_q8) {
+        q8_activation = work_.alloc_bytes(ops::gguf::vector_activation_bytes(5120, T)).data;
+        ops::gguf::rmsnorm_q8_1_vector_activation(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(w.input_norm.data), 5120, T,
+            config_.rms_norm_eps, true, q8_activation, s);
+    }
+#endif
+#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
+    const auto* gguf_mmq_projection = std::get_if<ops::GgufProjectionWeights>(&p.projection);
+    bool mmq_layouts_eligible = gguf_mmq_projection != nullptr &&
+                                !gguf_mmq_projection->parts.empty();
+    ops::gguf::GgmlType mmq_type_a = ops::gguf::GgmlType::Q4_K;
+    ops::gguf::GgmlType mmq_type_b = ops::gguf::GgmlType::Q4_K;
+    int mmq_layout_a = -1;
+    int mmq_layout_b = -1;
+    if (mmq_layouts_eligible) {
+        mmq_type_a = ops::detail::gguf_type(gguf_mmq_projection->parts.front().weight.qtype);
+        mmq_type_b = mmq_type_a;
+        mmq_layout_a = ops::gguf::matrix_activation_layout(mmq_type_a);
+        for (const auto& part : gguf_mmq_projection->parts) {
+            const auto type = ops::detail::gguf_type(part.weight.qtype);
+            if (part.weight.k != 5120 || part.weight.input_columns != nullptr ||
+                !ops::gguf::has_matrix_kernel(type)) {
+                mmq_layouts_eligible = false;
+                break;
+            }
+            const int layout = ops::gguf::matrix_activation_layout(type);
+            if (layout != mmq_layout_a && mmq_layout_b < 0) {
+                mmq_layout_b = layout;
+                mmq_type_b = type;
+            } else if (layout != mmq_layout_a && layout != mmq_layout_b) {
+                mmq_layouts_eligible = false;
+                break;
+            }
+        }
+    }
+    const bool fused_gguf_mmq = input_basis == InputBasis::Primal && gguf_mmq_projection != nullptr &&
+                                T > 8 && T <= 1024 && x.dtype == DType::BF16 && x.ne[0] == 5120 &&
+                                x.ne[1] == T && x.ne[2] == 1 && x.ne[3] == 1 &&
+                                x.is_contiguous() && x.data != nullptr &&
+                                (reinterpret_cast<std::uintptr_t>(x.data) &
+                                 (alignof(__nv_bfloat162) - 1)) == 0 &&
+                                w.input_norm.dtype == DType::BF16 && w.input_norm.ne[0] == 5120 &&
+                                w.input_norm.ne[1] == 1 && w.input_norm.ne[2] == 1 &&
+                                w.input_norm.ne[3] == 1 && w.input_norm.is_contiguous() &&
+                                w.input_norm.data != nullptr &&
+                                (reinterpret_cast<std::uintptr_t>(w.input_norm.data) &
+                                 (alignof(__nv_bfloat162) - 1)) == 0 && mmq_layouts_eligible;
+    std::array<ops::gguf::MatrixActivationPlane, 2> mmq_activations{};
+    if (fused_gguf_mmq) {
+        void* activation_a = work_.alloc_bytes(ops::gguf::matrix_activation_bytes(5120, T)).data;
+        void* activation_b = mmq_layout_b < 0
+                                 ? activation_a
+                                 : work_.alloc_bytes(ops::gguf::matrix_activation_bytes(5120, T)).data;
+        ops::gguf::rmsnorm_q8_1_matrix_activations(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(w.input_norm.data), 5120, T,
+            config_.rms_norm_eps, true, mmq_type_a, activation_a, mmq_type_b, activation_b, s);
+        mmq_activations[0] = {mmq_type_a, activation_a};
+        mmq_activations[1] = {mmq_type_b, activation_b};
+    }
+#endif
     if (input_basis == InputBasis::Rotated) {
         ops::rmsnorm_hadamard(x, w.input_norm, config_.rms_norm_eps, true, input_signs, h, s);
-    } else if (!fused_nvfp4) {
+    } else if (!fused_nvfp4
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+               && !fused_gguf_q8
+#endif
+#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
+               && !fused_gguf_mmq
+#endif
+    ) {
         ops::rmsnorm(x, w.input_norm, config_.rms_norm_eps, true, h, s);
     }
 
@@ -877,6 +972,17 @@ void TextContext::attn_mix(const BlockParameters& w, Tensor& x, int fidx, Phase 
         ops::attn_input_proj_fused_rmsnorm_nvfp4(x, w.input_norm, config_.rms_norm_eps,
                                                  single->weight, q_flat, gate_flat, k_flat, v_flat,
                                                  single->policy, work_, s);
+#if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
+    } else if (fused_gguf_q8) {
+        ops::attn_input_proj_q8_1_activation(5120, T, q8_activation, *gguf_projection,
+                                             q_flat, gate_flat, k_flat, v_flat, s);
+#endif
+#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
+    } else if (fused_gguf_mmq) {
+        ops::attn_input_proj_matrix_q8_1_activations(
+            5120, T, mmq_activations, *gguf_mmq_projection, q_flat, gate_flat, k_flat, v_flat,
+            work_, s);
+#endif
     } else {
         attention_projection(h, p, q_flat, gate_flat, k_flat, v_flat, work_, s, input_basis);
     }
@@ -965,6 +1071,44 @@ void TextContext::gdn_mix(const BlockParameters& w, Tensor& x, int gidx, Phase p
     Tensor beta        = control.beta;
     const InputBasis projection_basis = gdn_norm_control(x, w.input_norm, config_.rms_norm_eps, p,
                                                          h, g, beta, work_, ctx_.execution_view());
+
+#if defined(NINFER_GDN_PERSISTENT_MIXER)
+    if (ph == Phase::Verify && projection_basis == InputBasis::Primal &&
+        gdn_state_action_ == GdnStateAction::RecordForReplay &&
+        active_sequence_batch_ == 1 && active_sequence_width_ >= 2 &&
+        active_sequence_width_ <= 4 && active_linear_state_source_slots_ != nullptr &&
+        active_valid_columns_ != nullptr &&
+        replay_records_ != nullptr &&
+        config_.hidden_size == 5120 && config_.gdn->linear_num_key_heads == 16 &&
+        config_.gdn->linear_key_head_dim == 128 &&
+        config_.gdn->linear_num_value_heads == 48 &&
+        config_.gdn->linear_value_head_dim == 128 &&
+        config_.gdn->linear_conv_kernel_dim == 4 &&
+        p.output.weight.qtype == QType::GGUF_Q4_K && p.output.weight.n == 5120 &&
+        p.output.weight.k == 6144 && !rotated(p.output.hadamard_signs)) {
+        if (const auto* projection_weights =
+                std::get_if<ops::GgufProjectionWeights>(&p.projection)) {
+            const GdnStateRef state_pool = gdn_state(static_cast<std::uint32_t>(gidx));
+            ops::GdnPersistentState state;
+            state.action = ops::GdnPersistentStateAction::Record;
+            state.conv_states = state_pool.pool->layer_view(state_pool.local).conv;
+            state.recurrent_states = state_pool.pool->layer_view(state_pool.local).recurrent;
+            state.source_slots = *active_linear_state_source_slots_;
+            state.valid_columns = *active_valid_columns_;
+            state.records = replay_layer(static_cast<std::uint32_t>(gidx), active_sequence_batch_,
+                                         active_sequence_width_);
+            const bool executed = [&] {
+                auto scope = work_.scope();
+                WorkspaceArena scratch(work_.alloc_bytes(
+                    ops::gdn_persistent_mixer_workspace_bytes(active_sequence_width_)));
+                return ops::gdn_persistent_mixer(
+                    h, g, beta, *projection_weights, p.convolution, p.norm, p.output.weight,
+                    config_.rms_norm_eps, state, x, scratch, s);
+            }();
+            if (executed) { return; }
+        }
+    }
+#endif
 
     const auto projection = workspace::gdn_projection(work_, config_, T);
     Tensor z  = projection.output_gate.view({dimension(config_.gdn->linear_value_head_dim),
@@ -1116,6 +1260,36 @@ void TextContext::mlp_tail(const BlockParameters& weights, Tensor& x, Phase phas
             InputBasis::Rotated);
         return;
     }
+#if defined(NINFER_GGUF_FFN_RMSNORM_Q8_FUSION)
+    const bool fused_ffn_q8 = x.dtype == DType::BF16 &&
+                              x.ne[0] == 5120 && x.ne[1] >= 1 && x.ne[1] <= 8 &&
+                              x.ne[2] == 1 && x.ne[3] == 1 && x.is_contiguous() &&
+                              x.data != nullptr &&
+                              (reinterpret_cast<std::uintptr_t>(x.data) &
+                               (alignof(__nv_bfloat162) - 1)) == 0 &&
+                              weights.post_attention_norm.dtype == DType::BF16 &&
+                              weights.post_attention_norm.ne[0] == 5120 &&
+                              weights.post_attention_norm.ne[1] == 1 &&
+                              weights.post_attention_norm.ne[2] == 1 &&
+                              weights.post_attention_norm.ne[3] == 1 &&
+                              weights.post_attention_norm.is_contiguous() &&
+                              weights.post_attention_norm.data != nullptr &&
+                              (reinterpret_cast<std::uintptr_t>(weights.post_attention_norm.data) &
+                               (alignof(__nv_bfloat162) - 1)) == 0 &&
+                              h.data != nullptr &&
+                              (reinterpret_cast<std::uintptr_t>(h.data) &
+                               (alignof(int4) - 1)) == 0 &&
+                              ffn_prequantized_q8_input_eligible(weights.ffn, x.ne[1]);
+    if (fused_ffn_q8) {
+        ops::gguf::rmsnorm_q8_1_vector_activation(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(weights.post_attention_norm.data), 5120, x.ne[1],
+            config_.rms_norm_eps, true, h.data, ctx_.stream);
+        ffn(x, weights.ffn, x, hints, work_, ctx_.stream, false, phase == Phase::Verify,
+            InputBasis::Primal, h.data);
+        return;
+    }
+#endif
     ops::rmsnorm(x, weights.post_attention_norm, config_.rms_norm_eps, true, h, ctx_.stream);
     ffn(h, weights.ffn, x, hints, work_, ctx_.stream, false, phase == Phase::Verify);
 }

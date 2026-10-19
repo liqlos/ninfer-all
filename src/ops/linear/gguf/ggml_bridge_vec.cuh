@@ -10,6 +10,7 @@
 // llama.cpp's vector kernels round integer scales (the 2- and 3-bit i-quants).
 
 #include "ggml_bridge_internal.cuh"
+#include "../../common/memory.cuh"
 
 #include <algorithm>
 
@@ -159,8 +160,24 @@ struct Decoder<GGML_TYPE_Q4_K> {
         s.f[0]              = dm.x * float(sc);
         s.f[1]              = dm.y * float(m);
         const uint4* qs     = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
+#if defined(NINFER_GGUF_Q4_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
+        const uint4 own     = qs[u & 1];
+        const unsigned mask = __activemask();
+        const uint4 peer    = make_uint4(__shfl_xor_sync(mask, own.x, 1, 8),
+                                         __shfl_xor_sync(mask, own.y, 1, 8),
+                                         __shfl_xor_sync(mask, own.z, 1, 8),
+                                         __shfl_xor_sync(mask, own.w, 1, 8));
+        const uint4 a0      = (u & 1) ? peer : own;
+        const uint4 a1      = (u & 1) ? own : peer;
+#else
+#if defined(NINFER_GGUF_Q4_STREAMING_LOADS) && __CUDA_ARCH__ == 860
+        const uint4 a0      = __ldcs(qs);
+        const uint4 a1      = __ldcs(qs + 1);
+#else
         const uint4 a0      = qs[0];
         const uint4 a1      = qs[1];
+#endif
+#endif
         const int shift     = 4 * (u & 1);
         const std::uint32_t v[8] = {a0.x, a0.y, a0.z, a0.w, a1.x, a1.y, a1.z, a1.w};
 #pragma unroll
@@ -202,6 +219,14 @@ template <>
 struct Decoder<GGML_TYPE_Q6_K> {
     static constexpr int kBlockElems = 256, kBlockBytes = 210, kTableWords = 0;
     __device__ static const std::uint32_t* table() { return nullptr; }
+    __device__ __forceinline__ static std::uint32_t load32(const std::uint8_t* p) {
+#if defined(NINFER_GGUF_Q6_STREAMING_LOADS) && __CUDA_ARCH__ == 860
+        const auto* h = reinterpret_cast<const std::uint16_t*>(p);
+        return std::uint32_t(__ldcs(h)) | (std::uint32_t(__ldcs(h + 1)) << 16);
+#else
+        return u32_a2(p);
+#endif
+    }
     __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
                                                   const std::uint32_t*, Slice& s) {
         const int h = u / 4, q = u % 4;
@@ -211,13 +236,32 @@ struct Decoder<GGML_TYPE_Q6_K> {
         s.f[1]               = d * float(sc[2 * q + 1]);
         const std::uint8_t* ql = b + 64 * h + 32 * (q & 1);
         const std::uint8_t* qh = b + 128 + 32 * h;
+#if defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
+        const unsigned mask = __activemask();
+#pragma unroll
+        for (int base = 0; base < 8; base += 4) {
+            const std::uint32_t hi = u32_a2(qh + 4 * (base + q));
+            const std::uint32_t lo0 = u32_a2(ql + 4 * (base + (q >> 1)));
+            const std::uint32_t lo1 = u32_a2(ql + 4 * (base + 2 + (q >> 1)));
+#pragma unroll
+            for (int j = 0; j < 4; ++j) {
+                const std::uint32_t high = __shfl_sync(mask, hi, j, 4);
+                const std::uint32_t low = __shfl_sync(mask, j < 2 ? lo0 : lo1,
+                                                     (q & 1) + 2 * (j & 1), 4);
+                const std::uint32_t v = ((low >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                        (((high >> (2 * q)) << 4) & 0x30303030u);
+                s.w[base + j] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
+            }
+        }
+#else
 #pragma unroll
         for (int i = 0; i < 8; ++i) {
-            const std::uint32_t v = ((u32_a2(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
-                                    (((u32_a2(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
+            const std::uint32_t v = ((load32(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                    (((load32(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
             // v - 32 per byte, v in [0, 64): flip the high bits by whether v is below 32.
             s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
         }
+#endif
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
         return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
@@ -454,6 +498,10 @@ struct Decoder<GGML_TYPE_IQ1_M> {
     }
 };
 
+#if defined(NINFER_GGUF_Q4_ASYNC_EXTENDED_K) && !defined(NINFER_GGUF_Q4_ASYNC_PIPELINE)
+#error NINFER_GGUF_Q4_ASYNC_EXTENDED_K requires NINFER_GGUF_Q4_ASYNC_PIPELINE
+#endif
+
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
 template <ggml_type type, int T, bool Fused, int KS>
@@ -463,6 +511,10 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
     constexpr int kPerBlock = D::kBlockElems / 32;
     constexpr int kRows     = 2;
     __shared__ __align__(16) std::uint32_t table[kTable];
+#if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
+    constexpr int kQ4StageBytes = 4 * D::kBlockBytes;
+    __shared__ __align__(16) std::uint8_t q4_stage[2][kVecWarps][kRows][kQ4StageBytes];
+#endif
     if constexpr (D::kTableWords > 0) {
         const std::uint32_t* src = D::table();
         for (int i = threadIdx.x; i < D::kTableWords; i += kVecWarps * 32) { table[i] = src[i]; }
@@ -516,6 +568,82 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
             }
         };
+#if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
+        const auto staged_slice = [&](int it, int buffer) {
+            const int s = lane + 32 * it;
+            int a[T][8];
+            float d[T], sum[T];
+#pragma unroll
+            for (int j = 0; j < T; ++j) {
+                const float2 ds = __half22float2(p.ds[std::int64_t(j) * slices + s]);
+                d[j]            = ds.x;
+                sum[j]          = ds.y;
+                const auto* q   = reinterpret_cast<const int4*>(p.qs + std::int64_t(j) * k + 32 * s);
+                const int4 v0 = q[0], v1 = q[1];
+                a[j][0] = v0.x; a[j][1] = v0.y; a[j][2] = v0.z; a[j][3] = v0.w;
+                a[j][4] = v1.x; a[j][5] = v1.y; a[j][6] = v1.z; a[j][7] = v1.w;
+            }
+#pragma unroll
+            for (int r = 0; r < kRows; ++r) {
+                Slice sl;
+                D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
+#pragma unroll
+                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+            }
+        };
+        const auto prefetch = [&](int it, int buffer) {
+#pragma unroll
+            for (int r = 0; r < kRows; ++r) {
+                const auto* src = rowp[r] - lane_offset + it * kQ4StageBytes;
+                ninfer::ops::cp_async<16, ninfer::ops::Cache::cg>(
+                    q4_stage[buffer][warp][r] + 16 * lane, src + 16 * lane);
+                if (lane < 4) {
+                    ninfer::ops::cp_async<16, ninfer::ops::Cache::cg>(
+                        q4_stage[buffer][warp][r] + 16 * (32 + lane), src + 16 * (32 + lane));
+                }
+            }
+            ninfer::ops::cp_commit();
+        };
+#endif
+#if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
+        if constexpr (type == GGML_TYPE_Q4_K && KS == 5120) {
+            prefetch(0, 0);
+            ninfer::ops::cp_wait<0>();
+            __syncwarp();
+#pragma unroll
+            for (int it = 0; it < 5; ++it) {
+                if (it + 1 < 5) { prefetch(it + 1, (it + 1) & 1); }
+                staged_slice(it, it & 1);
+                if (it + 1 < 5) {
+                    ninfer::ops::cp_wait<0>();
+                    __syncwarp();
+                }
+            }
+#if defined(NINFER_GGUF_Q4_ASYNC_EXTENDED_K)
+        } else if constexpr (type == GGML_TYPE_Q4_K && (KS == 6144 || KS == 17408)) {
+            static_assert(KS % 1024 == 0);
+            constexpr int kQ4Stages = KS / 1024;
+            prefetch(0, 0);
+            ninfer::ops::cp_wait<0>();
+            __syncwarp();
+#pragma unroll
+            for (int it = 0; it < kQ4Stages; ++it) {
+                if (it + 1 < kQ4Stages) { prefetch(it + 1, (it + 1) & 1); }
+                staged_slice(it, it & 1);
+                if (it + 1 < kQ4Stages) {
+                    ninfer::ops::cp_wait<0>();
+                    __syncwarp();
+                }
+            }
+#endif
+        } else if constexpr (KS != 0) {
+            static_assert(KS % 1024 == 0);
+#pragma unroll
+            for (int it = 0; it < KS / 1024; ++it) { slice(it); }
+        } else {
+            for (int it = 0; lane + 32 * it < slices; ++it) { slice(it); }
+        }
+#else
         if constexpr (KS != 0) {
             static_assert(KS % 1024 == 0);
 #pragma unroll
@@ -523,6 +651,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
         } else {
             for (int it = 0; lane + 32 * it < slices; ++it) { slice(it); }
         }
+#endif
 #pragma unroll
         for (int r = 0; r < kRows; ++r) {
 #pragma unroll
@@ -568,6 +697,13 @@ void launch(const VecArgs& args, cudaStream_t stream) {
 
 template <ggml_type type, int T, bool Fused>
 void launch_k(const VecArgs& args, cudaStream_t stream) {
+#if defined(NINFER_GGUF_Q6_STATIC_K)
+    if constexpr (type == GGML_TYPE_Q6_K && !Fused && (T == 1 || T == 4)) {
+        if (args.k == 5120 && device_facts().cc == 860) {
+            return launch<type, T, Fused, 5120>(args, stream);
+        }
+    }
+#endif
     if constexpr (kVecStaticK<type>) {
         switch (args.k) {
         case 5120: return launch<type, T, Fused, 5120>(args, stream);

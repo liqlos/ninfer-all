@@ -81,11 +81,10 @@ void launch_nvfp4_a16_chunks(const Tensor& x, const Weight& weight, Tensor& out,
 template <class Geometry, class Schedule>
 void launch_nvfp4_a4_mma(const Weight& weight, Tensor& out, Nvfp4W4a4Workspace workspace,
                          std::int32_t tokens, cudaStream_t stream) {
-#if defined(NINFER_SM8X_COMPAT) && !defined(NINFER_SM120_NVFP4)
+#if defined(NINFER_SM8X_COMPAT)
     // The W4A4 MMA emits mma.sync...kind::mxf4nvf4.block_scale, a Blackwell-only qualifier, so
     // sm_8x must not instantiate it. Shapes still name their SM120 routes; A4 is never admitted
-    // there (prepare.cpp maps every stored policy to A16Only) and this turns a mis-selection into
-    // a precise error.
+    // there (kNvfp4TextPolicy is A16Only) and this turns a mis-selection into a precise error.
     (void)weight;
     (void)out;
     (void)workspace;
@@ -110,7 +109,7 @@ void launch_nvfp4_a4_mma(const Weight& weight, Tensor& out, Nvfp4W4a4Workspace w
 template <Nvfp4GeometryId Geometry>
 void launch_nvfp4_a4_tma(const Weight& weight, Tensor& out, Nvfp4W4a4Workspace scratch,
                          std::int32_t tokens, cudaStream_t stream) {
-#if defined(NINFER_SM8X_COMPAT) && !defined(NINFER_SM120_NVFP4)
+#if defined(NINFER_SM8X_COMPAT)
     // The TMA kernels live in the SM120-only non-RDC archive, which sm_8x does not build.
     (void)weight;
     (void)out;

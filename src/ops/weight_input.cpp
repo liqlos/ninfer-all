@@ -330,9 +330,10 @@ prepare_sparse_moe_weights(const WeightInput& router, const WeightInput& shared_
                        shared_format == QType::NVFP4 && shared_down_format == QType::NVFP4;
     require(router_bank.weight.qtype == QType::BF16 && (groupwise || nvfp4),
             "SparseMoe native bank formats are unsupported");
-#if defined(NINFER_SM8X_COMPAT) && !defined(NINFER_SM120_NVFP4)
+#if defined(NINFER_SM8X_COMPAT)
     // A model prefills, and this profile prefills only through W4A4 on Blackwell tensor cores.
-    require(!nvfp4, "SparseMoe NVFP4 expert banks need an sm_120a build");
+    require(!nvfp4,
+            "SparseMoe NVFP4 expert banks need a native sm_120 build (NINFER_SM120_NATIVE)");
 #endif
     if (nvfp4) {
         // The prefill route of this profile quantises the hidden state to four bits, which is what

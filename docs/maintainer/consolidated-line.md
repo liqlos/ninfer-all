@@ -89,7 +89,7 @@ their authorship:
 | #199 | sparse MoE keeps Q4 group quads in flight in the routed gate/up dot product and on the T = 1 path | Mykhailo Dementii |
 | #264, #273 | a partial last M tile in the fused NVFP4 SwiGLU TMA route; the text profile of `rmsnorm_rope` | Mykhailo Dementii |
 | #268 | the attention output gate applied by the small-T reduce epilogue on BF16 and INT8 caches, bit-identical to the separate multiply | Mykhailo Dementii |
-| #286-#290 | NVFP4 sparse-MoE expert banks: one divisor per stacked source matrix in the artifact, an NVFP4 profile for decode and the small-token route (CUDA cores, every build) and for prefill (W4A4, every sm_120a build; sm_8x builds refuse the banks at bind), and the `qwen3_6_35b_a3b_nvfp4` recipe. The decode codec sits beside the row-split codecs instead of coming through #286's refactor, so the groupwise profiles compile to the same kernels | Mykhailo Dementii |
+| #286-#290 | NVFP4 sparse-MoE expert banks: one divisor per stacked source matrix in the artifact, an NVFP4 profile for decode and the small-token route (CUDA cores, every build) and for prefill (W4A4, native sm_120 builds only; sm_8x builds refuse the banks at bind), and the `qwen3_6_35b_a3b_nvfp4` recipe. The decode codec sits beside the row-split codecs instead of coming through #286's refactor, so the groupwise profiles compile to the same kernels | Mykhailo Dementii |
 | #282 | GGUF (any ggml quant level) as a conversion source | giveen |
 | #284 | the `qwen3_8_27b_q6` recipe with a fused Q6 gate/up shape and tuned Q6 dispatch | bingchengcc |
 | #294 | structured output through xgrammar, speculative decoding included, opt-in with `--structured-output` | Andrey Shvartsman |
@@ -162,7 +162,7 @@ and have not been run.
 |---|---|---|
 | ops | device route profiles: per hardware class and SM count, the schedule each route key takes per width band, installed per CUDA device before any Op runs; `DeviceRouteForce` for calibration | `ops/common/device_route.{h,cpp}` |
 | calibration | `calibrate_device_routes` times every route family through the inference dispatch on synthetic weights and caches, L2 flushed per sample; a candidate wins only 3 % ahead, again in a second interleaved round, and with output within 5 % of the compiled route | `calibration/device_calibration.{h,cu}`, `apps/calibrate/main.cpp` (`ninfer-calibrate`) |
-| runtime | profiles come from the user's file, then the built-in table (`device_profiles.json`, embedded at configure time: RTX 3090, 4090, 5090, and the RTX PRO 6000 Blackwell Workstation, Max-Q and Server editions, each its own hardware class at 188 SMs), else a calibration at first start that is saved; `--device-profile auto\|off\|calibrate`, `--device-profile-path` | `runtime/engine/device_profile.{h,cpp}`, `device_profiles_builtin.cpp.in`, `model_instance.cpp`, `serve/serve_options.cpp` |
+| runtime | profiles come from the user's file, then the built-in table (`device_profiles.json`, embedded at configure time: RTX 3090, 4090, 5090), else a calibration at first start that is saved; `--device-profile auto\|off\|calibrate`, `--device-profile-path` | `runtime/engine/device_profile.{h,cpp}`, `device_profiles_builtin.cpp.in`, `model_instance.cpp`, `serve/serve_options.cpp` |
 | attention | INT8-family small-T tiers routed by profile: warps, CTAs per SM, key block, split QK across producer warps (`q`), the next tile's codes and scales staged in registers a whole iteration ahead (`e`), both (`qe`) | `ops/softmax_attention/dense/causal_cache/small_t_i8{.cuh,_launch.cuh}`, `small_t.cu` |
 | attention | FP16 accumulation of P·V per key tile (small-T and INT8 prompt kernels), by profile (`attn_pv_f16`) or `NINFER_SMALLT_PV_F16` / `NINFER_PROMPT_PV_F16` | `small_t_i8.cuh`, `prompt_i8.cuh`, `ops/common/mma.cuh` |
 | attention | the fast prompt kernel also serves `rk8v4` (packed int4 values decoded from byte-pair `ldmatrix.trans`) and the packed key codings (`rk4v4`, `rk4v4-e8`, `rk2v4-e8`, expanded into the stage's INT8 tile); on by profile (`attn_prompt_fast`), `NINFER_PROMPT_FAST`, or `--fast-prefill-kernel` | `prompt_i8_fast.cuh`, `prompt.cu` |
@@ -172,7 +172,6 @@ and have not been run.
 | graphs | MTP draft windows past eight verify columns build one CUDA Graph executable per profile (Mykhailo Dementii's topology classes, #221, cover up to eight) | `models/qwen3_5/program/planning/graph_profiles.cpp` |
 | graphs | MTP and one-token decode profiles share an executable only when every attention call they capture takes the same route, as `causal_softmax_attention_route_family` reports for the model's geometry and KV storage (BF16 takes the prompt kernel up to 128 keys); MTP class ids get a per-width stride of 64 | `models/qwen3_5/program/planning/graph_profiles.cpp`, `graphs.cpp`, `startup.cpp`, `ops/.../causal_softmax_attention.cpp` |
 | build | the INT8 small-T launch compiles in 28 units (width, geometry, input) | `ops/softmax_attention/sources.cmake` |
-| build | every `120a` build compiles the NVFP4 W4A4 units (`NINFER_SM120_NVFP4`), the default compatibility path included, and an NVFP4 weight keeps its stored A4 permission there; before, an NVFP4 artifact failed at runtime planning on that path because the A16 SwiGLU route stops at 16 columns. FP8 A8 still needs `NINFER_SM120_NATIVE` | `CMakeLists.txt`, `ops/CMakeLists.txt`, `models/qwen3_5/load/prepare.cpp`, `ops/linear/nvfp4/nvfp4_launch.cuh`, `ops/weight_input.cpp`, `ops/wrapper/sparse_moe.cpp` |
 
 ## Verification
 
@@ -195,7 +194,7 @@ and have not been run.
   `ninfer_qwen3_5_mtp_adaptive_test`, `ninfer_token_logprobs_test`, `ninfer_e8_root_decode_test`
   and the serve option and schema tests cover the fork ports.
 - `ninfer_sparse_moe_test` walks the NVFP4 profile at T = 1, 2 and 12 on sm_8x and from T = 1 to
-  4097 on an sm_120a build; `ninfer_gdn_replay_fold_test` folds records packed at a narrower
+  4097 on a native sm_120 build; `ninfer_gdn_replay_fold_test` folds records packed at a narrower
   width than planned; `ninfer_mtp_round_test` prepares proposals wider than the verification; the
   batch cases of `ninfer_softmax_attention_test` compare the gated output byte for byte with the
   separate multiply.
@@ -218,16 +217,6 @@ and have not been run.
 - sm_120a: on an RTX 5090 both the default compatibility build and the native build
   (`NINFER_SM120_NATIVE`) pass `ctest` (169 tests), and the native build converts and serves the
   RedHatAI Qwen3.6-35B-A3B NVFP4 checkpoint.
-- RTX PRO 6000 Blackwell (188 SMs), default `120a` build: the full `ctest` (171 tests; the NVFP4 A4
-  cases run, only the FP8 A8 ones skip); the real-model tests with the Qwen3.8 groupwise and NVFP4
-  artifacts and the 35B-A3B groupwise and NVFP4 artifacts; greedy answers of the Qwen3.8,
-  Ternary Bonsai 2, GSQ-RCO and 35B-A3B artifacts without speculation, under MTP and DFlash2 and
-  with Vision, byte-identical to the build before the NVFP4 change, while the Qwen3.8 NVFP4
-  artifact, which did not start before, answers in all four modes. The RedHatAI Qwen3.6-35B-A3B
-  NVFP4 checkpoint converts and serves on this build: quick-corpus perplexity 4.410 against 4.364
-  for the groupwise artifact, scored at 15,080 against 11,266 tok/s. Each edition (Workstation at
-  600 W, Max-Q at 300 W, Server at 600 W) was calibrated twice, and on the Workstation edition a
-  start with no profile file took the built-in profile and wrote none.
 
 ## Deployment
 

@@ -439,7 +439,9 @@ WorkspacePlan build_workspace_plan(const SequencePlanImpl& plan) {
                                                            phase == TextPhase::Verify));
         }
         if (!plan.causal_scoring) {
-            linear_scratch(layout, parameters.text.output_head, first, last);
+            const std::int32_t head_last = phase == TextPhase::Prefill ? 1 : last;
+            linear_scratch(layout, parameters.text.output_head, std::min(first, head_last),
+                           head_last);
         }
     };
     const auto mtp_post_mixer = [&](WorkspaceLayoutBuilder& layout, int first, int last) {
