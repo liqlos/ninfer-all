@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include "vecdotq.cuh"
 #include "mma.cuh"
 
@@ -431,7 +433,12 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 #endif
     {
     tile_A   A[ntx][MMQ_TILE_NE_K/QI8_1];
+#if defined(NINFER_GGUF_Q4_MMQ_PACKED_DM) && __CUDA_ARCH__ == 860
+    using dm_storage = typename std::conditional<type == GGML_TYPE_Q4_K && J == 128, half2, float2>::type;
+    dm_storage dmA[ntx][tile_C::ne/2][MMQ_TILE_NE_K/QI8_1];
+#else
     float2 dmA[ntx][tile_C::ne/2][MMQ_TILE_NE_K/QI8_1];
+#endif
 
 
 #pragma unroll
@@ -451,7 +458,14 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
             for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += QI8_1) {
                 const int k0 = k00 + k01;
 
-                dmA[n][l][k01/QI8_1] = __half22float2(x_dm[i*sram_stride + k0/QI8_1]);
+#if defined(NINFER_GGUF_Q4_MMQ_PACKED_DM) && __CUDA_ARCH__ == 860
+                if constexpr (type == GGML_TYPE_Q4_K && J == 128) {
+                    dmA[n][l][k01/QI8_1] = x_dm[i*sram_stride + k0/QI8_1];
+                } else
+#endif
+                {
+                    dmA[n][l][k01/QI8_1] = __half22float2(x_dm[i*sram_stride + k0/QI8_1]);
+                }
             }
         }
     }
@@ -479,8 +493,17 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 
 #pragma unroll
                 for (int l = 0; l < tile_C::ne; ++l) {
-                    sum[(j0/tile_C::J + n)*tile_C::ne + l] += dmA[n][l/2][k01/QI8_1].x*dsB[l%2].x*C.x[l];
-                    sum[(j0/tile_C::J + n)*tile_C::ne + l] += dmA[n][l/2][k01/QI8_1].y*dsB[l%2].y;
+                    float2 dm;
+#if defined(NINFER_GGUF_Q4_MMQ_PACKED_DM) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && J == 128) {
+                        dm = __half22float2(dmA[n][l/2][k01/QI8_1]);
+                    } else
+#endif
+                    {
+                        dm = dmA[n][l/2][k01/QI8_1];
+                    }
+                    sum[(j0/tile_C::J + n)*tile_C::ne + l] += dm.x*dsB[l%2].x*C.x[l];
+                    sum[(j0/tile_C::J + n)*tile_C::ne + l] += dm.y*dsB[l%2].y;
                 }
             }
         }

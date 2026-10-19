@@ -10,11 +10,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'source/tools/lab'))
 import profile_long_context as lab
 
+OUT_SUBDIR = 'ffn-pair'
+PROBE_NAME = 'ffn-pair-probe'
+
 
 def main():
     tag = sys.argv[1] if len(sys.argv) == 2 else 'screen'
     assert tag.isalnum() or tag.replace('-', '').isalnum()
-    out = ROOT / 'results/ffn-pair'
+    out = ROOT / 'results' / OUT_SUBDIR
     receipt = out / (tag + '-receipt.json')
     assert not receipt.exists()
     image = 'sha256:501c92a90c3d85adc616455a6783bb5ae8b82008f469cf8dc3d6da538f75475b'
@@ -39,7 +42,7 @@ def main():
         record['admission'] = lab.admission()
         fixture = ROOT / 'fixtures/operators/q4-full-k5120.bin'
         assert lab.sha(fixture) == 'be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790'
-        binary = ROOT / 'artifacts/experimental/ffn-pair-probe'
+        binary = ROOT / 'artifacts/experimental' / PROBE_NAME
         record['binary_sha256'] = lab.sha(binary)
         reservation = uuid.uuid4().hex
         created = lab.api('/v1/photo-gpu-reservations', {'owner': lab.OWNER,
@@ -50,7 +53,7 @@ def main():
         ident = lab.docker('create', '--name', 'ninfer-lab-ffn-pair-' + reservation[:8],
             '--label', 'io.codex.ninfer-owner=' + reservation, '--gpus', 'all',
             '--mount', 'type=bind,source=' + lab.WSL_ROOT + ',target=/lab,readonly',
-            '--entrypoint', '/lab/artifacts/experimental/ffn-pair-probe', image,
+            '--entrypoint', '/lab/artifacts/experimental/' + PROBE_NAME, image,
             '/lab/fixtures/operators/q4-full-k5120.bin', tag + '-' + reservation).stdout.strip()
         assert len(ident) == 64
         record['container_id'] = ident
