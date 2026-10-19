@@ -386,3 +386,12 @@ target_compile_options(ninfer_ggml_quants PRIVATE
 target_link_libraries(ninfer_ggml_quants PRIVATE CUDA::cudart CUDA::cublas)
 target_link_libraries(ninfer_ops PRIVATE ninfer_ggml_quants)
 target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp")
+
+option(NINFER_GGUF_Q6_MMQ_A_X4 "Load adjacent SM86 Q6 MMQ A fragments with one x4 instruction" OFF)
+if(NINFER_GGUF_Q6_MMQ_A_X4)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q6 MMQ A x4 loads require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_A_X4=1)
+endif()
