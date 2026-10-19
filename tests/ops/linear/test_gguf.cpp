@@ -11,7 +11,7 @@
 #include "ninfer/ops/linear_swiglu.h"
 #include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
-#if defined(NINFER_GGUF_Q4_T4_IMMA_TEST) || defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
+#if defined(NINFER_GGUF_Q4_T4_IMMA_TEST) || defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
 #include "ops/linear/gguf/ggml_bridge_test.h"
 #endif
 #include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
@@ -477,7 +477,7 @@ public:
         }
     }
 
-    std::vector<__nv_bfloat16> read(const char* label, bool require_all_initialized = true) const {
+    std::vector<__nv_bfloat16> read(const char* label) const {
         std::vector<std::uint8_t> bytes(storage_.bytes);
         check(cudaMemcpy(bytes.data(), storage_.p, storage_.bytes, cudaMemcpyDeviceToHost), label);
         for (std::size_t i = 0; i < 256; ++i) {
@@ -487,7 +487,7 @@ public:
         }
         std::vector<__nv_bfloat16> values(payload_bytes_ / sizeof(__nv_bfloat16));
         std::memcpy(values.data(), bytes.data() + 256, payload_bytes_);
-        if (require_all_initialized && std::any_of(values.begin(), values.end(), [](const __nv_bfloat16 value) {
+        if (std::any_of(values.begin(), values.end(), [](const __nv_bfloat16 value) {
                 std::uint16_t bits = 0;
                 std::memcpy(&bits, &value, sizeof(bits));
                 return bits == 0xffffU;
@@ -505,7 +505,7 @@ private:
 template <typename Launch>
 void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
                         const std::vector<__nv_bfloat16>& eager, const std::string& label,
-                        std::ofstream* output_file, bool require_all_initialized = true) {
+                        std::ofstream* output_file) {
     cudaStream_t stream = nullptr;
     cudaGraph_t graph = nullptr;
     cudaGraphExec_t executable = nullptr;
@@ -519,7 +519,7 @@ void check_graph_parity(Launch&& launch, GuardedOutput& guarded,
         guarded.poison();
         check(cudaGraphLaunch(executable, stream), "launch graph");
         check(cudaStreamSynchronize(stream), "synchronize graph");
-        const auto replay = guarded.read("read graph output", require_all_initialized);
+        const auto replay = guarded.read("read graph output");
         write_outputs(output_file, replay);
         if (replay.size() != eager.size() ||
             std::memcmp(replay.data(), eager.data(), replay.size() * sizeof(__nv_bfloat16)) != 0) {
@@ -1139,8 +1139,7 @@ void run_dual_mmq_fusion() {
 }
 #endif
 
-#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST) || defined(NINFER_GGUF_Q4_T4_IMMA_TEST) || \
-    defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST) || defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
 double q4_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
                          std::int32_t columns, std::int32_t column,
                          const std::vector<std::uint8_t>& input_bytes) {
@@ -1183,6 +1182,59 @@ double q4_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
         const double weight_dmin = half_to_float(quant_block + 2);
         result += (weight_d * scale) * activation_d * double(integer_dot) -
                   (weight_dmin * minimum) * activation_sum;
+    }
+    return result;
+}
+#endif
+
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+int q6_k_value_cpu(const std::uint8_t* block, int u, int index) {
+    const int h = u / 4;
+    const int q = u % 4;
+    const int word = index / 4;
+    const int byte = index % 4;
+    const int low_offset = 64 * h + 32 * (q & 1) + 4 * word + byte;
+    const int high_offset = 128 + 32 * h + 4 * word + byte;
+    const int low = (block[low_offset] >> (4 * (q >> 1))) & 0x0f;
+    const int high = (block[high_offset] >> (2 * q)) & 0x03;
+    return (low | (high << 4)) - 32;
+}
+
+double q6_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
+                         std::int32_t columns, std::int32_t column,
+                         const std::vector<std::uint8_t>& input_bytes) {
+    const std::size_t activation_scales = (std::size_t(k) * columns + 15) / 16 * 16;
+    double result = 0.0;
+    for (std::int32_t group = 0; group < k / 32; ++group) {
+        const std::int32_t block_index = group / 8;
+        const std::int32_t u = group % 8;
+        const std::uint8_t* block = row_data + std::size_t(block_index) * 210;
+        const int h = u / 4;
+        const int q = u % 4;
+        const auto* scales = reinterpret_cast<const std::int8_t*>(block + 192 + 8 * h);
+        const double weight_d = half_to_float(block + 208);
+        std::int64_t dot0 = 0;
+        std::int64_t dot1 = 0;
+        for (int index = 0; index < 32; ++index) {
+            const std::uint8_t activation_byte =
+                input_bytes[std::size_t(column) * k + group * 32 + index];
+            const int activation_q = activation_byte < 128
+                                         ? activation_byte
+                                         : int(activation_byte) - 256;
+            const std::int64_t term =
+                std::int64_t(q6_k_value_cpu(block, u, index)) * activation_q;
+            if (index < 16) {
+                dot0 += term;
+            } else {
+                dot1 += term;
+            }
+        }
+        const std::size_t scale_at = activation_scales +
+            (std::size_t(column) * (k / 32) + group) * sizeof(__half2);
+        const double activation_d = half_to_float(input_bytes.data() + scale_at);
+        const double weight_scale0 = weight_d * int(scales[2 * q]);
+        const double weight_scale1 = weight_d * int(scales[2 * q + 1]);
+        result += activation_d * (weight_scale0 * double(dot0) + weight_scale1 * double(dot1));
     }
     return result;
 }
@@ -1349,20 +1401,19 @@ int run_q4_t4_imma_regression() {
 }
 #endif
 
-#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
-void run_q4_t4_fused_imma_case(std::int32_t rows, std::uint32_t seed,
-                               const std::vector<std::int32_t>& checked_rows) {
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+void run_q6_t4_imma_case(std::int32_t rows, std::uint32_t seed,
+                         const std::vector<std::int32_t>& checked_rows) {
     constexpr std::int32_t k = 5120;
     constexpr std::int32_t columns = 4;
-    constexpr std::int64_t base_row_bytes = std::int64_t(k / 256) * 144;
-    constexpr std::int64_t row_bytes = base_row_bytes + 144;
-    constexpr std::int64_t output_stride = rows + 5;
-    const TypeCase type{QType::GGUF_Q4_K, "q4_k", {0, 2}};
+    constexpr std::int64_t base_row_bytes = std::int64_t(k / 256) * 210;
+    constexpr std::int64_t row_bytes = base_row_bytes + 210;
+    const TypeCase type{QType::GGUF_Q6_K, "q6_k", {208}};
     std::mt19937 rng(seed);
     std::normal_distribution<float> normal(0.0f, 0.4f);
-    const auto compact_weights = random_blocks(type, 2 * rows, k, rng);
-    std::vector<std::uint8_t> host_weights(std::size_t(2 * rows) * row_bytes, 0xa5);
-    for (std::int32_t row = 0; row < 2 * rows; ++row) {
+    const auto compact_weights = random_blocks(type, rows, k, rng);
+    std::vector<std::uint8_t> host_weights(std::size_t(rows) * row_bytes, 0xa5);
+    for (std::int32_t row = 0; row < rows; ++row) {
         std::memcpy(host_weights.data() + std::size_t(row) * row_bytes,
                     compact_weights.data() + std::size_t(row) * base_row_bytes,
                     base_row_bytes);
@@ -1374,84 +1425,128 @@ void run_q4_t4_fused_imma_case(std::int32_t rows, std::uint32_t seed,
     const auto input_bytes = cpu_quantize_vector_activation(host_x, k, columns);
     DeviceBuffer input(input_bytes.size());
     input.copy_from_host(input_bytes.data(), input_bytes.size());
-
-    GuardedOutput actual(std::size_t(output_stride) * columns);
-    GuardedOutput baseline(std::size_t(output_stride) * columns);
-    actual.poison();
-    baseline.poison();
-    const auto launch_candidate = [&](cudaStream_t stream) {
-        ops::gguf::vector_swiglu(ops::gguf::GgmlType::Q4_K, weights.p, row_bytes, rows, k,
-                                 input.p, columns, static_cast<__nv_bfloat16*>(actual.data()),
-                                 output_stride, stream);
+    const std::int64_t padded_output_stride = rows + 7;
+    const __nv_bfloat16 padding = __float2bfloat16(7.25f);
+    std::uint16_t padding_bits = 0;
+    std::memcpy(&padding_bits, &padding, sizeof(padding_bits));
+    const std::vector<__nv_bfloat16> initial(std::size_t(padded_output_stride) * columns, padding);
+    GuardedOutput actual(initial.size());
+    GuardedOutput baseline(initial.size());
+    const auto initialize = [&](GuardedOutput& output) {
+        output.poison();
+        check(cudaMemcpy(output.data(), initial.data(), initial.size() * sizeof(__nv_bfloat16),
+                         cudaMemcpyHostToDevice),
+              "initialize padded Q6_K T4 IMMA output");
     };
-    const auto launch_baseline = [&](cudaStream_t stream) {
-        ops::gguf::detail::q4_t4_fused_imma_baseline_for_test(
-            static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
-            static_cast<const std::uint8_t*>(input.p), baseline.data(), output_stride, stream);
-    };
-    launch_candidate(nullptr);
-    launch_baseline(nullptr);
-    check(cudaDeviceSynchronize(), "Q4_K T4 fused IMMA eager parity");
-    const auto got = actual.read("read Q4_K T4 fused IMMA output", false);
-    const auto expected = baseline.read("read Q4_K T4 fused baseline output", false);
+    initialize(actual);
+    initialize(baseline);
+    const ops::gguf::VectorOutput actual_out{static_cast<__nv_bfloat16*>(actual.data()), nullptr,
+                                              padded_output_stride, ops::gguf::Epilogue::Store,
+                                              nullptr, 0};
+    const ops::gguf::VectorOutput baseline_out{static_cast<__nv_bfloat16*>(baseline.data()), nullptr,
+                                                padded_output_stride, ops::gguf::Epilogue::Store,
+                                                nullptr, 0};
+    ops::gguf::vector_product(ops::gguf::GgmlType::Q6_K, weights.p, row_bytes, rows, k,
+                              input.p, columns, actual_out, nullptr);
+    ops::gguf::detail::q6_t4_imma_baseline_for_test(
+        static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
+        static_cast<const std::uint8_t*>(input.p), baseline.data(), padded_output_stride, nullptr);
+    check(cudaDeviceSynchronize(), "Q6_K T4 IMMA baseline parity");
+    const auto eager = actual.read("read Q6_K T4 IMMA output");
+    const auto expected = baseline.read("read Q6_K T4 IMMA baseline output");
+    if (eager.size() != expected.size() ||
+        std::memcmp(eager.data(), expected.data(), eager.size() * sizeof(__nv_bfloat16)) != 0) {
+        throw std::runtime_error("Q6_K T4 IMMA output differs from exact vector baseline buffers");
+    }
     for (std::int32_t column = 0; column < columns; ++column) {
-        for (std::int32_t row = 0; row < rows; ++row) {
-            const std::size_t index = std::size_t(column) * output_stride + row;
-            std::uint16_t got_bits = 0, expected_bits = 0;
-            std::memcpy(&got_bits, &got[index], sizeof(got_bits));
-            std::memcpy(&expected_bits, &expected[index], sizeof(expected_bits));
-            if (got_bits != expected_bits || got_bits == 0xffffU ||
-                !std::isfinite(__bfloat162float(got[index]))) {
-                throw std::runtime_error("Q4_K T4 fused IMMA output differs from exact fused baseline");
-            }
-        }
-        for (std::int64_t row = rows; row < output_stride; ++row) {
-            const std::size_t index = std::size_t(column) * output_stride + row;
-            std::uint16_t got_bits = 0, expected_bits = 0;
-            std::memcpy(&got_bits, &got[index], sizeof(got_bits));
-            std::memcpy(&expected_bits, &expected[index], sizeof(expected_bits));
-            if (got_bits != 0xffffU || expected_bits != 0xffffU) {
-                throw std::runtime_error("Q4_K T4 fused IMMA overwrote output stride padding");
+        for (std::int64_t row = rows; row < padded_output_stride; ++row) {
+            std::uint16_t bits = 0;
+            std::memcpy(&bits, &eager[std::size_t(column) * padded_output_stride + row],
+                        sizeof(bits));
+            if (bits != padding_bits) {
+                throw std::runtime_error("Q6_K T4 IMMA overwrote padded output rows");
             }
         }
     }
-
-    std::vector<float> oracle_values;
-    std::vector<double> oracle_expected;
-    oracle_values.reserve(checked_rows.size() * columns);
-    oracle_expected.reserve(checked_rows.size() * columns);
-    bool finite = true;
+    std::vector<float> got;
+    std::vector<double> want;
+    got.reserve(checked_rows.size() * columns);
+    want.reserve(checked_rows.size() * columns);
+    const bool finite = std::all_of(eager.begin(), eager.end(), [](__nv_bfloat16 value) {
+        return std::isfinite(__bfloat162float(value));
+    });
     for (const std::int32_t row : checked_rows) {
         if (row < 0 || row >= rows) {
-            throw std::runtime_error("Q4_K T4 fused IMMA oracle row is out of range");
+            throw std::runtime_error("Q6_K T4 IMMA oracle row is out of range");
         }
-        const std::uint8_t* gate_row = compact_weights.data() + std::size_t(row) * base_row_bytes;
-        const std::uint8_t* up_row = compact_weights.data() + std::size_t(rows + row) * base_row_bytes;
+        const std::uint8_t* raw_row = compact_weights.data() + std::size_t(row) * base_row_bytes;
         for (std::int32_t column = 0; column < columns; ++column) {
-            const double gate = q4_k_q8_1_dot_cpu(gate_row, k, columns, column, input_bytes);
-            const double up = q4_k_q8_1_dot_cpu(up_row, k, columns, column, input_bytes);
-            const float actual = __bfloat162float(got[std::size_t(column) * output_stride + row]);
-            finite = finite && std::isfinite(actual);
-            oracle_values.push_back(actual);
-            oracle_expected.push_back(gate / (1.0 + std::exp(-gate)) * up);
+            got.push_back(__bfloat162float(eager[std::size_t(column) * padded_output_stride + row]));
+            want.push_back(q6_k_q8_1_dot_cpu(raw_row, k, columns, column, input_bytes));
         }
     }
-    const Error error = compare(oracle_values, oracle_expected);
-    if (!finite || !(error.relative_rms < 3.5e-3 && error.relative_max < 5.0e-3)) {
-        throw std::runtime_error("Q4_K T4 fused IMMA output differs from independent Q8_1 FP64 SwiGLU oracle");
+    const Error error = compare(got, want);
+    if (!finite || !(error.relative_rms < 3.5e-3 && error.relative_max < 5e-3)) {
+        throw std::runtime_error("Q6_K T4 IMMA output differs from independent Q8_1 FP64 oracle");
     }
-    check_graph_parity(launch_candidate, actual, got, "Q4_K T4 fused IMMA graph", nullptr, false);
-    check_graph_parity(launch_baseline, baseline, expected, "Q4_K fused baseline graph", nullptr, false);
+    const auto replay = [&](auto&& launch, GuardedOutput& output, const char* label) {
+        initialize(output);
+        cudaStream_t stream = nullptr;
+        cudaGraph_t graph = nullptr;
+        cudaGraphExec_t executable = nullptr;
+        check(cudaStreamCreate(&stream), "create Q6_K T4 IMMA graph stream");
+        try {
+            check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
+                  "begin Q6_K T4 IMMA graph capture");
+            launch(stream);
+            check(cudaStreamEndCapture(stream, &graph), "end Q6_K T4 IMMA graph capture");
+            check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0),
+                  "instantiate Q6_K T4 IMMA graph");
+            check(cudaGraphLaunch(executable, stream), "launch Q6_K T4 IMMA graph");
+            check(cudaStreamSynchronize(stream), "synchronize Q6_K T4 IMMA graph");
+            auto values = output.read(label);
+            check(cudaGraphExecDestroy(executable), "destroy Q6_K T4 IMMA graph executable");
+            check(cudaGraphDestroy(graph), "destroy Q6_K T4 IMMA graph");
+            check(cudaStreamDestroy(stream), "destroy Q6_K T4 IMMA graph stream");
+            return values;
+        } catch (...) {
+            if (executable != nullptr) { cudaGraphExecDestroy(executable); }
+            if (graph != nullptr) { cudaGraphDestroy(graph); }
+            cudaStreamDestroy(stream);
+            throw;
+        }
+    };
+    const auto candidate_graph = replay(
+        [&](cudaStream_t stream) {
+            ops::gguf::vector_product(ops::gguf::GgmlType::Q6_K, weights.p, row_bytes, rows, k,
+                                      input.p, columns, actual_out, stream);
+        },
+        actual, "read Q6_K T4 IMMA graph output");
+    const auto baseline_graph = replay(
+        [&](cudaStream_t stream) {
+            ops::gguf::detail::q6_t4_imma_baseline_for_test(
+                static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
+                static_cast<const std::uint8_t*>(input.p), baseline.data(), padded_output_stride,
+                stream);
+        },
+        baseline, "read Q6_K T4 IMMA baseline graph output");
+    if (candidate_graph.size() != eager.size() || baseline_graph.size() != expected.size() ||
+        std::memcmp(candidate_graph.data(), eager.data(), eager.size() * sizeof(__nv_bfloat16)) != 0 ||
+        std::memcmp(baseline_graph.data(), expected.data(), expected.size() * sizeof(__nv_bfloat16)) != 0 ||
+        std::memcmp(candidate_graph.data(), baseline_graph.data(),
+                    candidate_graph.size() * sizeof(__nv_bfloat16)) != 0) {
+        throw std::runtime_error("Q6_K T4 IMMA graph outputs differ from eager exact baseline");
+    }
 }
 
-int run_q4_t4_fused_imma_regression() {
+int run_q6_t4_imma_regression() {
     int device = 0;
-    check(cudaGetDevice(&device), "get device for fused Q4 T4 IMMA regression");
     cudaDeviceProp properties{};
-    check(cudaGetDeviceProperties(&properties, device), "get properties for fused Q4 T4 IMMA regression");
+    check(cudaGetDevice(&device), "get Q6_K T4 IMMA device");
+    check(cudaGetDeviceProperties(&properties, device), "get Q6_K T4 IMMA properties");
     if (properties.major != 8 || properties.minor != 6) { return 77; }
-    run_q4_t4_fused_imma_case(8193, 88041, {0, 1, 257, 1023, 2048, 4095, 4096, 6143, 8191, 8192});
-    run_q4_t4_fused_imma_case(17408, 88042, {0, 1, 4095, 8191, 12287, 16383, 17407});
+    run_q6_t4_imma_case(1024, 89031, {0, 1, 127, 511, 1023});
+    run_q6_t4_imma_case(8193, 89032, {0, 1, 255, 256, 1023, 4095, 8191, 8192});
     return 0;
 }
 #endif
@@ -2032,8 +2127,8 @@ int main(int argc, char** argv) {
 #if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
     bool q4_t4_imma_regression = false;
 #endif
-#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
-    bool q4_t4_fused_imma_regression = false;
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+    bool q6_t4_imma_regression = false;
 #endif
     bool output_specified = false;
     bool weight_directory_specified = false;
@@ -2067,10 +2162,9 @@ int main(int argc, char** argv) {
         } else if (argument == "--q4-t4-imma-regression" && !q4_t4_imma_regression) {
             q4_t4_imma_regression = true;
 #endif
-#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
-        } else if (argument == "--q4-t4-fused-imma-regression" &&
-                   !q4_t4_fused_imma_regression) {
-            q4_t4_fused_imma_regression = true;
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+        } else if (argument == "--q6-t4-imma-regression" && !q6_t4_imma_regression) {
+            q6_t4_imma_regression = true;
 #endif
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
@@ -2107,8 +2201,8 @@ int main(int argc, char** argv) {
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
-#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
-        || (q4_t4_fused_imma_regression &&
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+        || (q6_t4_imma_regression &&
             (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
@@ -2135,12 +2229,16 @@ int main(int argc, char** argv) {
             return failures == 0 ? 0 : 1;
         }
 #endif
-#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
-        if (q4_t4_fused_imma_regression) {
-            const int failures = run_q4_t4_fused_imma_regression();
-            std::cout << (failures == 0 ? "OK" : failures == 77 ? "SKIP" : "FAIL")
-                      << " GGUF Q4_K T4 fused IMMA regression\n";
-            return failures == 0 || failures == 77 ? failures : 1;
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+        if (q6_t4_imma_regression) {
+            const int failures = run_q6_t4_imma_regression();
+            if (failures == 77) {
+                std::cout << "SKIP: Q6_K T4 IMMA regression requires SM86\n";
+                return 77;
+            }
+            std::cout << (failures == 0 ? "OK" : "FAIL")
+                      << " GGUF Q6_K T4 IMMA regression\n";
+            return failures == 0 ? 0 : 1;
         }
 #endif
         if (swiglu_q8_fusion) {
