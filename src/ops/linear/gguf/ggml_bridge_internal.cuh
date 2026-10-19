@@ -61,6 +61,7 @@ struct VecArgs {
     const std::int8_t* qs; // [columns][k]
     const half2* ds;       // [columns][k / 32]
     VecStore out;
+    bool q6_head_aligned_planes = false;
 };
 
 // Byte offset of the scales inside a planar vector activation of `columns` x `k`.
@@ -70,6 +71,7 @@ struct VecArgs {
 
 template <ggml_type type>
 void vec_launch(const VecArgs& args, int columns, bool fused, cudaStream_t stream);
+void q6_head_aligned_vec_launch(const VecArgs& args, int columns, cudaStream_t stream);
 
 __device__ __forceinline__ float vec_silu(float x) { return x / (1.0f + expf(-x)); }
 

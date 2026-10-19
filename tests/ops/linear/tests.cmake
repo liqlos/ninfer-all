@@ -51,6 +51,25 @@ ninfer_add_op_test(ninfer_linear_bf16_a16_test
 ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
+if(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST=1)
+  target_link_libraries(ninfer_linear_gguf_test PRIVATE ninfer_model_runtime)
+  set(NINFER_Q6_HEAD_FIXTURE_DIR "" CACHE PATH "Pinned full Q6 head fixture directory")
+  if(NOT NINFER_Q6_HEAD_FIXTURE_DIR STREQUAL "")
+    file(SHA256 "${NINFER_Q6_HEAD_FIXTURE_DIR}/q6-head-full-k5120.bin"
+      NINFER_Q6_HEAD_FIXTURE_SHA256)
+    if(NOT NINFER_Q6_HEAD_FIXTURE_SHA256 STREQUAL
+        "2155d6e1f7c5549077438c4760e6e150945dd5e406484b29162dff7b03d05da0")
+      message(FATAL_ERROR "Q6 head aligned test requires the pinned real output-head fixture")
+    endif()
+    add_test(NAME ninfer_linear_gguf_q6_head_aligned_planes_test
+      COMMAND ninfer_tests ninfer_linear_gguf_test --q6-head-aligned-planes-regression
+        --weight-dir "${NINFER_Q6_HEAD_FIXTURE_DIR}")
+    set_tests_properties(ninfer_linear_gguf_q6_head_aligned_planes_test PROPERTIES
+      SKIP_RETURN_CODE 77)
+  endif()
+endif()
 if(NINFER_GGUF_Q4_MMQ_K_STREAM)
   add_test(NAME ninfer_linear_gguf_q4_mmq_k_stream_test
     COMMAND ninfer_tests ninfer_linear_gguf_test --q4-mmq-k-stream-regression)

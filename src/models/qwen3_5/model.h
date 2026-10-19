@@ -71,6 +71,14 @@ public:
         return backing_.weight_pool();
     }
 
+    [[nodiscard]] const void* q6_head_aligned_planes() const noexcept {
+        return backing_.has_device_auxiliary(
+                   artifact::DeviceAuxiliaryKind::Q6HeadAlignedPlanes)
+                   ? backing_.device_auxiliary(
+                         artifact::DeviceAuxiliaryKind::Q6HeadAlignedPlanes).data
+                   : nullptr;
+    }
+
 private:
     friend std::unique_ptr<Model> materialize_model(LoadPlan&&, DeviceContext&,
                                                     const StartupObserver*);

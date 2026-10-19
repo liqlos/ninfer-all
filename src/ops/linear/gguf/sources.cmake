@@ -1,22 +1,14 @@
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
-option(NINFER_GGUF_DP4A_SHORT_CHAINS "Split SM86 generic Q4_K K5120 T4 vector dot chains" OFF)
-if(NINFER_GGUF_DP4A_SHORT_CHAINS)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "GGUF short DP4A chains require sm_86")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
-    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DP4A_SHORT_CHAINS=1)
-endif()
 option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
 option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Cooperatively load packed Q6_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q6_PACKED_SCALE_LOAD "Load each Q6_K scale pair with one aligned SM86 word transaction" OFF)
-option(NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME "Consume each cooperative SM86 Q6_K T4 row in two decoded halves" OFF)
 option(NINFER_GGUF_Q6_T4_SINGLE_ROW "Assign one non-fused SM86 Q6_K T4 output row to each warp" OFF)
 option(NINFER_GGUF_Q6_T4_IMMA "Use exact-chain SM86 Q6_K T4 INT8 MMA for non-fused K5120 and K17408 vector products" OFF)
+option(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES "Use an exact head-only Q6_K component-plane cache on SM86" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR "Assign adjacent SM86 Q4_K T4 fused gate/up rows to separate warps" OFF)
 option(NINFER_GGUF_Q4_T4_IMMA "Use exact-chain SM86 Q4_K T4 INT8 MMA for non-fused K5120 vector products" OFF)
@@ -26,21 +18,6 @@ option(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD "Load the aligned Q4_K vector block hea
 option(NINFER_GGUF_Q4_SPLIT_DP4A "Split SM86 Q4_K vector dots into independent DP4A chains" OFF)
 option(NINFER_GGUF_Q4_ASYNC_PIPELINE "Pipeline SM86 GGUF Q4_K K5120 vector weight loads" OFF)
 option(NINFER_GGUF_VECTOR_PREFETCH2 "Prefetch one SM86 Q4_K/Q6_K vector weight slice in registers" OFF)
-if(NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "Q6_K T4 half-decode consumption requires sm_86")
-  endif()
-  if(NOT NINFER_GGUF_Q6_COOPERATIVE_DECODE)
-    message(FATAL_ERROR "Q6_K T4 half-decode consumption requires cooperative Q6 decode")
-  endif()
-  if(NINFER_GGUF_Q6_STATIC_K OR NINFER_GGUF_VECTOR_PREFETCH2 OR
-     NINFER_GGUF_Q6_T4_SINGLE_ROW OR NINFER_GGUF_Q6_T4_IMMA OR
-     NINFER_GGUF_Q6_PACKED_SCALE_LOAD OR NINFER_GGUF_Q6_STREAMING_LOADS)
-    message(FATAL_ERROR "Q6_K T4 half-decode consumption requires the generic two-row cooperative route without static K, prefetch, IMMA, packed scales or streaming loads")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_HALF_DECODE_CONSUME=1)
-endif()
 option(NINFER_GGUF_Q4_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_X "Use SM86 cp.async raw-weight staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_K_STREAM "Stream SM86 Q4_K MMQ K slices to shorten live A fragments" OFF)
@@ -250,6 +227,19 @@ if(NINFER_GGUF_Q6_STATIC_K)
   endif()
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_STATIC_K=1)
+endif()
+if(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q6 head aligned planes require sm_86")
+  endif()
+  set_property(SOURCE
+    "${PROJECT_SOURCE_DIR}/src/artifact/materializer.cpp"
+    "${PROJECT_SOURCE_DIR}/src/models/qwen3_5/load.cpp"
+    "${PROJECT_SOURCE_DIR}/src/models/qwen3_5/execution/parameters.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_bridge.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES=1)
 endif()
 if(NINFER_GGUF_Q6_STREAMING_LOADS)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")

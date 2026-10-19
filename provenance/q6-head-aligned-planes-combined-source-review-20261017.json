@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "purpose": "Combined immutable collection of source-only review reports for the isolated Q6 head aligned-plane experiment.",
+  "source_identity": {
+    "base_commit": "fffed819a1b97437da3891b4afbc280e42965405",
+    "branch": "lab/q6-head-aligned-planes",
+    "worktree": "C:/AI/tuning/ninfer-lab-20261015/work-q6-head-aligned-planes",
+    "feature": "NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES",
+    "default": "OFF",
+    "tracked_binary_diff_sha256": "06c839531fd046f5de473fd554b67bfb36b7a8a81f59a9d3a4ff74fe2167aa3b",
+    "r1_review_input_sha256": "d0db0761305984e2cfde4b50fc0f3b052f9da1c4f69a268c661052586e1796c9",
+    "r2_review_input_sha256": "3611bcde43a8d7d3766d1e7338a70002696c29589e6d502f9a0cdff822e3c243",
+    "r3_delta_sha256": "369fe995956f84ff8ed0d92d7fcb25bacc90e5cd04ee503cd29ce4d217566a46",
+    "helper_header_sha256": "9c2a626a7c122e24d83ee9521082ed8a66d171d314aad21b1bc85da1e0c7f217",
+    "final_test_source_sha256": "0296051b8b8c3ee2a81fb6a63846714a66677480660329ab098a7bce577e03b8"
+  },
+  "fixture_pin": {
+    "path": "C:/AI/tuning/ninfer-lab-20261015/results/weight-fixtures/q6-head-full-k5120.bin",
+    "sha256": "2155d6e1f7c5549077438c4760e6e150945dd5e406484b29162dff7b03d05da0",
+    "bytes": 1042944000,
+    "rows": 248320,
+    "k": 5120,
+    "synthetic_fallback": false
+  },
+  "review_reports": [
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_math_review",
+      "stage": "R1",
+      "status": "PASS",
+      "report": "Q6_K byte layout, lane/block addressing, activation use, FP32 accumulation/reduction order, and BF16 store path pass source review. Runtime bitwise parity remains unverified because no build or test ran."
+    },
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_capacity_review",
+      "stage": "R1",
+      "status": "PASS_WITH_HARDENING_NOTE",
+      "report": "Current Qwen load path accounts the full cache in arena capacity and model-owned lifetime; only vision overlay creates evictable placements and the feature excludes overlay. R1 note: Binder appended cache after evictable tail if a future caller combined them."
+    },
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_test_review",
+      "stage": "R1",
+      "status": "BLOCK",
+      "report": "CMake-only fixture SHA check did not prove the runtime harness consumed the pinned file; runtime checked size only. Eager/graph exact operator output and canary coverage existed. Production model-route proof remained absent."
+    },
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_math_review",
+      "stage": "R2",
+      "status": "PASS",
+      "report": "Math/addressing unchanged. R2 places the auxiliary before the evictable tail. The digest test API is fully qualified and linked through ninfer_model_runtime only with the feature. The harness hashes exact in-memory full fixture bytes used by baseline and candidate; T1/T4 compare eager and graph BF16 output exactly and check canary."
+    },
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_capacity_review",
+      "stage": "R2",
+      "status": "PASS",
+      "report": "R2 cache placement follows resident rank-0 objects and precedes evictable tail; computed offset/bytes still describe arena suffix. Full 1,048,903,680-byte cache plus alignment is included before DeviceArena allocation; subsequent runtime KV admission sees post-model free memory."
+    },
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_test_review",
+      "stage": "R2",
+      "status": "PASS_WITH_RUNTIME_GAP",
+      "report": "Runtime SHA over exact in-memory fixture bytes and R2 tail fix pass. T1/T4 eager/graph equality and canary checks remain. End-to-end model load and production-dispatch proof still pending."
+    },
+    {
+      "identity": "/root/strategy_fusion_graph/q6planes_test_review",
+      "stage": "R3",
+      "status": "PASS",
+      "report": "Fully qualified digest calls match frontend/digest.h declarations and R2 test-target linkage remains. No build/test/GPU; end-to-end route proof pending."
+    }
+  ],
+  "final_scope": {
+    "source_math": "PASS by independent source review",
+    "capacity_lifetime_tail": "PASS after R2",
+    "runtime_fixture_pin": "PASS after R2/R3, over the exact in-memory source bytes consumed",
+    "operator_and_graph": "Source test is wired for T1/T4 and exact eager/captured-graph BF16 output with canary",
+    "model_runtime_route": "UNPROVED: source wiring is present, but test calls the public operator directly and no actual model load/server route was run",
+    "build": "NOT RUN",
+    "tests": "NOT RUN",
+    "gpu": "NOT RUN",
+    "timing": "NOT RUN",
+    "commit": "NOT MADE"
+  },
+  "minimal_integration_path": [
+    "After the parent-owned child pair completes, configure a build directory inside this isolated worktree only, CMAKE_CUDA_ARCHITECTURES=86, BUILD_TESTING=ON, NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES=ON, and NINFER_Q6_HEAD_FIXTURE_DIR=C:/AI/tuning/ninfer-lab-20261015/results/weight-fixtures.",
+    "Build ninfer_linear_gguf_test and ninfer-serve from that isolated build; configure checks the pinned fixture and the test hashes the loaded bytes again at execution.",
+    "Run only ninfer_linear_gguf_q6_head_aligned_planes_test first; require exact T1/T4 baseline parity for eager and captured graph and canaries.",
+    "Then qualify actual model loading and production gguf_project dispatch with the exact pinned model, while proving fixed 65536-context/KV capacity and broker external reserve are unchanged; compare feature-OFF and ON output bytes on the same controlled request. Operator CTest alone is not runtime-route evidence.",
+    "Only after route proof and resource admission, include the isolated export in the parent-owned serial A/B trial; do not merge into active source before qualification."
+  ],
+  "constraints": [
+    "This receipt records static review only, not runtime correctness or speed.",
+    "The full persistent cache is 1,048,903,680 bytes; canonical model weight bytes remain resident too.",
+    "The feature remains default OFF."
+  ]
+}

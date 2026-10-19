@@ -1,6 +1,7 @@
 #include "artifact/materializer.h"
 
 #include "artifact/framing.h"
+#include "artifact/q6_head_aligned_planes.h"
 #include "artifact/transcode.h"
 #include "artifact/reader.h"
 #include "core/startup.h"
@@ -167,6 +168,19 @@ std::span<const std::byte> MaterializedArtifact::pinned_block() const noexcept {
     return {static_cast<const std::byte*>(pinned_->data()), pinned_->size()};
 }
 
+DeviceSpan MaterializedArtifact::device_auxiliary(DeviceAuxiliaryKind kind) const {
+    if (kind == DeviceAuxiliaryKind::Q6HeadAlignedPlanes && !device_auxiliaries_.empty() &&
+        device_auxiliaries_.front().bytes != 0) {
+        return device_auxiliaries_.front();
+    }
+    throw ArtifactError("requested device auxiliary is absent");
+}
+
+bool MaterializedArtifact::has_device_auxiliary(DeviceAuxiliaryKind kind) const noexcept {
+    return kind == DeviceAuxiliaryKind::Q6HeadAlignedPlanes && !device_auxiliaries_.empty() &&
+           device_auxiliaries_.front().bytes != 0;
+}
+
 MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& plan,
                                  DeviceContext& device, const StartupObserver* startup_observer,
                                  std::unique_ptr<EvictableWeightPool> backing) {
@@ -176,8 +190,13 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
     const StartupObserver no_observer;
     const auto& observer = startup_observer ? *startup_observer : no_observer;
     std::uint64_t total  = 0;
+    std::uint64_t payload_total = 0;
     for (const auto& placement : plan.device_objects) {
-        total = checked_add(total, placement.bytes, "device payload bytes");
+        payload_total = checked_add(payload_total, placement.bytes, "device payload bytes");
+    }
+    total = payload_total;
+    for (const auto& auxiliary : plan.device_auxiliaries) {
+        total = checked_add(total, auxiliary.bytes, "device payload and auxiliary bytes");
     }
     StartupPhaseScope phase(observer, StartupPhase::WeightsMaterialize, StartupProgressUnit::Bytes,
                             total);
@@ -197,6 +216,7 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
         throw ArtifactError("an eviction pool backs only a single-device materialization");
     }
     out.arenas_.resize(rank_count);
+    out.device_auxiliaries_.resize(plan.device_auxiliaries.size());
     for (std::size_t rank = 0; rank < rank_count; ++rank) {
         const auto capacity = plan.device_capacity(rank);
         if (capacity > std::numeric_limits<std::size_t>::max()) {
@@ -223,6 +243,17 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
             out.stats_.offloaded_device_capacity_bytes = checked_add(
                 out.stats_.offloaded_device_capacity_bytes, capacity, "offloaded device capacity");
         }
+    }
+    for (std::size_t index = 0; index < plan.device_auxiliaries.size(); ++index) {
+        const auto& auxiliary = plan.device_auxiliaries[index];
+        if (auxiliary.offset > plan.device_capacity(0) ||
+            auxiliary.bytes > plan.device_capacity(0) - auxiliary.offset ||
+            auxiliary.alignment == 0 || auxiliary.offset % auxiliary.alignment != 0) {
+            throw ArtifactError("invalid device auxiliary placement");
+        }
+        out.device_auxiliaries_[index] = {
+            static_cast<std::byte*>(out.arenas_[0]->base()) + auxiliary.offset,
+            static_cast<std::size_t>(auxiliary.bytes)};
     }
     if (plan.pinned_capacity_bytes > std::numeric_limits<std::size_t>::max()) {
         throw ArtifactError("pinned Host backing exceeds size_t");
@@ -441,16 +472,64 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
         if (next_range != ranges.size()) { throw ArtifactError("incomplete device upload"); }
     }
     if (!uploaded_any) {
+        if (!plan.device_auxiliaries.empty()) {
+            throw ArtifactError("device auxiliary has no uploaded canonical source object");
+        }
         phase.complete(transcoded_bytes, total);
         return out;
     }
-    if (checked_add(copied, transcoded_bytes, "uploaded bytes") != total) {
+    if (checked_add(copied, transcoded_bytes, "uploaded bytes") != payload_total) {
         throw ArtifactError("incomplete device upload");
     }
-    out.stats_.h2d_bytes = checked_add(copied, transcoded_bytes, "uploaded bytes");
+    std::uint64_t auxiliary_uploaded = 0;
+    for (std::size_t auxiliary_index = 0; auxiliary_index < plan.device_auxiliaries.size();
+         ++auxiliary_index) {
+        const auto& auxiliary = plan.device_auxiliaries[auxiliary_index];
+        if (auxiliary.kind != DeviceAuxiliaryKind::Q6HeadAlignedPlanes) {
+            throw ArtifactError("unsupported device auxiliary transform");
+        }
+        constexpr std::uint64_t rows = 248320;
+        constexpr std::uint64_t k = 5120;
+        constexpr std::uint64_t blocks_per_row = k / 256;
+        constexpr std::uint64_t source_row_bytes = blocks_per_row * 210;
+        constexpr std::uint64_t destination_row_bytes = 4224;
+        constexpr std::uint64_t chunk_rows = 512;
+        const auto& object = reader.directory().tensor(auxiliary.source);
+        if (reader.geometry(auxiliary.source).format != QType::GGUF_Q6_K ||
+            reader.geometry(auxiliary.source).layout != QuantLayout::GgufBlocks ||
+            reader.geometry(auxiliary.source).bytes != rows * source_row_bytes ||
+            object.shape != Shape{rows, k} || auxiliary.bytes != rows * destination_row_bytes) {
+            throw ArtifactError("Q6 head aligned cache source geometry changed");
+        }
+        std::vector<std::byte> source(static_cast<std::size_t>(chunk_rows * source_row_bytes));
+        std::vector<std::byte> destination(static_cast<std::size_t>(chunk_rows * destination_row_bytes));
+        out.stats_.peak_staging_bytes = std::max<std::uint64_t>(
+            out.stats_.peak_staging_bytes, source.size() + destination.size());
+        auto* const cache = static_cast<std::byte*>(out.device_auxiliaries_[auxiliary_index].data);
+        for (std::uint64_t first = 0; first < rows; first += chunk_rows) {
+            const std::uint64_t count = std::min(chunk_rows, rows - first);
+            const auto source_bytes = static_cast<std::size_t>(count * source_row_bytes);
+            const auto destination_bytes = static_cast<std::size_t>(count * destination_row_bytes);
+            reader.read_into(object.offset + first * source_row_bytes,
+                             std::span(source).first(source_bytes));
+            out.stats_.read_bytes = checked_add(out.stats_.read_bytes, source_bytes,
+                                                "Q6 aligned cache source bytes");
+            pack_q6_head_aligned_planes(std::span(source).first(source_bytes), count,
+                                        std::span(destination).first(destination_bytes));
+            check_cuda(cudaMemcpy(cache + first * destination_row_bytes, destination.data(),
+                                  destination_bytes, cudaMemcpyHostToDevice),
+                       "upload Q6 head aligned planes");
+            auxiliary_uploaded = checked_add(auxiliary_uploaded, destination_bytes,
+                                             "Q6 aligned cache upload bytes");
+            phase.progress(checked_add(checked_add(copied, transcoded_bytes, "uploaded bytes"),
+                                       auxiliary_uploaded, "uploaded bytes"), total);
+        }
+    }
+    out.stats_.h2d_bytes = checked_add(checked_add(copied, transcoded_bytes, "uploaded bytes"),
+                                       auxiliary_uploaded, "uploaded bytes");
     out.stats_.upload_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-    phase.complete(checked_add(copied, transcoded_bytes, "uploaded bytes"), total);
+    phase.complete(out.stats_.h2d_bytes, total);
     return out;
 }
 

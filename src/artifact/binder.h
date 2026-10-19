@@ -48,6 +48,7 @@ public:
     [[nodiscard]] const Reader& reader() const noexcept { return reader_; }
 
     void require_device(ObjectHandle object, std::uint64_t alignment = 256);
+    void reserve_q6_head_aligned_planes(ObjectHandle object);
     // Materialize a device object in a narrower row-split format than the artifact stores. The
     // object must already have a device demand and be a row-split Q8_G32_FP16 tensor, and every
     // consumer must accept the target format; a repeated request must name the same target.
@@ -90,6 +91,7 @@ private:
     std::uint64_t read_bytes_        = 0;
     std::uint64_t owned_value_bytes_ = 0;
     std::uint64_t next_pinned_order_ = 0;
+    std::optional<ObjectHandle> q6_head_aligned_planes_;
 };
 
 } // namespace ninfer::artifact

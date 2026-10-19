@@ -112,6 +112,17 @@ LoadPlan plan_load(const artifact::Reader& reader, LoadOptions options) {
         loading::apply_vision_overlay_placement(bindings, out->weights, mtp_parameters,
                                                 draft_parameters);
     }
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
+    if (options.ranks == 1 && !options.overlay_vision()) {
+        const auto& head_binding = bindings.at(out->weights.text.output_head).reference.binding;
+        if (head_binding.whole_object && head_binding.parts.size() == 1) {
+            const auto object = head_binding.parts.front().object;
+            if (reader.directory().tensor(object).id == "weight/000131") {
+                binder.reserve_q6_head_aligned_planes(object);
+            }
+        }
+    }
+#endif
     out->weights.text.output_head_use =
         bindings.use(out->weights.text.output_head, "text/final_hidden");
     if (out->weights.mtp) {

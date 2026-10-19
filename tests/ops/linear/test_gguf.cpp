@@ -12,6 +12,10 @@
 #include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
 #include "ops/linear/gguf/ggml_bridge_test.h"
+#include "artifact/q6_head_aligned_planes.h"
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+#include "models/qwen3_5/frontend/digest.h"
+#endif
 #include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
 #include "ops/linear/gguf/gguf_linear.h"
 
@@ -2078,8 +2082,19 @@ struct VectorBenchCase {
 
 void launch_vector_candidate(const VectorBenchCase& c, const void* weights,
                              std::int64_t row_bytes, const void* activation, void* output,
-                             cudaStream_t stream) {
+                             cudaStream_t stream, const void* aligned_weights = nullptr) {
     const auto type = ops::detail::gguf_type(c.qtype);
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+    if (aligned_weights != nullptr) {
+        const ops::gguf::VectorOutput out{static_cast<__nv_bfloat16*>(output), nullptr, c.rows,
+                                           ops::gguf::Epilogue::Store, nullptr, 0};
+        if (!ops::gguf::q6_head_aligned_vector_product(aligned_weights, c.rows, c.k, activation,
+                                                       c.columns, out, stream)) {
+            throw std::runtime_error("Q6 head aligned route rejected its pinned real fixture");
+        }
+        return;
+    }
+#endif
     if (c.fused) {
         ops::gguf::vector_swiglu(type, weights, row_bytes, c.rows, c.k, activation, c.columns,
                                  static_cast<__nv_bfloat16*>(output), c.rows, stream);
@@ -2145,6 +2160,11 @@ void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
         }
         if (full_q6_head) {
             host_weights.swap(fixture);
+            if (ninfer::models::qwen3_5::frontend::sha256_hex(
+                    ninfer::models::qwen3_5::frontend::sha256(host_weights)) !=
+                "2155d6e1f7c5549077438c4760e6e150945dd5e406484b29162dff7b03d05da0") {
+                throw std::runtime_error("Q6 head fixture content hash differs from pinned artifact");
+            }
             fixture_label = "pinned_full_real_object:" + filename;
         } else {
             host_weights.resize(weight_bytes);
@@ -2162,6 +2182,20 @@ void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
     }
     DeviceBuffer weight_device(host_weights.size());
     weight_device.copy_from_host(host_weights.data(), host_weights.size());
+    DeviceBuffer aligned_weight_device;
+    if (full_q6_head) {
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+        std::vector<std::byte> aligned_host(std::size_t(c.rows) * 4224);
+        artifact::pack_q6_head_aligned_planes(
+            {reinterpret_cast<const std::byte*>(host_weights.data()), host_weights.size()},
+            c.rows, aligned_host);
+        aligned_weight_device = DeviceBuffer(aligned_host.size() + 128);
+        aligned_weight_device.fill(0xA5);
+        aligned_weight_device.copy_from_host(aligned_host.data(), aligned_host.size());
+#else
+        throw std::runtime_error("Q6 head aligned fixture test was not enabled in this build");
+#endif
+    }
 
     std::normal_distribution<float> normal(0.0f, 0.4f);
     std::vector<__nv_bfloat16> input_host(std::size_t(c.k) * c.columns);
@@ -2188,7 +2222,8 @@ void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
         launch_vector_baseline(c, weight_device.p, row_bytes, activation_device.p,
                               baseline_output.data(), stream);
         launch_vector_candidate(c, weight_device.p, row_bytes, activation_device.p,
-                               candidate_output.data(), stream);
+                               candidate_output.data(), stream,
+                               aligned_weight_device.p == nullptr ? nullptr : aligned_weight_device.p);
         check(cudaStreamSynchronize(stream), "synchronize vector benchmark exact-output pass");
         const auto baseline_host = baseline_output.read("read vector benchmark baseline");
         const auto candidate_host = candidate_output.read("read vector benchmark candidate");
@@ -2197,6 +2232,17 @@ void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
                         baseline_host.size() * sizeof(__nv_bfloat16)) != 0) {
             throw std::runtime_error("vector benchmark candidate output differs from exact baseline");
         }
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+        if (aligned_weight_device.p != nullptr) {
+            std::array<std::byte, 128> canary{};
+            aligned_weight_device.copy_to_host(canary.data(), canary.size(),
+                                               std::size_t(c.rows) * 4224);
+            if (!std::all_of(canary.begin(), canary.end(),
+                             [](std::byte value) { return value == std::byte{0xA5}; })) {
+                throw std::runtime_error("Q6 head aligned vector route overwrote its cache canary");
+            }
+        }
+#endif
         const auto capture_arm = [&](bool baseline, cudaGraph_t* graph, cudaGraphExec_t* executable) {
             check(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
                   "begin vector benchmark graph capture");
@@ -2206,7 +2252,8 @@ void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
                                           baseline_output.data(), stream);
                 } else {
                     launch_vector_candidate(c, weight_device.p, row_bytes, activation_device.p,
-                                           candidate_output.data(), stream);
+                                           candidate_output.data(), stream,
+                                           aligned_weight_device.p == nullptr ? nullptr : aligned_weight_device.p);
                 }
             }
             check(cudaStreamEndCapture(stream, graph), "end vector benchmark graph capture");
@@ -2225,6 +2272,17 @@ void run_vector_event_case(const VectorBenchCase& c, int blocks, int repeats,
                         graph_baseline_host.size() * sizeof(__nv_bfloat16)) != 0) {
             throw std::runtime_error("vector benchmark graph output differs from exact baseline");
         }
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+        if (aligned_weight_device.p != nullptr) {
+            std::array<std::byte, 128> canary{};
+            aligned_weight_device.copy_to_host(canary.data(), canary.size(),
+                                               std::size_t(c.rows) * 4224);
+            if (!std::all_of(canary.begin(), canary.end(),
+                             [](std::byte value) { return value == std::byte{0xA5}; })) {
+                throw std::runtime_error("Q6 head aligned graph route overwrote its cache canary");
+            }
+        }
+#endif
 
         const std::string type_name = c.qtype == QType::GGUF_Q4_K ? "q4_k" : "q6_k";
         const std::string shape = type_name + "_n" + std::to_string(c.rows) + "_k" +
@@ -2326,6 +2384,20 @@ int run_vector_event_benchmark(int blocks, int repeats, std::uint32_t seed,
     if (!*output) { throw std::runtime_error("failed flushing vector benchmark output"); }
     return 0;
 }
+
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+int run_q6_head_aligned_planes_regression(const std::string& weight_directory) {
+    if (weight_directory.empty() || !std::filesystem::is_directory(weight_directory)) {
+        throw std::runtime_error("Q6 head aligned regression requires the pinned real fixture directory");
+    }
+    for (const int columns : {1, 4}) {
+        const VectorBenchCase test{QType::GGUF_Q6_K, 248320, 5120, columns, false,
+                                   static_cast<std::uint32_t>(40131 + columns)};
+        run_vector_event_case(test, 1, 1, weight_directory, std::cout);
+    }
+    return 0;
+}
+#endif
 
 int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                    std::uint64_t& total_checksum, std::ofstream* output_file,
@@ -2680,6 +2752,9 @@ int main(int argc, char** argv) {
     bool mmq_q6_real_shapes = false;
     bool q4_mmq_k_stream_regression = false;
     bool vector_event_benchmark = false;
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+    bool q6_head_aligned_planes_regression = false;
+#endif
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
     bool rmsnorm_q8_fusion = false;
@@ -2720,6 +2795,11 @@ int main(int argc, char** argv) {
             q4_mmq_k_stream_regression = true;
         } else if (argument == "--vector-event-benchmark" && !vector_event_benchmark) {
             vector_event_benchmark = true;
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+        } else if (argument == "--q6-head-aligned-planes-regression" &&
+                   !q6_head_aligned_planes_regression) {
+            q6_head_aligned_planes_regression = true;
+#endif
         } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
@@ -2779,6 +2859,16 @@ int main(int argc, char** argv) {
             return 2;
         }
     }
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+    if (q6_head_aligned_planes_regression &&
+        (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || q4_mmq_k_stream_regression ||
+         vector_event_benchmark || swiglu_q8_fusion || rmsnorm_q8_fusion ||
+         rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
+         benchmark_options_specified || !weight_directory_specified || weight_directory.empty())) {
+        std::cerr << "Q6 head aligned regression requires only --weight-dir <pinned-real-fixture-directory>\n";
+        return 2;
+    }
+#endif
     if ((output_specified &&
          (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes || q4_mmq_k_stream_regression || vector_event_benchmark) || output_path.empty())) ||
         (weight_directory_specified &&
@@ -2832,6 +2922,13 @@ int main(int argc, char** argv) {
         return 2;
     }
     try {
+#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES_TEST)
+        if (q6_head_aligned_planes_regression) {
+            const int result = run_q6_head_aligned_planes_regression(weight_directory);
+            std::cout << "OK Q6 head aligned real-fixture T1/T4 exact and graph regression\n";
+            return result;
+        }
+#endif
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
         if (q4_t4_fused_warp_pair_regression) {
             const int failures = run_q4_t4_fused_warp_pair_regression();
