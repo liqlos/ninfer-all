@@ -19,18 +19,6 @@ endif()
 
 project(ninfer LANGUAGES C CXX CUDA)
 
-set(NINFER_CUDA_FATBIN_COMPRESSION "default" CACHE STRING
-    "CUDA fatbinary compression mode")
-set_property(CACHE NINFER_CUDA_FATBIN_COMPRESSION PROPERTY STRINGS default size)
-if(NOT NINFER_CUDA_FATBIN_COMPRESSION STREQUAL "default" AND
-   NOT NINFER_CUDA_FATBIN_COMPRESSION STREQUAL "size")
-  message(FATAL_ERROR
-    "NINFER_CUDA_FATBIN_COMPRESSION must be 'default' or 'size'; got '${NINFER_CUDA_FATBIN_COMPRESSION}'")
-endif()
-if(NINFER_CUDA_FATBIN_COMPRESSION STREQUAL "size")
-  add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--compress-mode=size>)
-endif()
-
 # NINFER_SM8X_COMPAT gates every Ampere/early-Ada compatibility path. ninfer_ops also sets it
 # PUBLIC for its own consumers, but that link is PRIVATE through ninfer_engine, so apps and tests
 # would not otherwise see it. Defining it globally keeps a single consistent answer for every
