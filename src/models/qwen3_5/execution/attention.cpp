@@ -7,7 +7,6 @@
 #include "ninfer/ops/rope.h"
 #include "ops/linear/gguf/ggml_bridge.h"
 
-#include <algorithm>
 #include <stdexcept>
 
 namespace ninfer::models::qwen3_5::execution {
@@ -56,11 +55,6 @@ std::size_t attention_projection_workspace_bytes(const AttentionParameters& para
 #if defined(NINFER_GGUF_RMSNORM_Q8_FUSION)
         if (gguf->parts.front().weight.k == 5120 && last <= 8) {
             bytes += ops::gguf::vector_activation_bytes(5120, last) + 256;
-        }
-#endif
-#if defined(NINFER_GGUF_RMSNORM_MMQ_FUSION)
-        if (gguf->parts.front().weight.k == 5120 && last > 8) {
-            bytes += 2 * (ops::gguf::matrix_activation_bytes(5120, std::min(last, 1024)) + 256);
         }
 #endif
         return bytes;

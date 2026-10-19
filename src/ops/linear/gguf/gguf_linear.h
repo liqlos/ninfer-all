@@ -57,32 +57,16 @@ struct GgufShape {
 
 // Runs every product against one BF16 activation x [K,T], quantizing x once per activation layout
 // (and once more per distinct input gather).
-bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
-                  WorkspaceArena& workspace, cudaStream_t stream,
-                  bool* used_mmq_store = nullptr,
-                  bool* used_dual_layout_mmq_pack = nullptr,
-                  bool* used_mmq_gate_epilogue = nullptr);
+void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
+                  WorkspaceArena& workspace, cudaStream_t stream);
 void gguf_project_q8_1_activation(int k, int columns, const void* activation,
                                   std::span<const GgufProduct> products,
                                   cudaStream_t stream);
-void gguf_project_matrix_q8_1_activation(int k, int columns, QType activation_format,
-                                         const void* activation,
-                                         std::span<const GgufProduct> products,
-                                         WorkspaceArena& workspace, cudaStream_t stream);
-bool gguf_project_matrix_q8_1_activations(
-    int k, int columns, std::span<const gguf::MatrixActivationPlane> activations,
-    std::span<const GgufProduct> products, WorkspaceArena& workspace, cudaStream_t stream,
-    bool* used_mmq_store = nullptr, bool* used_mmq_gate_epilogue = nullptr);
 
 void gguf_linear(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& workspace,
                  cudaStream_t stream);
 void gguf_linear_add(const Tensor& x, const Weight& w, Tensor& residual,
                      WorkspaceArena& workspace, cudaStream_t stream);
-
-enum class GgufSwiGluRoute { Fallback, ProducerQ8, PersistentFfn };
-
-[[nodiscard]] GgufSwiGluRoute gguf_swiglu_linear_add_route(
-    const Weight& gate, const Weight* up, const Weight& down, std::int32_t tokens);
 
 [[nodiscard]] std::size_t gguf_swiglu_linear_add_workspace_capacity_bytes(
     const Weight& gate, const Weight* up, const Weight& down, std::int32_t min_tokens,
@@ -90,12 +74,6 @@ enum class GgufSwiGluRoute { Fallback, ProducerQ8, PersistentFfn };
 bool gguf_swiglu_linear_add(const Tensor& x, const Weight& gate, const Weight* up,
                             const Weight& down, Tensor& residual, WorkspaceArena& workspace,
                             cudaStream_t stream);
-bool gguf_swiglu_linear_add_prequantized(const void* activation, int k, int columns,
-                                         const Weight& gate, const Weight* up,
-                                         const Weight& down, Tensor& residual,
-                                         WorkspaceArena& workspace, cudaStream_t stream);
-bool gguf_swiglu_prequantized(const void* activation, int k, int columns,
-                              const Weight& gate, Tensor& output, cudaStream_t stream);
 
 // out = silu(gate x) * (up x). `up` null means `gate` is one [gate; up] parent of 2 * out rows.
 void gguf_swiglu(const Tensor& x, const Weight& gate, const Weight* up, Tensor& out,

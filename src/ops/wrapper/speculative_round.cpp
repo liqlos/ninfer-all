@@ -237,25 +237,6 @@ void speculative_select_accepted_hidden(const Tensor& hidden, const Tensor& sele
     detail::speculative_select_accepted_hidden_launch(hidden, selectors, out, stream);
 }
 
-void speculative_select_accepted_hidden_scatter(const Tensor& hidden,
-                                                const Tensor& selectors,
-                                                const Tensor& destinations, Tensor& out,
-                                                cudaStream_t stream) {
-    constexpr const char* op = "speculative_select_accepted_hidden_scatter";
-    require_dtype(hidden, DType::BF16, op, "hidden");
-    if (hidden.ne[0] <= 0 || hidden.ne[1] <= 0 || hidden.ne[2] <= 0 || hidden.ne[3] != 1) {
-        throw std::invalid_argument("speculative_select_accepted_hidden_scatter: invalid hidden shape");
-    }
-    require_vector(selectors, DType::I32, hidden.ne[2], op, "selectors");
-    require_vector(destinations, DType::I32, hidden.ne[2], op, "destinations");
-    require_dtype(out, DType::BF16, op, "out");
-    if (out.ne[0] != hidden.ne[0] || out.ne[1] <= 0 || out.ne[2] != 1 || out.ne[3] != 1) {
-        throw std::invalid_argument("speculative_select_accepted_hidden_scatter: invalid output shape");
-    }
-    detail::speculative_select_accepted_hidden_scatter_launch(hidden, selectors, destinations,
-                                                              out, stream);
-}
-
 void proposal_remap_token_ids(Tensor& proposal_tokens, const std::int32_t* id_map, std::int32_t n,
                               cudaStream_t stream) {
     constexpr const char* op = "proposal_remap_token_ids";

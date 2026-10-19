@@ -177,9 +177,6 @@ void speculative_accept_sparse_drafts(
  */
 void speculative_select_accepted_hidden(const Tensor& hidden, const Tensor& selectors, Tensor& out,
                                         cudaStream_t stream);
-void speculative_select_accepted_hidden_scatter(const Tensor& hidden, const Tensor& selectors,
-                                                const Tensor& destinations, Tensor& out,
-                                                cudaStream_t stream);
 
 /**
  * Op: proposal_remap_token_ids

@@ -546,42 +546,4 @@ void attn_input_proj_q8_1_activation(int input_rows, int columns, const void* ac
     detail::gguf_project_q8_1_activation(input_rows, columns, activation, products, stream);
 }
 
-void attn_input_proj_matrix_q8_1_activation(int input_rows, int columns, QType activation_format,
-                                           const void* activation,
-                                           const GgufProjectionWeights& weights, Tensor& q,
-                                           Tensor& gate, Tensor& k, Tensor& v,
-                                           WorkspaceArena& workspace, cudaStream_t stream) {
-    const gguf::MatrixActivationPlane plane{detail::gguf_type(activation_format), activation};
-    attn_input_proj_matrix_q8_1_activations(input_rows, columns, {&plane, 1}, weights, q, gate, k,
-                                            v, workspace, stream);
-}
-
-void attn_input_proj_matrix_q8_1_activations(
-    int input_rows, int columns, std::span<const gguf::MatrixActivationPlane> activations,
-    const GgufProjectionWeights& weights, Tensor& q, Tensor& gate, Tensor& k, Tensor& v,
-    WorkspaceArena& workspace, cudaStream_t stream) {
-    if (input_rows != 5120 || columns <= 8 || columns > 1024 || activations.empty()) {
-        throw std::invalid_argument("attn_input_proj: invalid prepared matrix q8_1 activation");
-    }
-    const std::int32_t query_rows = q.ne[0];
-    const std::int32_t kv_rows = k.ne[0];
-    require_matrix(q, query_rows, columns, "q");
-    require_matrix(gate, query_rows, columns, "gate");
-    require_matrix(k, kv_rows, columns, "k");
-    require_matrix(v, kv_rows, columns, "v");
-    require_gguf_attention(weights, input_rows, query_rows, kv_rows);
-    Tensor* outputs[] = {&q, &gate, &k, &v};
-    std::vector<detail::GgufProduct> products;
-    products.reserve(weights.parts.size());
-    for (const auto& part : weights.parts) {
-        detail::GgufProduct product;
-        product.weight = &part.weight;
-        product.out = outputs[part.output];
-        product.row = part.row;
-        products.push_back(product);
-    }
-    detail::gguf_project_matrix_q8_1_activations(input_rows, columns, activations, products,
-                                                workspace, stream);
-}
-
 } // namespace ninfer::ops
