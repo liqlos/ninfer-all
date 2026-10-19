@@ -97,6 +97,13 @@ void matrix_product(GgmlType type, const void* weight, std::int64_t row_bytes, i
                     const void* activation, int columns, float* out,
                     std::int64_t out_column_stride, void* fixup, cudaStream_t stream);
 
+[[nodiscard]] bool matrix_product_bf16_store(GgmlType type, const void* weight,
+                                             std::int64_t row_bytes, int rows, int k,
+                                             const void* activation, int columns,
+                                             __nv_bfloat16* out,
+                                             std::int64_t out_column_stride,
+                                             cudaStream_t stream, bool accumulate = false);
+
 // out <- epilogue(in) for an FP32 [rows, columns] plane whose columns are `in_column_stride` apart.
 void store_plane(const float* in, std::int64_t in_column_stride, int rows, int columns,
                  const VectorOutput& out, cudaStream_t stream);

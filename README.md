@@ -1,5 +1,8 @@
 # NInfer-all
 
+This fork adds opt-in RTX 3090 kernels that share Q4_K/Q6_K loads between lanes and fuse MMQ BF16 stores.
+[Build and validation scope](docs/performance-rtx3090-w.md) · [Measurements of the archived W v6 version](benchmarks/rtx3090-w/README.md).
+
 One line of [NInfer](https://github.com/Neroued/ninfer) for the RTX 3090, RTX 4090 and RTX 5090,
 consolidated from the forks that carry it and extended with this repository's own work. The base is
 the `master` of [ashalliants/ninfer-3090](https://github.com/ashalliants/ninfer-3090): v0.11.0 and

@@ -91,4 +91,10 @@ void matrix_product_impl(const void* weight, std::int64_t row_bytes, int rows, i
                          const void* activation, int columns, float* out,
                          std::int64_t out_column_stride, void* fixup, cudaStream_t stream);
 
+template <ggml_type type>
+bool matrix_product_bf16_store_impl(const void* weight, std::int64_t row_bytes, int rows, int k,
+                                    const void* activation, int columns, __nv_bfloat16* out,
+                                    std::int64_t out_column_stride, cudaStream_t stream,
+                                    bool accumulate);
+
 } // namespace ninfer::ops::gguf::detail
