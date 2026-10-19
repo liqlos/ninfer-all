@@ -442,30 +442,6 @@ int test_declared_frontend_semantics() {
                                    fixture_byte_token('C'), fixture_byte_token(' '),
                                    fixture_byte_token(0xc3), fixture_byte_token(0xa9)},
               "declared NFC/ByteLevel tokenizer did not preserve case and compose Unicode");
-    auto legacy = tokenizer;
-    std::string legacy_pattern = legacy["pre_tokenizer"]["pretokenizers"][0]["pattern"]["Regex"];
-    for (const std::string marks : {std::string("\\p{L}\\p{M}"),
-                                    std::string("\\s\\p{L}\\p{M}\\p{N}")}) {
-        const std::string replacement = marks == "\\p{L}\\p{M}" ? "\\p{L}" : "\\s\\p{L}\\p{N}";
-        const std::size_t pos = legacy_pattern.find(marks);
-        legacy_pattern.replace(pos, marks.size(), replacement);
-    }
-    legacy["pre_tokenizer"]["pretokenizers"][0]["pattern"]["Regex"] = legacy_pattern;
-    const std::string merged = std::string("b") + byte_level_symbol(0xcc);
-    for (auto* item : {&tokenizer, &legacy}) {
-        (*item)["model"]["vocab"][merged] = 1500;
-        (*item)["model"]["merges"].push_back(nlohmann::json::array({"b", byte_level_symbol(0xcc)}));
-    }
-    const fi::Tokenizer modern_split(
-        {tokenizer.dump(), source.tokenizer_config_json, source.generation_config_json});
-    const fi::Tokenizer legacy_split(
-        {legacy.dump(), source.tokenizer_config_json, source.generation_config_json});
-    failures += check(modern_split.encode("b\xcc\x81") ==
-                          std::vector<int>{1500, fixture_byte_token(0x81)} &&
-                          legacy_split.encode("b\xcc\x81") ==
-                              std::vector<int>{fixture_byte_token('b'), fixture_byte_token(0xcc),
-                                               fixture_byte_token(0x81)},
-                      "legacy Qwen split pattern did not preserve byte-level BPE boundaries");
     for (const auto& [path, value] : std::vector<std::pair<const char*, nlohmann::json>>{
              {"/normalizer/type", "Lowercase"},
              {"/pre_tokenizer/pretokenizers/0/pattern/Regex", "\\w+"},

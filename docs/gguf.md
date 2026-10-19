@@ -23,8 +23,6 @@ Every product quantizes its BF16 activation to ggml's `q8_1` numbers, one scale 
 values, as llama.cpp does, and accumulates in FP32; the weights' represented values are exactly
 those of `ggml-quants.c`.
 
-For a `GateProduct`, the FP32 gate plane and BF16 destination must occupy disjoint memory ranges.
-
 - **Up to eight columns** (decode, speculative verification, small batches), the vector kernel
   (`src/ops/linear/gguf/ggml_bridge_vec.cuh`) decodes each 32-value slice of a row once into int8
   words and dots it with every column. A warp owns two rows; a `[gate; up]` pair of one type is one

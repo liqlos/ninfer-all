@@ -250,7 +250,6 @@ Json make_api_index(const std::string& model_id) {
               endpoint("GET", "/v1/models", "configured OpenAI model alias"),
               endpoint("GET", "/v1/models/{id}", "lookup of the configured alias"),
               endpoint("POST", "/v1/chat/completions", "OpenAI-style chat generation"),
-              endpoint("POST", "/tokenize", "exact OpenAI Chat prompt-token count without generation"),
               endpoint("POST", "/v1/responses", "OpenAI Responses generation, state, and SSE"),
               endpoint("POST", "/v1/responses/input_tokens",
                        "Responses prompt-token count without generation"),

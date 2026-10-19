@@ -2,16 +2,10 @@
 
 #include "ninfer/types.h"
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
 #include <cstdint>
 #include <span>
 
 namespace ninfer::qwen3_5 {
-
-inline constexpr std::uint32_t kMtpLookupMaximumSuffix = 256;
-inline constexpr std::size_t kMtpLookupMaximumHistory = 65536;
 
 // Context-lookup drafting: propose the continuation that followed the last time this n-gram
 // appeared.
@@ -79,64 +73,6 @@ inline constexpr std::size_t kMtpLookupMaximumHistory = 65536;
         return count;
     }
     return 0;
-}
-
-[[nodiscard]] inline std::uint32_t lookup_draft_longest_suffix(std::span<const TokenId> ledger,
-                                                               std::uint32_t min_ngram,
-                                                               std::uint32_t max_drafts,
-                                                               TokenId* out) {
-    if (min_ngram == 0 || max_drafts == 0 || out == nullptr || ledger.size() < 2) { return 0; }
-
-    const std::size_t size = ledger.size();
-    const std::size_t pattern_size =
-        std::min<std::size_t>(size, kMtpLookupMaximumSuffix);
-    if (min_ngram > pattern_size) { return 0; }
-
-    std::array<TokenId, kMtpLookupMaximumSuffix> pattern{};
-    std::array<std::uint32_t, kMtpLookupMaximumSuffix> prefix{};
-    for (std::size_t i = 0; i < pattern_size; ++i) { pattern[i] = ledger[size - 1 - i]; }
-    for (std::size_t i = 1; i < pattern_size; ++i) {
-        std::uint32_t matched = prefix[i - 1];
-        while (matched != 0 && pattern[matched] != pattern[i]) {
-            matched = prefix[matched - 1];
-        }
-        if (pattern[matched] == pattern[i]) { ++matched; }
-        prefix[i] = matched;
-    }
-
-    const std::size_t oldest_candidate_end =
-        size - 1 > kMtpLookupMaximumHistory ? size - 1 - kMtpLookupMaximumHistory : 0;
-    const std::size_t oldest_scan_start =
-        oldest_candidate_end > pattern_size - 1 ? oldest_candidate_end - (pattern_size - 1) : 0;
-    std::size_t end = size - 2;
-    std::uint32_t matched = 0;
-    std::uint32_t best_length = 0;
-    std::size_t best_end = 0;
-    while (true) {
-        while (matched != 0 && pattern[matched] != ledger[end]) {
-            matched = prefix[matched - 1];
-        }
-        if (pattern[matched] == ledger[end]) { ++matched; }
-        if (matched != 0) {
-            const std::size_t candidate_end = end + matched - 1;
-            if (candidate_end >= oldest_candidate_end && matched >= min_ngram &&
-                matched > best_length) {
-                best_length = matched;
-                best_end = candidate_end;
-                if (best_length == pattern_size) { break; }
-            }
-        }
-        if (end == oldest_scan_start) { break; }
-        --end;
-    }
-    if (best_length == 0) { return 0; }
-
-    const std::size_t source = best_end + 1;
-    const std::size_t available = size - source;
-    const auto count = static_cast<std::uint32_t>(
-        std::min<std::size_t>(available, max_drafts));
-    for (std::uint32_t i = 0; i < count; ++i) { out[i] = ledger[source + i]; }
-    return count;
 }
 
 } // namespace ninfer::qwen3_5

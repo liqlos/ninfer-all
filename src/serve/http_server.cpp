@@ -513,9 +513,6 @@ void HttpServer::register_routes() {
                  [this](const httplib::Request& req, httplib::Response& res) {
                      handle_chat_completions(req, res);
                  });
-    server_.Post("/tokenize", [this](const httplib::Request& req, httplib::Response& res) {
-        handle_tokenize(req, res);
-    });
     server_.Post("/v1/responses", [this](const httplib::Request& req, httplib::Response& res) {
         handle_responses(req, res);
     });

@@ -211,7 +211,6 @@ this adds a CPU synchronization point and mask transfers per round. No speedup c
 | `GET /v1/models` | configured OpenAI model alias, effective `max_model_len` (also as `context_window`), whether it accepts images, and a llama.cpp-compatible `meta` object (see [Models](#models)) |
 | `GET /v1/models/{id}` | lookup of the configured alias with the same fields |
 | `POST /v1/chat/completions` | OpenAI-style chat generation |
-| `POST /tokenize` | exact OpenAI Chat prompt-token count without generation |
 | `POST /v1/responses` | OpenAI Responses Core generation, state, typed Items, and SSE |
 | `POST /v1/responses/input_tokens` | Responses prompt-token count without generation |
 | `GET /v1/responses/{id}` | retrieve a locally stored terminal Response |

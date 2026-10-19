@@ -254,32 +254,4 @@ void HttpServer::handle_chat_completions(const httplib::Request& req, httplib::R
     }
 }
 
-void HttpServer::handle_tokenize(const httplib::Request& req, httplib::Response& res) {
-    try {
-        RequestLimits limits;
-        limits.default_max_tokens   = options_.default_max_tokens;
-        limits.first_token_logprobs = options_.first_token_logprobs;
-        OpenAIChatRequest request   = parse_chat_completion_request(parse_json_body(req), limits);
-        if (request.model.empty()) {
-            request.model = public_model_id_;
-        } else {
-            validate_openai_model(request.model, public_model_id_);
-        }
-        const int tokens = service_->count_prompt_tokens(
-            request.generation, [&req] { return client_disconnected(req); });
-        res.set_content(nlohmann::json{{"count", tokens}}.dump(), "application/json");
-    } catch (const ApiException& exception) {
-        write_openai_error(res, exception.error());
-    } catch (const std::exception& exception) {
-        operational_log_.http_failure(
-            "openai_chat_tokenize",
-            make_internal_request_failure(RequestFailurePhase::Http, exception.what()));
-        ApiError error;
-        error.status  = 500;
-        error.type    = "internal_error";
-        error.message = exception.what();
-        write_openai_error(res, error);
-    }
-}
-
 } // namespace ninfer::serve

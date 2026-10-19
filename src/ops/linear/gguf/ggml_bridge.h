@@ -31,17 +31,6 @@ enum class GgmlType : int {
     IQ1_M   = 29,
 };
 
-struct MatrixActivationPlane {
-    GgmlType type;
-    const void* data;
-};
-
-struct MatrixBf16StorePlan {
-    int J = 0;
-    int I = 0;
-    bool stream_k = false;
-};
-
 struct BlockShape {
     int elements = 0;
     int bytes    = 0;
@@ -58,23 +47,12 @@ struct BlockShape {
 
 // Columns the vector kernel takes in one launch; wider products take the matrix kernel.
 inline constexpr int kMaxVectorColumns = 8;
-inline constexpr int kMaxGateMatrixColumns = 1280;
 
 // Activation for the vector kernel: q8_1 blocks of 32 values, [columns][k / 32].
 [[nodiscard]] std::size_t vector_activation_bytes(int k, int columns);
 // `input_columns` (optional, [k]) makes element c of each column x[input_columns[c]].
 void quantize_vector_activation(const __nv_bfloat16* x, int k, int columns,
                                 const std::int32_t* input_columns, void* out, cudaStream_t stream);
-void rmsnorm_q8_1_vector_activation(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
-                                    int columns, float eps, bool unit_offset, void* out,
-                                    cudaStream_t stream);
-void rmsnorm_q8_1_matrix_activation(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
-                                    int columns, float eps, bool unit_offset, GgmlType type,
-                                    void* out, cudaStream_t stream);
-void rmsnorm_q8_1_matrix_activations(const __nv_bfloat16* x, const __nv_bfloat16* weight, int k,
-                                    int columns, float eps, bool unit_offset, GgmlType type_a,
-                                    void* out_a, GgmlType type_b, void* out_b,
-                                    cudaStream_t stream);
 
 enum class Epilogue : int {
     Store,       // out = y
@@ -103,27 +81,12 @@ void vector_swiglu(GgmlType type, const void* weight, std::int64_t row_bytes, in
                    const void* activation, int columns, __nv_bfloat16* out,
                    std::int64_t out_column_stride, cudaStream_t stream);
 
-void vector_swiglu_q8(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
-                      const void* activation, int columns, void* out, cudaStream_t stream,
-                      int warps = 4);
-
-[[nodiscard]] bool persistent_swiglu_q8_add_available(int columns, cudaStream_t stream);
-bool persistent_swiglu_q8_add(GgmlType gate_type, const void* gate_weight, std::int64_t gate_row_bytes,
-                              int intermediate_rows, int gate_k, const void* input_activation,
-                              GgmlType down_type, const void* down_weight,
-                              std::int64_t down_row_bytes, int down_rows, int down_k,
-                              void* q8_workspace, __nv_bfloat16* residual,
-                              std::int64_t residual_stride, int columns, cudaStream_t stream);
-
 // Activation for the matrix kernel, laid out for the type's scale/sum schedule. Types that share a
 // schedule share an activation, see matrix_activation_layout().
 [[nodiscard]] int matrix_activation_layout(GgmlType type);
 [[nodiscard]] std::size_t matrix_activation_bytes(int k, int columns);
 void quantize_matrix_activation(GgmlType type, const __nv_bfloat16* x, int k, int columns,
                                 const std::int32_t* input_columns, void* out, cudaStream_t stream);
-[[nodiscard]] bool quantize_matrix_activation_pair(
-    GgmlType type_a, GgmlType type_b, const __nv_bfloat16* x, int k, int columns,
-    const std::int32_t* input_columns, void* out_a, void* out_b, cudaStream_t stream);
 
 // Bytes of the stream-k fixup plane the matrix kernel may need for this product on the current
 // device (zero when the tiles divide evenly across the machine).
@@ -133,22 +96,6 @@ void quantize_matrix_activation(GgmlType type, const __nv_bfloat16* x, int k, in
 void matrix_product(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
                     const void* activation, int columns, float* out,
                     std::int64_t out_column_stride, void* fixup, cudaStream_t stream);
-
-[[nodiscard]] bool matrix_bf16_store_plan(GgmlType type, int rows, int columns,
-                                          MatrixBf16StorePlan& plan);
-[[nodiscard]] bool matrix_product_bf16_store(GgmlType type, const void* weight,
-                                             std::int64_t row_bytes, int rows, int k,
-                                             const void* activation, int columns,
-                                             __nv_bfloat16* out,
-                                             std::int64_t out_column_stride,
-                                             cudaStream_t stream, bool accumulate = false);
-[[nodiscard]] bool matrix_bf16_gate_store_plan(GgmlType type, int rows, int columns,
-                                               MatrixBf16StorePlan& plan);
-[[nodiscard]] bool matrix_product_bf16_gate_store(
-    GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
-    const void* activation, int columns, __nv_bfloat16* out,
-    std::int64_t out_column_stride, const float* gate, std::int64_t gate_column_stride,
-    cudaStream_t stream);
 
 // out <- epilogue(in) for an FP32 [rows, columns] plane whose columns are `in_column_stride` apart.
 void store_plane(const float* in, std::int64_t in_column_stride, int rows, int columns,
