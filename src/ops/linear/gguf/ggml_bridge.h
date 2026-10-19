@@ -58,6 +58,7 @@ struct BlockShape {
 
 // Columns the vector kernel takes in one launch; wider products take the matrix kernel.
 inline constexpr int kMaxVectorColumns = 8;
+inline constexpr int kMaxGateMatrixColumns = 1280;
 
 // Activation for the vector kernel: q8_1 blocks of 32 values, [columns][k / 32].
 [[nodiscard]] std::size_t vector_activation_bytes(int k, int columns);

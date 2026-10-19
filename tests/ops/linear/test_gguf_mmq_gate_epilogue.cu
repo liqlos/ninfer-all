@@ -454,9 +454,8 @@ bool invalid_spans_and_alias_do_not_write(int rows, int columns, std::uint32_t s
     return true;
 }
 
-bool full_swiglu_wrapper_case(std::uint32_t seed) {
+bool full_swiglu_wrapper_case(int columns, std::uint32_t seed) {
     constexpr int k = 5120;
-    constexpr int columns = 1024;
     constexpr int parent_rows = 34816;
     constexpr int rows = parent_rows / 2;
     const auto host_weight = make_q4_weight(parent_rows, k, seed + 31);
@@ -537,7 +536,14 @@ int main() {
             !compare_case(128, 1024, false, false, 2, false, 0xE195u) ||
             !gather_falls_back(synthetic_rows, 17, 0xE194u) ||
             !invalid_spans_and_alias_do_not_write(synthetic_rows, 17, 0xE196u) ||
-            !full_swiglu_wrapper_case(0xE197u)) {
+            !full_swiglu_wrapper_case(1024, 0xE197u) ||
+            !compare_case(17408, 1279, false, false, 7, true, 0xE198u) ||
+            !compare_case(17408, 1280, false, false, 7, true, 0xE199u) ||
+            !compare_case(17408, 1280, true, true, 9, true, 0xE19Au) ||
+            !compare_case(17408, 1281, false, false, 2, false, 0xE19Bu) ||
+            !compare_case(128, 247, false, false, 2, false, 0xE19Cu) ||
+            !full_swiglu_wrapper_case(1280, 0xE19Du) ||
+            !full_swiglu_wrapper_case(247, 0xE19Eu)) {
             return 1;
         }
         std::cout << "Q4 MMQ GateProduct direct, prepared, graph, and fallback checks passed\n";

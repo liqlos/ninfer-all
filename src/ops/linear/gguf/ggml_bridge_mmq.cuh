@@ -3,7 +3,7 @@
 // Host side of ggml's integer tensor-core matrix kernel (mmq.cuh launch_mul_mat_q), without ggml's
 // backend context: the caller owns the activation, the FP32 output and the stream-k fixup plane.
 
-#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y) || defined(NINFER_GGUF_Q4_MMQ_ASYNC_X)
+#if defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y) || defined(NINFER_GGUF_Q4_MMQ_ASYNC_X) || defined(NINFER_GGUF_Q6_MMQ_ASYNC_Y)
 #include "../../common/memory.cuh"
 #endif
 
@@ -317,7 +317,7 @@ bool matrix_product_bf16_gate_store_impl(
     constexpr int block_bytes = ggml_cuda_type_traits<type>::bs;
     if (type != GGML_TYPE_Q4_K || weight == nullptr || activation == nullptr || out == nullptr ||
         gate == nullptr || k <= 0 || k % 256 != 0 || rows <= 0 || rows % 128 != 0 ||
-        columns <= kMaxVectorColumns || columns > 1024 || out_column_stride < rows ||
+        columns <= kMaxVectorColumns || columns > kMaxGateMatrixColumns || out_column_stride < rows ||
         out_column_stride > INT_MAX || gate_column_stride < rows || gate_column_stride > INT_MAX ||
         row_bytes / block_bytes > INT_MAX ||
         (reinterpret_cast<std::uintptr_t>(weight) & 15U) != 0U ||

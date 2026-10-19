@@ -632,7 +632,7 @@ bool matrix_product_bf16_store(GgmlType type, const void* weight, std::int64_t r
 bool matrix_bf16_gate_store_plan(GgmlType type, int rows, int columns,
                                  MatrixBf16StorePlan& plan) {
 #if defined(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
-    if (type != GgmlType::Q4_K) { return false; }
+    if (type != GgmlType::Q4_K || columns > kMaxGateMatrixColumns) { return false; }
     int J = 0;
     int I = 0;
     bool stream_k = false;
