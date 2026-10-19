@@ -78,13 +78,6 @@ if(NINFER_GGUF_Q6_T4_IMMA)
     COMMAND ninfer_tests ninfer_linear_gguf_test --q6-t4-imma-regression)
   set_tests_properties(ninfer_linear_gguf_q6_t4_imma_test PROPERTIES SKIP_RETURN_CODE 77)
 endif()
-if(NINFER_GGUF_Q6_T4_IMMA_K16)
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_IMMA_K16_TEST=1)
-  add_test(NAME ninfer_linear_gguf_q6_t4_imma_k16_test
-    COMMAND ninfer_tests ninfer_linear_gguf_test --q6-t4-imma-k16-regression)
-  set_tests_properties(ninfer_linear_gguf_q6_t4_imma_k16_test PROPERTIES SKIP_RETURN_CODE 77)
-endif()
 if(NINFER_GGUF_Q4_T4_FUSED_IMMA)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST=1)

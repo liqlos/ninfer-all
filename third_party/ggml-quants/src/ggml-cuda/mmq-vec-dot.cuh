@@ -1132,7 +1132,11 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
     const int i0 = (threadIdx.y / ntx) * (ntx*tile_A::I);
 
     tile_A   A[ntx][8];
+#if defined(NINFER_GGUF_Q6_MMQ_PACKED_SCALES) && __CUDA_ARCH__ == 860
+    int    scA[ntx][tile_C::ne/2][2];
+#else
     int    scA[ntx][tile_C::ne/2][8];
+#endif
     float   dA[ntx][tile_C::ne/2];
 
 #pragma unroll
@@ -1154,12 +1158,16 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
                 const int i = i0 + n*tile_C::I + tile_C::get_i(2*l);
 
                 const int      sc_packed = x_sc[i*sram_stride + k0/16];
+#if defined(NINFER_GGUF_Q6_MMQ_PACKED_SCALES) && __CUDA_ARCH__ == 860
+                scA[n][l][k01/16] = sc_packed;
+#else
                 const int8_t * sc        = (const int8_t *) &sc_packed;
 
 #pragma unroll
                 for (int ksc = 0; ksc < sizeof(int); ++ksc) {
                     scA[n][l][k01/4 + ksc] = sc[ksc];
                 }
+#endif
             }
         }
 
@@ -1199,7 +1207,15 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 
 #pragma unroll
                 for (int l = 0; l < tile_C::ne; ++l) {
+#if defined(NINFER_GGUF_Q6_MMQ_PACKED_SCALES) && __CUDA_ARCH__ == 860
+                    const unsigned packed = static_cast<unsigned>(scA[n][l/2][k01/16]);
+                    const int shift = 8 * ((k01/4) & 3);
+                    const int scale0 = static_cast<int>(static_cast<int8_t>(packed >> shift));
+                    const int scale1 = static_cast<int>(static_cast<int8_t>(packed >> (shift + 8)));
+                    tmp[n][l] += (C[0].x[l]*scale0 + C[1].x[l]*scale1)*dB[l%2];
+#else
                     tmp[n][l] += (C[0].x[l]*scA[n][l/2][k01/4 + 0] + C[1].x[l]*scA[n][l/2][k01/4 + 1])*dB[l%2];
+#endif
                 }
             }
         }
