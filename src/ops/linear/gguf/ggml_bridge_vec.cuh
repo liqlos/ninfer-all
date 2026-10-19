@@ -66,6 +66,18 @@ __device__ __forceinline__ int dot4(const int* w, const int* a, int acc) {
     return acc;
 }
 
+__device__ __forceinline__ int dot4_short_chain(const int* w, const int* a, int acc) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+    int even = ggml_cuda_dp4a(w[0], a[0], 0);
+    int odd = ggml_cuda_dp4a(w[1], a[1], 0);
+    even = ggml_cuda_dp4a(w[2], a[2], even);
+    odd = ggml_cuda_dp4a(w[3], a[3], odd);
+    return acc + even + odd;
+#else
+    return dot4(w, a, acc);
+#endif
+}
+
 __device__ __forceinline__ int sum4(const int* a) {
     int acc = 0;
 #pragma unroll
@@ -216,6 +228,18 @@ struct Decoder<GGML_TYPE_Q4_K> {
         return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
 #else
         return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
+#endif
+    }
+    __device__ __forceinline__ static float dot_short_chain(const Slice& s, const int* a, float d,
+                                                            float sum) {
+#if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
+        const int dot_lo = dot4_short_chain(s.w, a, 0);
+        const int dot_hi = dot4_short_chain(s.w + 4, a + 4, 0);
+        return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
+#else
+        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4,
+                                                    dot4_short_chain(s.w, a, 0))) -
+               s.f[1] * sum;
 #endif
     }
 };
@@ -1134,7 +1158,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
@@ -1175,7 +1209,15 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int r = 0; r < kRows; ++r) {
 #pragma unroll
                     for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                            acc[r][j] += D::dot_short_chain(staged[it & 1][r], a[j], d[j], sum[j]);
+                        } else {
+                            acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+                        }
+#else
                         acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+#endif
                     }
                 }
             }
@@ -1201,7 +1243,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
         const auto prefetch = [&](int it, int buffer) {

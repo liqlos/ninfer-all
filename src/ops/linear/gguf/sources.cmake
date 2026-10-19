@@ -1,6 +1,14 @@
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
+option(NINFER_GGUF_DP4A_SHORT_CHAINS "Split SM86 generic Q4_K K5120 T4 vector dot chains" OFF)
+if(NINFER_GGUF_DP4A_SHORT_CHAINS)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF short DP4A chains require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DP4A_SHORT_CHAINS=1)
+endif()
 option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
@@ -378,3 +386,12 @@ target_compile_options(ninfer_ggml_quants PRIVATE
 target_link_libraries(ninfer_ggml_quants PRIVATE CUDA::cudart CUDA::cublas)
 target_link_libraries(ninfer_ops PRIVATE ninfer_ggml_quants)
 target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp")
+
+option(NINFER_GGUF_Q6_MMQ_A_X4 "Load adjacent SM86 Q6 MMQ A fragments with one x4 instruction" OFF)
+if(NINFER_GGUF_Q6_MMQ_A_X4)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q6 MMQ A x4 loads require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_A_X4=1)
+endif()
