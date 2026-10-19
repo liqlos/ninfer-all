@@ -1097,14 +1097,12 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
 template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true,
-          bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>(),
-          bool HeadOccupancyFive = false>
-#if defined(NINFER_GGUF_Q6_T4_HEAD_OCCUPANCY_FIVE) && __CUDA_ARCH__ == 860
-__launch_bounds__(kVecWarps * 32, HeadOccupancyFive ? 5 : 1)
+          bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
+#if defined(NINFER_GGUF_Q6_T4_HEAD_BOUND)
+__device__ __forceinline__ void kernel_body(VecArgs p) {
 #else
-__launch_bounds__(kVecWarps * 32)
+__launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 #endif
-__global__ void kernel(VecArgs p) {
     using D = std::conditional_t<Baseline, BaselineDecoder<type>, Decoder<type>>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
     constexpr int kPerBlock = D::kBlockElems / 32;
@@ -1350,6 +1348,18 @@ __global__ void kernel(VecArgs p) {
     }
 }
 
+#if defined(NINFER_GGUF_Q6_T4_HEAD_BOUND)
+template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true,
+          bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
+__launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
+    kernel_body<type, T, Fused, KS, Prefetch2, Baseline, Rows>(p);
+}
+
+__launch_bounds__(kVecWarps * 32, 5) __global__ void kernel_q6_t4_head_bound(VecArgs p) {
+    kernel_body<GGML_TYPE_Q6_K, 4, false, 0, true, false, 2>(p);
+}
+#endif
+
 template <ggml_type type, int T, bool Fused, int KS>
 void launch_baseline(const VecArgs& args, cudaStream_t stream) {
     static const int resident = [] {
@@ -1368,19 +1378,19 @@ void launch_baseline(const VecArgs& args, cudaStream_t stream) {
 
 template <ggml_type type, int T, bool Fused, int KS>
 void launch_fallback(const VecArgs& args, cudaStream_t stream) {
-#if defined(NINFER_GGUF_Q6_T4_HEAD_OCCUPANCY_FIVE)
+#if defined(NINFER_GGUF_Q6_T4_HEAD_BOUND)
     if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused && KS == 0) {
         if (device_facts().cc == 860 && args.k == 5120) {
             static const int resident = [] {
                 int blocks = 0;
                 check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                          &blocks, kernel<type, T, false, 0, true, false, 2, true>, kVecWarps * 32, 0),
+                          &blocks, kernel_q6_t4_head_bound, kVecWarps * 32, 0),
                       "Q6 head occupancy schedule");
                 return std::max(blocks, 1);
             }();
             const int groups = (args.rows + kVecWarps * 2 - 1) / (kVecWarps * 2);
             const int blocks = std::min(groups, resident * device_facts().sm_count);
-            kernel<type, T, false, 0, true, false, 2, true><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            kernel_q6_t4_head_bound<<<blocks, kVecWarps * 32, 0, stream>>>(args);
             check(cudaGetLastError(), "Q6 head occupancy launch");
             return;
         }

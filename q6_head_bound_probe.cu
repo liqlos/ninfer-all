@@ -12,9 +12,9 @@
 #include <stdexcept>
 #define NINFER_GGUF_Q6_COOPERATIVE_DECODE 1
 #define NINFER_GGUF_Q4_COOPERATIVE_DECODE 1
-#include "src/ops/linear/gguf/head_occupancy_five_off.cuh"
-#define NINFER_GGUF_Q6_T4_HEAD_OCCUPANCY_FIVE 1
-#include "src/ops/linear/gguf/head_occupancy_five_on.cuh"
+#include "src/ops/linear/gguf/head_bound_off.cuh"
+#define NINFER_GGUF_Q6_T4_HEAD_BOUND 1
+#include "src/ops/linear/gguf/head_bound_on.cuh"
 using namespace ninfer::ops::gguf::detail;
 namespace ninfer::ops::gguf::detail {
 const DeviceFacts& device_facts() {
@@ -66,11 +66,11 @@ template<int T,ggml_type Type=GGML_TYPE_Q6_K,bool Fused=false> static void run(c
     ck(cudaMalloc(&dw,w.size()));ck(cudaMalloc(&dq,q.size()));ck(cudaMalloc(&dd,ds.size()*sizeof(half2)));ck(cudaMalloc(&da,(std::size_t(rows)*T+32)*2));ck(cudaMalloc(&db,(std::size_t(rows)*T+32)*2));
     ck(cudaMemcpy(dw,w.data(),w.size(),cudaMemcpyHostToDevice));ck(cudaMemcpy(dq,q.data(),q.size(),cudaMemcpyHostToDevice));ck(cudaMemcpy(dd,ds.data(),ds.size()*sizeof(half2),cudaMemcpyHostToDevice));
     ck(cudaMemset(da,0xa5,(std::size_t(rows)*T+32)*2));ck(cudaMemset(db,0xa5,(std::size_t(rows)*T+32)*2));
-    cudaFuncAttributes fa,fb;ck(cudaFuncGetAttributes(&fa,off_probe::vec::kernel<Type,T,Fused,(Type==GGML_TYPE_Q4_K?5120:0)>));if(k==5120){ck(cudaFuncGetAttributes(&fb,on_probe::vec::kernel<Type,T,Fused,0,true,false,2,true>));}else{ck(cudaFuncGetAttributes(&fb,on_probe::vec::kernel<Type,T,Fused,0>));}
+    cudaFuncAttributes fa,fb;ck(cudaFuncGetAttributes(&fa,off_probe::vec::kernel<Type,T,Fused,(Type==GGML_TYPE_Q4_K?5120:0)>));if(k==5120){ck(cudaFuncGetAttributes(&fb,on_probe::vec::kernel_q6_t4_head_bound));}else{ck(cudaFuncGetAttributes(&fb,on_probe::vec::kernel<Type,T,Fused,0>));}
     int resident;ck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&resident,off_probe::vec::kernel<Type,T,Fused,(Type==GGML_TYPE_Q4_K?5120:0)>,128,0));
     cudaDeviceProp prop;ck(cudaGetDeviceProperties(&prop,0));if(prop.major!=8||prop.minor!=6)throw std::runtime_error("SM86 required");
     const int grid=std::min((rows+(Fused?4:8)-1)/(Fused?4:8),resident*prop.multiProcessorCount);
-    int on_resident;if(k==5120){ck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&on_resident,on_probe::vec::kernel<Type,T,Fused,0,true,false,2,true>,128,0));}else{ck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&on_resident,on_probe::vec::kernel<Type,T,Fused,0>,128,0));}
+    int on_resident;if(k==5120){ck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&on_resident,on_probe::vec::kernel_q6_t4_head_bound,128,0));}else{ck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&on_resident,on_probe::vec::kernel<Type,T,Fused,0>,128,0));}
     const int on_grid=std::min((rows+(Fused?4:8)-1)/(Fused?4:8),on_resident*prop.multiProcessorCount);
     std::printf("{\"kind\":\"native_grid\",\"shape\":\"%s\",\"off_grid\":%d,\"on_grid\":%d}\n",tag,grid,on_grid);
     VecArgs a{dw,std::int64_t(k/256)*(Type==GGML_TYPE_Q4_K?144:210),rows,k,dq,dd,{da,nullptr,rows,ninfer::ops::gguf::Epilogue::Store,nullptr,0}};VecArgs b=a;b.out.bf16=db;
