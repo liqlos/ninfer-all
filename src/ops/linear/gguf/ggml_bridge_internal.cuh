@@ -12,6 +12,7 @@
 #include "../../common/silu.h"
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -22,6 +23,7 @@ struct DeviceFacts {
     int cc         = 0; // ggml's compute capability: 100 * major + 10 * minor
     int sm_count   = 0;
     std::size_t shared_per_block_optin = 0;
+    std::array<int, 3> max_grid{};
 };
 
 [[nodiscard]] const DeviceFacts& device_facts();
@@ -148,10 +150,10 @@ __device__ __forceinline__ void vec_store(const VecStore& out, int row, int colu
     out.bf16[at] = __float2bfloat16(value);
 }
 
-template <ggml_type type>
+template <ggml_type type, typename Dst = float, bool accumulate = false>
 void matrix_product_impl(const void* weight, std::int64_t row_bytes, int rows, int k,
-                         const void* activation, int columns, float* out,
+                         const void* activation, int columns, Dst* out,
                          std::int64_t out_column_stride, void* fixup, cudaStream_t stream,
-                         bool tail);
+                         bool tail, float* partial = nullptr);
 
 } // namespace ninfer::ops::gguf::detail
