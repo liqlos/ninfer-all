@@ -263,7 +263,8 @@ std::size_t gguf_project_workspace_bytes(std::span<const GgufShape> shapes,
 }
 
 void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
-                  WorkspaceArena& workspace, cudaStream_t stream) {
+                  WorkspaceArena& workspace, cudaStream_t stream, bool* used_mmq_store) {
+    if (used_mmq_store != nullptr) { *used_mmq_store = false; }
     require_activation(x, "gguf product");
     if (products.empty()) { return; }
     for (const auto& p : products) { require_product(x, p); }
@@ -349,6 +350,20 @@ void gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 activations.push_back({layout, w.input_columns, data});
                 found = activations.end() - 1;
             }
+#if defined(NINFER_GGUF_MMQ_STORE_FUSION)
+            if (p.f32 == nullptr && w.input_columns == nullptr &&
+                (p.epilogue == GgufEpilogue::Store || p.epilogue == GgufEpilogue::Accumulate) &&
+                (w.qtype == QType::GGUF_Q4_K || w.qtype == QType::GGUF_Q6_K)) {
+                const gguf::VectorOutput destination = output(p, 0);
+                if (gguf::matrix_product_bf16_store(type, w.qdata, row_bytes(w), w.n, k,
+                                                    found->data, t, destination.bf16,
+                                                    destination.column_stride, stream,
+                                                    p.epilogue == GgufEpilogue::Accumulate)) {
+                    if (used_mmq_store != nullptr) { *used_mmq_store = true; }
+                    continue;
+                }
+            }
+#endif
             gguf::matrix_product(type, w.qdata, row_bytes(w), w.n, k, found->data, t, out, stride,
                                  fixup, stream, k % 256 != 0);
         } else if (t <= kDequantizedVectorColumns) {

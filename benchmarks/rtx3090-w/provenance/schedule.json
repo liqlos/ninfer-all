@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "protocol_id": "historic-w-b0-20pair-20261017",
+  "blocks": [
+    {
+      "block_id": "hw20-block-01",
+      "block_index": 0,
+      "pairs": [
+        {
+          "pair_id": "hw20b01p01",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p01-b0",
+          "candidate_tag": "hw20-20261017-p01-w"
+        },
+        {
+          "pair_id": "hw20b01p02",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p02-b0",
+          "candidate_tag": "hw20-20261017-p02-w"
+        },
+        {
+          "pair_id": "hw20b01p03",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p03-b0",
+          "candidate_tag": "hw20-20261017-p03-w"
+        },
+        {
+          "pair_id": "hw20b01p04",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p04-b0",
+          "candidate_tag": "hw20-20261017-p04-w"
+        }
+      ]
+    },
+    {
+      "block_id": "hw20-block-02",
+      "block_index": 1,
+      "pairs": [
+        {
+          "pair_id": "hw20b02p01",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p05-b0",
+          "candidate_tag": "hw20-20261017-p05-w"
+        },
+        {
+          "pair_id": "hw20b02p02",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p06-b0",
+          "candidate_tag": "hw20-20261017-p06-w"
+        },
+        {
+          "pair_id": "hw20b02p03",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p07-b0",
+          "candidate_tag": "hw20-20261017-p07-w"
+        },
+        {
+          "pair_id": "hw20b02p04",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p08-b0",
+          "candidate_tag": "hw20-20261017-p08-w"
+        }
+      ]
+    },
+    {
+      "block_id": "hw20-block-03",
+      "block_index": 2,
+      "pairs": [
+        {
+          "pair_id": "hw20b03p01",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p09-b0",
+          "candidate_tag": "hw20-20261017-p09-w"
+        },
+        {
+          "pair_id": "hw20b03p02",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p10-b0",
+          "candidate_tag": "hw20-20261017-p10-w"
+        },
+        {
+          "pair_id": "hw20b03p03",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p11-b0",
+          "candidate_tag": "hw20-20261017-p11-w"
+        },
+        {
+          "pair_id": "hw20b03p04",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p12-b0",
+          "candidate_tag": "hw20-20261017-p12-w"
+        }
+      ]
+    },
+    {
+      "block_id": "hw20-block-04",
+      "block_index": 3,
+      "pairs": [
+        {
+          "pair_id": "hw20b04p01",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p13-b0",
+          "candidate_tag": "hw20-20261017-p13-w"
+        },
+        {
+          "pair_id": "hw20b04p02",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p14-b0",
+          "candidate_tag": "hw20-20261017-p14-w"
+        },
+        {
+          "pair_id": "hw20b04p03",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p15-b0",
+          "candidate_tag": "hw20-20261017-p15-w"
+        },
+        {
+          "pair_id": "hw20b04p04",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p16-b0",
+          "candidate_tag": "hw20-20261017-p16-w"
+        }
+      ]
+    },
+    {
+      "block_id": "hw20-block-05",
+      "block_index": 4,
+      "pairs": [
+        {
+          "pair_id": "hw20b05p01",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p17-b0",
+          "candidate_tag": "hw20-20261017-p17-w"
+        },
+        {
+          "pair_id": "hw20b05p02",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p18-b0",
+          "candidate_tag": "hw20-20261017-p18-w"
+        },
+        {
+          "pair_id": "hw20b05p03",
+          "pair_order": "candidate-first",
+          "baseline_tag": "hw20-20261017-p19-b0",
+          "candidate_tag": "hw20-20261017-p19-w"
+        },
+        {
+          "pair_id": "hw20b05p04",
+          "pair_order": "baseline-first",
+          "baseline_tag": "hw20-20261017-p20-b0",
+          "candidate_tag": "hw20-20261017-p20-w"
+        }
+      ]
+    }
+  ]
+}

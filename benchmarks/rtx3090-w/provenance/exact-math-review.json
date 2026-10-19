@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "review_kind": "read-only historical exact-W source and evidence review",
+  "reviewed_at": "2026-10-17",
+  "source_head": "eb82d92d37c7e3fd8dcaef74a4286158c66808f8",
+  "candidate_image": "sha256:0400a382e1b5ce533cd169379afe3c3b99f73c908b8168f9e554bb03616f0c5b",
+  "candidate_executable_sha256": "ff5effe98b81194b936171aff99cdcef2d5a70ba101f5b9382dfba98d6bde9ad",
+  "baseline_image": "sha256:872466f1af777b597d94e57635b0768809bcb37ed1ab9a167646c3f02a5b8cb9",
+  "enabled_options": {
+    "NINFER_GGUF_Q4_COOPERATIVE_DECODE": "ON",
+    "NINFER_GGUF_Q6_COOPERATIVE_DECODE": "ON",
+    "NINFER_GGUF_MMQ_STORE_FUSION": "ON",
+    "NINFER_GGUF_SWIGLU_Q8_WARPS": "4"
+  },
+  "reviewed_git_blob_sha256": {
+    "src/ops/linear/gguf/ggml_bridge_vec.cuh": "ed8289b51b18dde872e5c05124c3840159d5b2ecb14dfb6ec3d7a098835a0b16",
+    "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "d754e5e665ca8c1e16530ebb28d2cddec047e263cbe75a16895e41b062c1bab3",
+    "src/ops/linear/gguf/ggml_bridge_internal.cuh": "4cccc413e878aea3c9d00f9a069083566c57d613eb6880660928c314360320c1",
+    "src/ops/linear/gguf/ggml_bridge.cu": "30aa10eec306a4fb961bf4c192509f1c5c815644767a4b0366dc248767eb0526",
+    "src/ops/linear/gguf/gguf_linear.cpp": "f267601ba9914f7282e90c88b554b499c919b9db9a01032a696376e8593660a1",
+    "src/ops/linear/gguf/sources.cmake": "53227cdb7406cd65c1427b6e82aa354233fd07cd867d8a6ccacbe8006bd19367",
+    "src/ops/linear/gguf/ggml_vec_q4_k.cu": "60397e66c7b260e68b76c276975e199a1ced47fb8a2a12dadc88cfdfdb23b2e4",
+    "src/ops/linear/gguf/ggml_vec_q6_k.cu": "eba1985305f194fc2aa8ccc11541fb973d9c69be220d197fcb4f078cd7b2c6eb",
+    "src/ops/linear/gguf/ggml_mmq_q4_k.cu": "c308901c63c7ccb0d0929c44924e938a30b4347de41a35f1f178a488f887c914",
+    "src/ops/linear/gguf/ggml_mmq_q6_k.cu": "acdd2392ebef82828c1050d339c05962bf09ac933d41b15372b39ee82d43d594",
+    "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "ca3b03f4618b427c955ffa6950d53b44940c005b82ec3001e6b76ddfc10ff2b9"
+  },
+  "evidence_file_sha256": {
+    "results/lowlevel-final-b0-native-balanced.json": "767fd184c38ebad5bebe42ca68ffc3db671de9bb753b22d8d085cd3206cf78ae",
+    "results/lowlevel-final-native-p1-identity.json": "a410adc219639339f3a7f6be5c808f3b3c77ab542ee6fab473299d27a60f349b"
+  },
+  "findings": [
+    {
+      "area": "Q4 cooperative decode",
+      "result": "No source-level mapping or arithmetic-order defect found. Each lane has sub=lane%8; XOR-1 with shuffle width 8 exchanges the complementary uint4 half within the same 8-lane block subgroup. Selection reconstructs the same a0/a1 words as the non-cooperative branch before unchanged nibble extraction, scale/min arithmetic, and dot expression."
+    },
+    {
+      "area": "Q6 cooperative decode",
+      "result": "No source-level mapping or arithmetic-order defect found. Four-lane groups correspond to q=0..3. High words are sourced from lane j; low words from (q&1)+2*(j&1), matching ql pointer parity and base+word addressing. Nibble extraction, signed 6-bit conversion, scale application, and dot expression are unchanged. Source-level per-lane word loads fall from 16 to 6 per decoded slice, with added shuffles; this does not establish reduced DRAM traffic."
+    },
+    {
+      "area": "MMQ BF16 store",
+      "result": "Direct path is gated to SM86, Q4_K/Q6_K, rows divisible by 128, columns above vector limit, valid K/row-byte/output-stride geometry, and selected launch with no stream-K fixup. It writes the same float MMQ sum through __float2bfloat16; accumulate reads existing BF16, converts to float, adds, and rounds back, matching store_plane arithmetic order. Unsupported conditions return false or reject and caller retains normal float-plane path."
+    },
+    {
+      "area": "Empirical winner record",
+      "result": "Referenced balanced result records 3 complete launch pairs (2 baseline-first, 1 candidate-first), 36 requests per arm, all listed identity/workload/output-hash gates passed, pair improvements 5.1128716%, 5.2096141%, 5.2820813% (mean 5.2015223%)."
+    }
+  ],
+  "static_scope": "Reviewed pinned git source and listed receipts only; no source edits.",
+  "limitations": [
+    "Static review is not an exhaustive proof of every runtime path or architecture.",
+    "Only recorded corpus/output hashes and runtime gates are covered by the evidence artifact.",
+    "Three independent launch pairs are too few for a stable high-confidence population interval; resampling these three deltas understates uncertainty.",
+    "Original B0 image has no captured CMake option receipt, so comparison does not identify causal per-flag contributions.",
+    "No build, Docker, WSL, GPU timing, or source modification was performed."
+  ]
+}

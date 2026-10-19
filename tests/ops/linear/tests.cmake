@@ -62,3 +62,10 @@ ninfer_add_op_test(ninfer_linear_bf16_a16_test
 ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
+
+ninfer_add_op_test(ninfer_linear_gguf_mmq_store_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
+  LIBRARIES ninfer_ops)
+if(NINFER_GGUF_MMQ_STORE_FUSION)
+  target_compile_definitions(ninfer_linear_gguf_mmq_store_test PRIVATE NINFER_GGUF_MMQ_STORE_FUSION=1)
+endif()

@@ -7,6 +7,9 @@ from one GPU, or from up to eight as pipeline stages on Linux. The same chat mod
 [typed decisions](docs/serving.md#typed-decisions): choice, yes/no and score questions about a
 state, each option with its probability, through TypeSafe's System One and OpenAI's Decisions APIs.
 
+Opt-in SM86 Q4_K/Q6_K kernels: [options and validation](docs/performance-rtx3090-w.md),
+[historical measurements](benchmarks/rtx3090-w/README.md).
+
 [Quick start](#quick-start) · [Supported GPUs](#supported-gpus) · [Models](#artifacts) ·
 [Highlights](#highlights) · [Features](#features) · [Docker](#docker) · [Building](#building) ·
 [Documentation](docs/README.md)

@@ -7,6 +7,9 @@ marked `NInfer:` in the source. Q4_0's DP4A matrix product (`mmq-vec-dot.cuh`, t
 without integer tensor cores such as Tesla V100) takes its -8 offset term from the quantized
 activation instead of the block's FP16 sum, which overflows once 32 activations sum past 65504.
 
+The optional Q4_K/Q6_K MMQ BF16 epilogue in `ggml-cuda/mmq.cuh` writes outputs and residual
+accumulations directly to BF16; FP32 accumulation and final BF16 rounding remain unchanged.
+
 NInfer compiles ggml's integer tensor-core matrix multiplication (`ggml-cuda/mmq.cuh`) and its
 dequantizers through the bridge in `src/ops/linear/gguf/`, as a separate archive, and keeps only the
 headers that code includes. Products of up to eight tokens use NInfer's own kernel
