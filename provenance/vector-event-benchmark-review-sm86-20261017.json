@@ -1,0 +1,74 @@
+{
+  "artifact": "vector-event-benchmark-review-sm86",
+  "date": "2026-10-17",
+  "worktree": "C:/AI/tuning/ninfer-lab-20261015/work-target16-vector-bench",
+  "source_head": "5817c5564e668638fd281eceb337a12cafda40f0",
+  "base_revision": "5817c5564e668638fd281eceb337a12cafda40f0",
+  "input_manifest": {
+    "path": "provenance/vector-event-benchmark-review-input-20261017-r2.json",
+    "sha256": "547cc0ea030cc834fea303fcb52bb00ce910c4b08b9baefbcecf18c12205cef4"
+  },
+  "status": "PASS_STATIC",
+  "scope": "Read-only review of candidate-vs-direct-vector CUDA-event benchmark, baseline helper path, production-route preservation, and source/build bindings.",
+  "reviewed_files": [
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_test.h",
+      "bytes": 1071,
+      "sha256": "da05aaeb5ac287abcf3efdf0791d5c41091223da7bc3636bd240846bff19a9c1",
+      "manifest_match": true
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_vec.cuh",
+      "bytes": 52435,
+      "sha256": "26949cb14db388eab6d60575d928770c09c911b0cb09c046aec124265b10c02a",
+      "manifest_match": true
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_vec_q4_k.cu",
+      "bytes": 2265,
+      "sha256": "b65b58eeb5708af58dd0c1717da32367d2bd559ca8f5e420066cb53202a57550",
+      "manifest_match": true
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_vec_q6_k.cu",
+      "bytes": 1821,
+      "sha256": "98011c18055b8dd20ab4a870e8caf478c4e0342869ab35a56146be5a05e64138",
+      "manifest_match": true
+    },
+    {
+      "path": "tests/ops/linear/test_gguf.cpp",
+      "bytes": 131817,
+      "sha256": "61b3471f4f829f0d7642aa58121c2054a91844e17f1238292b6622c45cc05b96",
+      "manifest_match": true
+    },
+    {
+      "path": "provenance/vector-event-benchmark-review-input-20261017.json",
+      "bytes": 3656,
+      "sha256": "a4e6dce90b9a1a7efa304ba852c9016268ec6c0f180bc29112e6d3fc4e16091f",
+      "manifest_match": true
+    }
+  ],
+  "findings": [],
+  "assessment": {
+    "baseline": {
+      "launch": "Direct generic kernel; two output rows per warp; excludes public-route dispatch, fused-warp specialization, IMMA, and async prefetch pipeline.",
+      "decoder": "Independent Q4_K/Q6_K decoder preserves only the existing cooperative-decode macro. Other candidate decode-load macros are bypassed. Q6 baseline stores block-D times two independent int8 scales for each 16-value group; it computes activation-d*(f0*dotlo+f1*dothi), without the Q4 min/sum term.",
+      "static_k": "Q6 baseline uses KS=5120 only when NINFER_GGUF_Q6_STATIC_K is enabled, K=5120, compute capability is 8.6, and T is 1 or 4; otherwise KS=0, matching the public W route.",
+      "fused_q4": "Candidate and baseline both perform fused Q4 SwiGLU in one vector kernel launch."
+    },
+    "route_preservation": "Candidate continues through public vector_product/vector_swiglu dispatch. The direct baseline calls the templated generic vector kernel with Baseline=true and Rows=2; it bypasses Q4 fused warp-pair and IMMA candidate dispatch, while preserving the source-level cooperative Q4/Q6 decode macros. The Q6 baseline selects KS=5120 only for Q6_STATIC_K + K5120 + SM86 + T in {1,4}; other cases use KS=0.",
+    "default_behavior": "The normal public dispatch keeps the fused-warp-pair selection in launch(); the refactor moves it out of the baseline helper, so the new baseline does not alter which route public inference takes. The new event benchmark is an explicit test CLI option and no CMake profile option/default was changed.",
+    "build_binding": "Q4/Q6 .cu sources already belong to ninfer_ggml_quants; the direct baseline helper definitions are in those compiled TUs, declarations are included by test_gguf.cpp, and ninfer_linear_gguf_test already links ninfer_ops. Cooperative decode and static-K definitions are applied per source in the existing GGUF sources.cmake."
+  },
+  "evidence": [
+    "All six reviewed file hashes and byte lengths matched revision-2 manifest.",
+    "git diff --check passed.",
+    "Static inspection only; no build, tests, Docker, profiling, GPU work, or timing was performed."
+  ],
+  "limitations": [
+    "No emitted-code/resource proof or execution result.",
+    "CUDA-event windows measure warm-cache operator work, not host launch overhead or full-model latency.",
+    "Exact BF16 output comparison is present as a runtime gate but has not been executed.",
+    "The benchmark compares the public candidate route against a direct generic baseline; it does not by itself isolate a single enabled candidate optimization."
+  ]
+}

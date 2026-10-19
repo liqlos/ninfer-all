@@ -1,0 +1,136 @@
+{
+  "artifact": "vector-event-benchmark-review-input",
+  "revision": 2,
+  "date": "2026-10-17",
+  "worktree": "C:/AI/tuning/ninfer-lab-20261015/work-target16-vector-bench",
+  "base_revision": "5817c5564e668638fd281eceb337a12cafda40f0",
+  "status": "implementation draft; not built or executed",
+  "purpose": "Paired warm-cache CUDA-event measurements for public GGUF vector dispatch versus a direct conventional vector-kernel baseline using identical weight and activation buffers.",
+  "baseline_contract": {
+    "launch": "Direct generic kernel; two output rows per warp; excludes public-route dispatch, fused-warp specialization, IMMA, and async prefetch pipeline.",
+    "decoder": "Independent Q4_K/Q6_K decoder preserves only the existing cooperative-decode macro. Other candidate decode-load macros are bypassed. Q6 baseline stores block-D times two independent int8 scales for each 16-value group; it computes activation-d*(f0*dotlo+f1*dothi), without the Q4 min/sum term.",
+    "static_k": "Q6 baseline uses KS=5120 only when NINFER_GGUF_Q6_STATIC_K is enabled, K=5120, compute capability is 8.6, and T is 1 or 4; otherwise KS=0, matching the public W route.",
+    "fused_q4": "Candidate and baseline both perform fused Q4 SwiGLU in one vector kernel launch."
+  },
+  "timing": {
+    "stream": "dedicated CUDA stream",
+    "correctness_gate": "Exact BF16 output comparison before warm-up and timing",
+    "warmup_launches_per_arm": 20,
+    "window_order": "ABBA per block",
+    "default_blocks": 20,
+    "default_launches_per_window": 100,
+    "raw_output": "JSONL case records, every timed window, and paired per-block means",
+    "scope": "Warm-cache operator only, not full-model latency"
+  },
+  "cases": [
+    {
+      "K": 5120,
+      "route": "product",
+      "type": "Q4_K",
+      "N": 6144,
+      "T": 4
+    },
+    {
+      "K": 5120,
+      "route": "product",
+      "type": "Q4_K",
+      "N": 1024,
+      "T": 4
+    },
+    {
+      "K": 5120,
+      "route": "product",
+      "type": "Q4_K",
+      "N": 17408,
+      "T": 4
+    },
+    {
+      "K": 5120,
+      "route": "fused_swiglu",
+      "type": "Q4_K",
+      "N": 17408,
+      "T": 4
+    },
+    {
+      "K": 5120,
+      "route": "product",
+      "type": "Q6_K",
+      "N": 1024,
+      "T": 1
+    },
+    {
+      "K": 5120,
+      "route": "product",
+      "type": "Q6_K",
+      "N": 1024,
+      "T": 2
+    },
+    {
+      "K": 5120,
+      "route": "product",
+      "type": "Q6_K",
+      "N": 1024,
+      "T": 4
+    },
+    {
+      "K": 17408,
+      "route": "product",
+      "type": "Q6_K",
+      "N": 5120,
+      "T": 4
+    }
+  ],
+  "inputs": {
+    "default": "Deterministic synthetic GGUF blocks and BF16 activation quantized before timing with existing Q8_1 quantizer",
+    "optional_fixtures": "If --weight-dir is supplied, missing fixture is fatal; existing pinned 257-row fixture tiled cyclically to requested N is labeled repeated_fixture_257_rows and is not presented as a full actual-shape matrix.",
+    "allocation_or_repacking_inside_timing": false,
+    "random_generation_inside_timing": false
+  },
+  "reviewed_files": [
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_test.h",
+      "bytes": 1071,
+      "sha256": "da05aaeb5ac287abcf3efdf0791d5c41091223da7bc3636bd240846bff19a9c1"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_vec.cuh",
+      "bytes": 52435,
+      "sha256": "26949cb14db388eab6d60575d928770c09c911b0cb09c046aec124265b10c02a"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_vec_q4_k.cu",
+      "bytes": 2265,
+      "sha256": "b65b58eeb5708af58dd0c1717da32367d2bd559ca8f5e420066cb53202a57550"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_vec_q6_k.cu",
+      "bytes": 1821,
+      "sha256": "98011c18055b8dd20ab4a870e8caf478c4e0342869ab35a56146be5a05e64138"
+    },
+    {
+      "path": "tests/ops/linear/test_gguf.cpp",
+      "bytes": 131817,
+      "sha256": "61b3471f4f829f0d7642aa58121c2054a91844e17f1238292b6622c45cc05b96"
+    },
+    {
+      "path": "provenance/vector-event-benchmark-review-input-20261017.json",
+      "bytes": 3656,
+      "sha256": "a4e6dce90b9a1a7efa304ba852c9016268ec6c0f180bc29112e6d3fc4e16091f"
+    }
+  ],
+  "reviewed_files_note": "Raw SHA-256 and byte length cover every modified source/header/test file and the preserved revision-1 review-input artifact. This revision-2 file is excluded from its own hash list.",
+  "validation": {
+    "performed": [
+      "git diff --check",
+      "revision-2 JSON parse"
+    ],
+    "not_performed": [
+      "build",
+      "tests",
+      "GPU benchmark",
+      "Docker",
+      "profiling"
+    ],
+    "reason": "Parent-directed prohibition pending root review."
+  }
+}
