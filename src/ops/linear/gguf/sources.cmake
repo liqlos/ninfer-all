@@ -14,9 +14,9 @@ option(NINFER_GGUF_Q4_T4_SINGLE_ROW "Assign one non-fused SM86 Q4_K T4 output ro
 option(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD "Load the aligned Q4_K vector block header in one SM86 vector transaction" OFF)
 option(NINFER_GGUF_Q4_SPLIT_DP4A "Split SM86 Q4_K vector dots into independent DP4A chains" OFF)
 option(NINFER_GGUF_Q4_ASYNC_PIPELINE "Pipeline SM86 GGUF Q4_K K5120 vector weight loads" OFF)
+option(NINFER_GGUF_VECTOR_PREFETCH2 "Prefetch one SM86 Q4_K/Q6_K vector weight slice in registers" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_X "Use SM86 cp.async raw-weight staging for GGUF Q4_K MMQ" OFF)
-option(NINFER_GGUF_Q4_MMQ_K_STREAM "Stream SM86 Q4_K MMQ K slices to shorten live A fragments" OFF)
 option(NINFER_GGUF_Q6_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q6_K MMQ" OFF)
 option(NINFER_GGUF_SM86_MMQ_TILE_CAP "Limit the column tile of wide SM86 Q4_K/Q6_K MMQ products" OFF)
 set(NINFER_GGUF_SM86_MMQ_MAX_J "64" CACHE STRING "Maximum column tile for the SM86 MMQ experiment")
@@ -249,6 +249,27 @@ if(NINFER_GGUF_Q4_ASYNC_PIPELINE)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_ASYNC_PIPELINE=1)
 endif()
+if(NINFER_GGUF_VECTOR_PREFETCH2)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF vector weight prefetch requires sm_86")
+  endif()
+  if(NINFER_GGUF_Q4_ASYNC_PIPELINE)
+    message(FATAL_ERROR "GGUF vector weight prefetch cannot be combined with the Q4 async pipeline")
+  endif()
+  if(NINFER_GGUF_Q4_T4_IMMA)
+    message(FATAL_ERROR "GGUF vector weight prefetch cannot be combined with the Q4 T4 IMMA route")
+  endif()
+  if(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
+    message(FATAL_ERROR "GGUF vector weight prefetch cannot be combined with the Q4 T4 fused warp-pair route")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_VECTOR_PREFETCH2=1
+      NINFER_GGUF_VECTOR_PREFETCH2_TEST=1)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/src")
+endif()
 option(NINFER_GGUF_Q4_ASYNC_EXTENDED_K "Extend the SM86 Q4 async pipeline to long K rows" OFF)
 if(NINFER_GGUF_Q4_ASYNC_EXTENDED_K)
   if(NOT NINFER_GGUF_Q4_ASYNC_PIPELINE)
@@ -280,14 +301,6 @@ if(NINFER_GGUF_Q4_MMQ_ASYNC_X)
   endif()
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_ASYNC_X=1)
-endif()
-if(NINFER_GGUF_Q4_MMQ_K_STREAM)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "GGUF Q4 MMQ K-slice streaming requires sm_86")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu"
-    "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_dual_q4_k.cu" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_K_STREAM=1)
 endif()
 add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"

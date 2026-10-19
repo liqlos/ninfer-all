@@ -538,6 +538,10 @@ struct Decoder<GGML_TYPE_IQ1_M> {
 #error NINFER_GGUF_Q4_ASYNC_EXTENDED_K requires NINFER_GGUF_Q4_ASYNC_PIPELINE
 #endif
 
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2) && defined(NINFER_GGUF_Q4_ASYNC_PIPELINE)
+#error NINFER_GGUF_VECTOR_PREFETCH2 cannot be combined with NINFER_GGUF_Q4_ASYNC_PIPELINE
+#endif
+
 template <ggml_type type, int T, bool Fused>
 constexpr int vector_rows_per_warp() {
 #if defined(NINFER_GGUF_Q4_T4_SINGLE_ROW)
@@ -740,7 +744,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
 template <ggml_type type, int T, bool Fused, int KS,
-          int Rows = vector_rows_per_warp<type, T, Fused>()>
+          bool Prefetch2 = true, int Rows = vector_rows_per_warp<type, T, Fused>()>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
     using D                 = Decoder<type>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
@@ -804,6 +808,50 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
             }
         };
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
+        if constexpr (Prefetch2 && T <= 4 &&
+                      ((type == GGML_TYPE_Q4_K &&
+                        ((!Fused && (KS == 5120 || KS == 17408)) || (Fused && KS == 5120))) ||
+                       (type == GGML_TYPE_Q6_K && !Fused && (KS == 5120 || KS == 17408)))) {
+            constexpr int kPrefetchIterations = KS / 1024;
+            Slice staged[2][kRows];
+#pragma unroll
+            for (int r = 0; r < kRows; ++r) {
+                D::decode(rowp[r], sub, table, staged[0][r]);
+            }
+#pragma unroll
+            for (int it = 0; it < kPrefetchIterations; ++it) {
+                const int s = lane + 32 * it;
+                int a[T][8];
+                float d[T], sum[T];
+#pragma unroll
+                for (int j = 0; j < T; ++j) {
+                    const float2 ds = __half22float2(p.ds[std::int64_t(j) * slices + s]);
+                    d[j]            = ds.x;
+                    sum[j]          = ds.y;
+                    const auto* q   = reinterpret_cast<const int4*>(p.qs + std::int64_t(j) * k + 32 * s);
+                    const int4 v0 = q[0], v1 = q[1];
+                    a[j][0] = v0.x; a[j][1] = v0.y; a[j][2] = v0.z; a[j][3] = v0.w;
+                    a[j][4] = v1.x; a[j][5] = v1.y; a[j][6] = v1.z; a[j][7] = v1.w;
+                }
+                if (it + 1 < kPrefetchIterations) {
+                    const int next = it + 1;
+#pragma unroll
+                    for (int r = 0; r < kRows; ++r) {
+                        D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * next * D::kBlockBytes,
+                                  sub, table, staged[(next) & 1][r]);
+                    }
+                }
+#pragma unroll
+                for (int r = 0; r < kRows; ++r) {
+#pragma unroll
+                    for (int j = 0; j < T; ++j) {
+                        acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+                    }
+                }
+            }
+        } else
+#endif
 #if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
         const auto staged_slice = [&](int it, int buffer) {
             const int s = lane + 32 * it;
@@ -915,7 +963,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
     }
 }
 
-template <ggml_type type, int T, bool Fused, int KS>
+template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true>
 void launch_baseline(const VecArgs& args, cudaStream_t stream) {
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
     if constexpr (type == GGML_TYPE_Q4_K && T == 4 && Fused) {
@@ -936,15 +984,15 @@ void launch_baseline(const VecArgs& args, cudaStream_t stream) {
 #endif
     static const int resident = [] {
         int blocks = 0;
-        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kernel<type, T, Fused, KS>,
-                                                            kVecWarps * 32, 0),
+        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                  &blocks, kernel<type, T, Fused, KS, Prefetch2>, kVecWarps * 32, 0),
               "vector occupancy");
         return std::max(blocks, 1);
     }();
     constexpr int per_block = kVecWarps * (Fused ? 1 : vector_rows_per_warp<type, T, Fused>());
     const int groups    = (args.rows + per_block - 1) / per_block;
     const int blocks    = std::min(groups, resident * device_facts().sm_count);
-    kernel<type, T, Fused, KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+    kernel<type, T, Fused, KS, Prefetch2><<<blocks, kVecWarps * 32, 0, stream>>>(args);
     check(cudaGetLastError(), "vector product launch");
     }
 }
@@ -974,6 +1022,14 @@ void launch(const VecArgs& args, cudaStream_t stream) {
 
 template <ggml_type type, int T, bool Fused>
 void launch_k(const VecArgs& args, cudaStream_t stream) {
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2)
+    if constexpr (type == GGML_TYPE_Q6_K && !Fused && T <= 4) {
+        if (device_facts().cc == 860) {
+            if (args.k == 5120) { return launch<type, T, Fused, 5120>(args, stream); }
+            if (args.k == 17408) { return launch<type, T, Fused, 17408>(args, stream); }
+        }
+    }
+#endif
 #if defined(NINFER_GGUF_Q6_STATIC_K)
     if constexpr (type == GGML_TYPE_Q6_K && !Fused && (T == 1 || T == 4)) {
         if (args.k == 5120 && device_facts().cc == 860) {

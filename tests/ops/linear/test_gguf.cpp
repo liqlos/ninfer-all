@@ -11,7 +11,7 @@
 #include "ninfer/ops/linear_swiglu.h"
 #include "ninfer/ops/rmsnorm.h"
 #include "ops/linear/gguf/ggml_bridge.h"
-#if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
+#if defined(NINFER_GGUF_Q4_T4_IMMA_TEST) || defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
 #include "ops/linear/gguf/ggml_bridge_test.h"
 #endif
 #include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
@@ -1139,7 +1139,8 @@ void run_dual_mmq_fusion() {
 }
 #endif
 
-#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST) || defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST) || defined(NINFER_GGUF_Q4_T4_IMMA_TEST) || \
+    defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
 double q4_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
                          std::int32_t columns, std::int32_t column,
                          const std::vector<std::uint8_t>& input_bytes) {
@@ -1344,6 +1345,194 @@ void run_q4_t4_imma_case(std::int32_t rows, std::uint32_t seed,
 int run_q4_t4_imma_regression() {
     run_q4_t4_imma_case(8193, 88031, {0, 1, 257, 1023, 2048, 4095, 4096, 6143, 8191, 8192});
     run_q4_t4_imma_case(17408, 88032, {0, 1, 4095, 8191, 12287, 16383, 17407});
+    return 0;
+}
+#endif
+
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
+void run_vector_prefetch2_case(const TypeCase& type, std::int32_t k, std::int32_t columns,
+                               std::int32_t rows, std::uint32_t seed,
+                               const std::vector<std::int32_t>& checked_rows) {
+    const auto shape = gguf_block_shape(type.qtype);
+    const std::int64_t base_row_bytes = std::int64_t(k / shape.elements) * shape.bytes;
+    const std::int64_t row_bytes = base_row_bytes + shape.bytes;
+    std::mt19937 rng(seed);
+    std::normal_distribution<float> normal(0.0f, 0.4f);
+    const auto compact_weights = random_blocks(type, rows, k, rng);
+    std::vector<std::uint8_t> host_weights(std::size_t(rows) * row_bytes, 0xa5);
+    for (std::int32_t row = 0; row < rows; ++row) {
+        std::memcpy(host_weights.data() + std::size_t(row) * row_bytes,
+                    compact_weights.data() + std::size_t(row) * base_row_bytes,
+                    base_row_bytes);
+    }
+    DeviceBuffer weights(host_weights.size());
+    weights.copy_from_host(host_weights.data(), host_weights.size());
+    std::vector<__nv_bfloat16> host_x(std::size_t(k) * columns);
+    for (auto& value : host_x) { value = __float2bfloat16(normal(rng)); }
+    const auto input_bytes = cpu_quantize_vector_activation(host_x, k, columns);
+    DeviceBuffer input(input_bytes.size());
+    input.copy_from_host(input_bytes.data(), input_bytes.size());
+    GuardedOutput actual(std::size_t(rows) * columns);
+    GuardedOutput baseline(std::size_t(rows) * columns);
+    actual.poison();
+    baseline.poison();
+    const ops::gguf::VectorOutput actual_out{static_cast<__nv_bfloat16*>(actual.data()), nullptr,
+                                              rows, ops::gguf::Epilogue::Store, nullptr, 0};
+    ops::gguf::vector_product(ops::detail::gguf_type(type.qtype), weights.p, row_bytes, rows, k,
+                              input.p, columns, actual_out, nullptr);
+    if (type.qtype == QType::GGUF_Q4_K) {
+        ops::gguf::detail::q4_vector_prefetch2_baseline_for_test(
+            static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
+            static_cast<const std::uint8_t*>(input.p), columns, baseline.data(), rows, nullptr);
+    } else {
+        ops::gguf::detail::q6_vector_prefetch2_baseline_for_test(
+            static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
+            static_cast<const std::uint8_t*>(input.p), columns, baseline.data(), rows, nullptr);
+    }
+    check(cudaDeviceSynchronize(), "Q4_K/Q6_K vector prefetch2 baseline parity");
+    const auto eager = actual.read("read vector prefetch2 output");
+    const auto expected = baseline.read("read vector prefetch2 baseline output");
+    if (eager.size() != expected.size() ||
+        std::memcmp(eager.data(), expected.data(), eager.size() * sizeof(__nv_bfloat16)) != 0) {
+        throw std::runtime_error(std::string(type.name) + " vector prefetch2 differs from exact baseline");
+    }
+
+    std::vector<float> cpu_weights;
+    if (type.qtype == QType::GGUF_Q6_K) {
+        decode_k_cpu(type.qtype, compact_weights, rows, k, cpu_weights);
+    }
+    const std::size_t activation_scale_offset =
+        (std::size_t(k) * columns + 15) / 16 * 16;
+    std::vector<double> want;
+    std::vector<float> got;
+    want.reserve(checked_rows.size() * columns);
+    got.reserve(checked_rows.size() * columns);
+    for (std::int32_t column = 0; column < columns; ++column) {
+        for (const std::int32_t row : checked_rows) {
+            if (row < 0 || row >= rows) {
+                throw std::runtime_error(std::string(type.name) + " prefetch2 oracle row is out of range");
+            }
+            double sum = 0.0;
+            if (type.qtype == QType::GGUF_Q4_K) {
+                sum = q4_k_q8_1_dot_cpu(
+                    compact_weights.data() + std::size_t(row) * base_row_bytes,
+                    k, columns, column, input_bytes);
+            } else {
+                for (std::int32_t group = 0; group < k / 32; ++group) {
+                    const double activation_scale = half_to_float(
+                        input_bytes.data() + activation_scale_offset +
+                        (std::size_t(column) * (k / 32) + group) * sizeof(__half2));
+                    for (std::int32_t lane = 0; lane < 32; ++lane) {
+                        const std::int32_t index = group * 32 + lane;
+                        const std::uint8_t packed = input_bytes[std::size_t(column) * k + index];
+                        const std::int32_t quantized = packed < 128 ? packed : int(packed) - 256;
+                        sum += double(cpu_weights[std::size_t(row) * k + index]) *
+                               (double(quantized) * activation_scale);
+                    }
+                }
+            }
+            want.push_back(sum);
+            got.push_back(__bfloat162float(eager[std::size_t(column) * rows + row]));
+        }
+    }
+    const Error error = compare(got, want);
+    const bool finite = std::all_of(got.begin(), got.end(),
+                                    [](float value) { return std::isfinite(value); });
+    const bool within_oracle_tolerance = type.qtype == QType::GGUF_Q4_K
+        ? error.relative_rms < 3.5e-3 && error.relative_max < 5.0e-3
+        : error.relative_rms < 2.0e-2 && error.relative_max < 8.0e-2;
+    if (!finite || !within_oracle_tolerance) {
+        throw std::runtime_error(std::string(type.name) + " vector prefetch2 differs from independent oracle");
+    }
+    check_graph_parity(
+        [&](cudaStream_t stream) {
+            ops::gguf::vector_product(ops::detail::gguf_type(type.qtype), weights.p, row_bytes,
+                                      rows, k, input.p, columns, actual_out, stream);
+        },
+        actual, eager, std::string(type.name) + " vector prefetch2 graph", nullptr);
+}
+
+void run_q4_fused_vector_prefetch2_case(std::int32_t columns, std::uint32_t seed) {
+    constexpr std::int32_t rows = 8193;
+    constexpr std::int32_t k = 5120;
+    constexpr std::int64_t row_bytes = std::int64_t(k / 256) * 144;
+    const TypeCase type{QType::GGUF_Q4_K, "q4_k", {0, 2}};
+    std::mt19937 rng(seed);
+    std::normal_distribution<float> normal(0.0f, 0.4f);
+    const auto compact_weights = random_blocks(type, 2 * rows, k, rng);
+    DeviceBuffer weights(compact_weights.size());
+    weights.copy_from_host(compact_weights.data(), compact_weights.size());
+    std::vector<__nv_bfloat16> host_x(std::size_t(k) * columns);
+    for (auto& value : host_x) { value = __float2bfloat16(normal(rng)); }
+    const auto input_bytes = cpu_quantize_vector_activation(host_x, k, columns);
+    DeviceBuffer input(input_bytes.size());
+    input.copy_from_host(input_bytes.data(), input_bytes.size());
+
+    GuardedOutput actual(std::size_t(rows) * columns);
+    GuardedOutput baseline(std::size_t(rows) * columns);
+    actual.poison();
+    baseline.poison();
+    ops::gguf::vector_swiglu(ops::gguf::GgmlType::Q4_K, weights.p, row_bytes, rows, k,
+                             input.p, columns, static_cast<__nv_bfloat16*>(actual.data()), rows,
+                             nullptr);
+    ops::gguf::detail::q4_vector_prefetch2_fused_baseline_for_test(
+        static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
+        static_cast<const std::uint8_t*>(input.p), columns, baseline.data(), rows, nullptr);
+    check(cudaDeviceSynchronize(), "Q4_K fused vector prefetch2 baseline parity");
+    const auto eager = actual.read("read Q4_K fused vector prefetch2 output");
+    const auto expected = baseline.read("read Q4_K fused vector prefetch2 baseline output");
+    if (eager.size() != expected.size() ||
+        std::memcmp(eager.data(), expected.data(), eager.size() * sizeof(__nv_bfloat16)) != 0) {
+        throw std::runtime_error("Q4_K fused vector prefetch2 differs from exact baseline");
+    }
+
+    const std::vector<std::int32_t> checked_rows{0, 1, 257, 1023, 2048,
+                                                  4095, 4096, 6143, 8191, 8192};
+    std::vector<float> got;
+    std::vector<double> want;
+    got.reserve(checked_rows.size() * columns);
+    want.reserve(checked_rows.size() * columns);
+    for (std::int32_t column = 0; column < columns; ++column) {
+        for (const std::int32_t row : checked_rows) {
+            const double gate = q4_k_q8_1_dot_cpu(
+                compact_weights.data() + std::size_t(row) * row_bytes,
+                k, columns, column, input_bytes);
+            const double up = q4_k_q8_1_dot_cpu(
+                compact_weights.data() + std::size_t(rows + row) * row_bytes,
+                k, columns, column, input_bytes);
+            got.push_back(__bfloat162float(eager[std::size_t(column) * rows + row]));
+            want.push_back(gate / (1.0 + std::exp(-gate)) * up);
+        }
+    }
+    const Error error = compare(got, want);
+    if (!(error.relative_rms < 3.5e-3 && error.relative_max < 5e-3)) {
+        throw std::runtime_error("Q4_K fused vector prefetch2 differs from independent Q8_1 oracle");
+    }
+    check_graph_parity(
+        [&](cudaStream_t stream) {
+            ops::gguf::vector_swiglu(ops::gguf::GgmlType::Q4_K, weights.p, row_bytes, rows, k,
+                                     input.p, columns,
+                                     static_cast<__nv_bfloat16*>(actual.data()), rows, stream);
+        },
+        actual, eager, "Q4_K fused vector prefetch2 odd-row graph", nullptr);
+}
+
+int run_vector_prefetch2_regression() {
+    const TypeCase types[] = {{QType::GGUF_Q4_K, "q4_k", {0, 2}},
+                              {QType::GGUF_Q6_K, "q6_k", {208}}};
+    std::uint32_t seed = 88911;
+    for (const TypeCase& type : types) {
+        for (const std::int32_t k : {5120, 17408}) {
+            for (const std::int32_t columns : {1, 2, 3, 4}) {
+                run_vector_prefetch2_case(type, k, columns, 5, seed++, {0, 1, 2, 3, 4});
+            }
+        }
+    }
+    run_vector_prefetch2_case(types[0], 5120, 3, 8193, seed++,
+                              {0, 1, 257, 1023, 2048, 4095, 4096, 6143, 8191, 8192});
+    for (const std::int32_t columns : {1, 2, 3, 4}) {
+        run_q4_fused_vector_prefetch2_case(columns, seed++);
+    }
     return 0;
 }
 #endif
@@ -1773,14 +1962,10 @@ int run_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
 
 int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
                        std::ofstream* output_file, const std::string& weight_directory,
-                       std::size_t& files_used, bool k_stream_regression = false,
-                       std::int32_t requested_rows = 0,
-                       std::int32_t requested_fixture_rows = 0) {
-    const std::int32_t rows = requested_rows == 0 ? 256 : requested_rows;
-    const std::int32_t fixture_rows = requested_fixture_rows == 0 ? 257 : requested_fixture_rows;
-    const std::vector<std::int32_t> widths = k_stream_regression
-        ? std::vector<std::int32_t>{1280, 1281}
-        : std::vector<std::int32_t>{9, 17, 40, 70, 127, 130, 1024};
+                       std::size_t& files_used) {
+    constexpr std::int32_t rows = 256;
+    constexpr std::int32_t fixture_rows = 257;
+    constexpr std::int32_t widths[] = {9, 17, 40, 70, 127, 130, 1024};
     const auto type = ops::detail::gguf_type(c.qtype);
     if ((c.qtype != QType::GGUF_Q4_K && c.qtype != QType::GGUF_Q6_K) ||
         !ops::gguf::has_matrix_kernel(type)) {
@@ -1815,7 +2000,7 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
           "copy MMQ alignment fallback weights");
     const Weight shifted_weight = gguf_weight(c.qtype, shifted_bytes, rows, k);
 
-    const std::int32_t max_t = widths.back();
+    constexpr std::int32_t max_t = 1024;
     std::mt19937 activation_rng(seed + 1907);
     std::normal_distribution<float> normal(0.0f, 0.35f);
     std::vector<__nv_bfloat16> x_host(std::size_t(k) * max_t);
@@ -1854,15 +2039,12 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
         std::vector<std::int32_t> samples{0, 1, t / 2, t - 2, t - 1};
         std::sort(samples.begin(), samples.end());
         samples.erase(std::unique(samples.begin(), samples.end()), samples.end());
-        const std::int32_t row_step = k_stream_regression && rows > 257
-            ? std::max<std::int32_t>(1, (rows + 127) / 128)
-            : 1;
         std::vector<float> sampled_got;
         std::vector<double> sampled_want;
-        sampled_got.reserve(samples.size() * ((rows + row_step - 1) / row_step));
-        sampled_want.reserve(samples.size() * ((rows + row_step - 1) / row_step));
+        sampled_got.reserve(samples.size() * rows);
+        sampled_want.reserve(samples.size() * rows);
         for (const std::int32_t col : samples) {
-            for (std::int32_t row = 0; row < rows; row += row_step) {
+            for (std::int32_t row = 0; row < rows; ++row) {
                 double acc = 0.0;
                 const float* wr = cpu_weights.data() + std::size_t(row) * k;
                 const float* xr = x_float.data() + std::size_t(col) * k;
@@ -1895,7 +2077,7 @@ int run_mmq_real_shape(const TypeCase& c, std::int32_t k, std::uint32_t seed,
             }
             write_outputs(output_file, shifted_host);
         }
-        if (k_stream_regression || t == 9 || t == 40 || t == 130 || t == 1024) {
+        if (t == 9 || t == 40 || t == 130 || t == 1024) {
             check_graph_parity(
                 [&](cudaStream_t stream) {
                     ops::linear(x, weight, out, ops::LinearPolicy::A16Only, workspace, stream);
@@ -1920,7 +2102,6 @@ int main(int argc, char** argv) {
     bool real_shapes = false;
     bool mmq_real_shapes = false;
     bool mmq_q6_real_shapes = false;
-    bool q4_mmq_k_stream_regression = false;
     bool swiglu_q8_fusion = false;
     bool swiglu_q8_benchmark = false;
     bool rmsnorm_q8_fusion = false;
@@ -1931,6 +2112,9 @@ int main(int argc, char** argv) {
 #endif
 #if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
     bool q4_t4_imma_regression = false;
+#endif
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
+    bool vector_prefetch2_regression = false;
 #endif
     bool output_specified = false;
     bool weight_directory_specified = false;
@@ -1944,9 +2128,6 @@ int main(int argc, char** argv) {
             mmq_real_shapes = true;
         } else if (argument == "--mmq-q6-real-shapes" && !mmq_q6_real_shapes) {
             mmq_q6_real_shapes = true;
-        } else if (argument == "--q4-mmq-k-stream-regression" &&
-                   !q4_mmq_k_stream_regression) {
-            q4_mmq_k_stream_regression = true;
         } else if (argument == "--swiglu-q8-fusion" && !swiglu_q8_fusion) {
             swiglu_q8_fusion = true;
         } else if (argument == "--swiglu-q8-benchmark" && !swiglu_q8_fusion) {
@@ -1967,6 +2148,10 @@ int main(int argc, char** argv) {
         } else if (argument == "--q4-t4-imma-regression" && !q4_t4_imma_regression) {
             q4_t4_imma_regression = true;
 #endif
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
+        } else if (argument == "--vector-prefetch2-regression" && !vector_prefetch2_regression) {
+            vector_prefetch2_regression = true;
+#endif
         } else if (argument == "--output" && !output_specified && i + 1 < argc) {
             output_specified = true;
             output_path = argv[++i];
@@ -1974,41 +2159,42 @@ int main(int argc, char** argv) {
             weight_directory_specified = true;
             weight_directory = argv[++i];
         } else {
-            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --q4-mmq-k-stream-regression | --real-shapes [--output <file>] "
+            std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                          "[--weight-dir <dir>]]\n";
             return 2;
         }
     }
     if ((output_specified &&
-         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
-            q4_mmq_k_stream_regression) || output_path.empty())) ||
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || output_path.empty())) ||
         (weight_directory_specified &&
-         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
-            q4_mmq_k_stream_regression) || weight_directory.empty())) ||
-        (q4_mmq_k_stream_regression && (real_shapes || mmq_real_shapes || mmq_q6_real_shapes)) ||
+         (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes) || weight_directory.empty())) ||
         (real_shapes && (mmq_real_shapes || mmq_q6_real_shapes)) ||
         (mmq_real_shapes && mmq_q6_real_shapes) ||
-        ((real_shapes || mmq_real_shapes || mmq_q6_real_shapes || q4_mmq_k_stream_regression) &&
+        ((real_shapes || mmq_real_shapes || mmq_q6_real_shapes) &&
          (swiglu_q8_fusion || rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion)) ||
         (rmsnorm_q8_fusion && (swiglu_q8_fusion || rmsnorm_mmq_q8_fusion)) ||
         (rmsnorm_mmq_q8_fusion && (swiglu_q8_fusion || dual_mmq_fusion)) ||
         (dual_mmq_fusion && (swiglu_q8_fusion || rmsnorm_q8_fusion))
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST)
         || (q4_t4_fused_warp_pair_regression &&
-            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
-             q4_mmq_k_stream_regression || swiglu_q8_fusion ||
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
 #if defined(NINFER_GGUF_Q4_T4_IMMA_TEST)
         || (q4_t4_imma_regression &&
-            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes ||
-             q4_mmq_k_stream_regression || swiglu_q8_fusion ||
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
+             rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
+             weight_directory_specified))
+#endif
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
+        || (vector_prefetch2_regression &&
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || swiglu_q8_fusion ||
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
         ) {
-        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --q4-mmq-k-stream-regression | --real-shapes [--output <file>] "
+        std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
         return 2;
     }
@@ -2026,6 +2212,14 @@ int main(int argc, char** argv) {
             const int failures = run_q4_t4_imma_regression();
             std::cout << (failures == 0 ? "OK" : "FAIL")
                       << " GGUF Q4_K T4 IMMA regression\n";
+            return failures == 0 ? 0 : 1;
+        }
+#endif
+#if defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
+        if (vector_prefetch2_regression) {
+            const int failures = run_vector_prefetch2_regression();
+            std::cout << (failures == 0 ? "OK" : "FAIL")
+                      << " GGUF Q4_K/Q6_K vector prefetch2 regression\n";
             return failures == 0 ? 0 : 1;
         }
 #endif
@@ -2102,43 +2296,6 @@ int main(int argc, char** argv) {
                 if (!output_file) { throw std::runtime_error("failed flushing Q6 MMQ output file"); }
             }
             std::cout << (failures == 0 ? "OK" : "FAIL") << " GGUF Q6_K MMQ real shapes\n";
-            return failures == 0 ? 0 : 1;
-        }
-        if (q4_mmq_k_stream_regression) {
-            std::ofstream output_file;
-            std::ofstream* output = nullptr;
-            if (output_specified) {
-                output_file.open(output_path, std::ios::binary | std::ios::trunc);
-                if (!output_file) {
-                    throw std::runtime_error("could not open Q4 MMQ K-stream output file: " +
-                                             output_path);
-                }
-                output = &output_file;
-            }
-            if (weight_directory_specified && !std::filesystem::is_directory(weight_directory)) {
-                throw std::runtime_error("--weight-dir is not a directory: " + weight_directory);
-            }
-            const auto all = cases();
-            const auto q4 = std::find_if(all.begin(), all.end(), [](const TypeCase& c) {
-                return c.qtype == QType::GGUF_Q4_K;
-            });
-            if (q4 == all.end()) { throw std::logic_error("Q4_K case is not registered"); }
-            std::size_t files_used = 0;
-            int failures = run_mmq_real_shape(*q4, 5120, 49203, output,
-                                              weight_directory, files_used, true, 17408, 17408);
-            failures += run_mmq_real_shape(*q4, 5120, 49204, output,
-                                           weight_directory, files_used, true, 257, 17408);
-            if (weight_directory_specified && files_used != 2) {
-                throw std::runtime_error("--weight-dir must provide q4-k5120.bin with 17408 and 257 rows");
-            }
-            if (output != nullptr) {
-                output_file.flush();
-                if (!output_file) {
-                    throw std::runtime_error("failed flushing Q4 MMQ K-stream output file");
-                }
-            }
-            std::cout << (failures == 0 ? "OK" : "FAIL")
-                      << " GGUF Q4 MMQ K-stream regression\n";
             return failures == 0 ? 0 : 1;
         }
         if (rmsnorm_q8_fusion) {
