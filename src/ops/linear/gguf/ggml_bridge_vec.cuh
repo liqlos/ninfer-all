@@ -1098,7 +1098,12 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 // [gate; up] parent and each output row is silu(gate row) * up row.
 template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true,
           bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
-__launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
+#if defined(NINFER_GGUF_Q6_T4_OCCUPANCY_FIVE) && __CUDA_ARCH__ == 860
+__launch_bounds__(kVecWarps * 32, (type == GGML_TYPE_Q6_K && T == 4 && !Fused && !Baseline && KS == 0 && Rows == 2) ? 5 : 1)
+#else
+__launch_bounds__(kVecWarps * 32)
+#endif
+__global__ void kernel(VecArgs p) {
     using D = std::conditional_t<Baseline, BaselineDecoder<type>, Decoder<type>>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
     constexpr int kPerBlock = D::kBlockElems / 32;
