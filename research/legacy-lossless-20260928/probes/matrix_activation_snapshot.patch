@@ -1,0 +1,16 @@
+diff --git a/source/src/ops/linear/gguf/ggml_bridge.cu b/source/src/ops/linear/gguf/ggml_bridge.cu
+--- a/source/src/ops/linear/gguf/ggml_bridge.cu
++++ b/source/src/ops/linear/gguf/ggml_bridge.cu
+@@ -4,3 +4,4 @@
+ #include "ggml_bridge_internal.cuh"
+ #include "vector_snapshot.cuh"
++#include "matrix_activation_snapshot.cuh"
+ #include "q6_fields.cuh"
+@@ -434,4 +434,5 @@
+     if (k <= 0 || k % (4 * detail::kMatrixQuantizeThreads) != 0 || columns <= 0) {
+         throw std::invalid_argument("gguf matrix activation: K must be whole 512-value groups");
+     }
++    detail::capture_matrix_activation_snapshot(x, k, columns, input_columns, stream);
+     const dim3 blocks(columns, (k + 4 * detail::kMatrixQuantizeThreads - 1) /
+                                    (4 * detail::kMatrixQuantizeThreads),
+                       1);

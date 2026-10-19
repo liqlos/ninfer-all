@@ -7,8 +7,6 @@ add_library(ninfer_artifact STATIC
   binder.cpp
   materializer.cpp
   transcode.cpp
-  q6_fields.cpp
-  q4_fields.cpp
   permute_row_split.cu
   views.cpp
 )

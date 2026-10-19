@@ -832,7 +832,8 @@ runtime::ExecutionTiming ProgramImpl::resolve_pending_raw(
         needs_hidden_correction = needs_hidden_correction || partial_terminal;
     }
 
-    const auto tail_started = Clock::now();
+    const std::uint32_t verify_drafts = record_width - 1U;
+    const auto tail_started           = Clock::now();
     try {
         timing.resume_submit();
         const std::span<const ops::GdnReplayFoldRow> fold_span(fold_rows.data(), lanes.size());
@@ -876,7 +877,7 @@ runtime::ExecutionTiming ProgramImpl::resolve_pending_raw(
             if (speculative_backend == SpeculativeBackend::Mtp && io.mtp_decode) {
                 // The round's target hidden is laid out at the width it verified.
                 const qwen3_5::MtpDecodeState frame =
-                    io.mtp_decode->verification_view(mtp_round_verify_window);
+                    io.mtp_decode->verification_view(verify_drafts);
                 selector_tensor                = frame.current_extents.slice(0, 0, batch);
                 hidden                         = frame.target_hidden.slice(2, 0, batch);
                 selected     = frame.target_continuation_hidden.slice(1, 0, batch);
@@ -934,7 +935,7 @@ runtime::ExecutionTiming ProgramImpl::resolve_pending_raw(
     }
 
     const double tail_seconds = std::chrono::duration<double>(Clock::now() - tail_started).count();
-    const std::uint32_t width = draft_window + 1U;
+    const std::uint32_t width = verify_drafts + 1U;
     try {
         for (std::size_t row = 0; row < lanes.size(); ++row) {
             SequenceState& sequence = active_sequence(lanes[row]);
@@ -980,9 +981,21 @@ runtime::ExecutionTiming ProgramImpl::resolve_pending_raw(
                     // one-hot either way, so verify treats them identically and a wrong guess costs
                     // throughput rather than correctness.
                     if (lookup_ngram != 0) {
+#if defined(NINFER_MTP_LONGEST_SUFFIX_LOOKUP)
+                        const auto found = lookup_ngram <= kMtpLookupMaximumSuffix
+                                               ? ::ninfer::qwen3_5::lookup_draft_longest_suffix(
+                                                     std::span<const TokenId>(sequence.ledger),
+                                                     lookup_ngram, draft_window,
+                                                     sequence.mtp_drafts.data())
+                                               : ::ninfer::qwen3_5::lookup_draft(
+                                                     std::span<const TokenId>(sequence.ledger),
+                                                     lookup_ngram, draft_window,
+                                                     sequence.mtp_drafts.data());
+#else
                         const auto found = ::ninfer::qwen3_5::lookup_draft(std::span<const TokenId>(sequence.ledger),
                                                                  lookup_ngram, draft_window,
                                                                  sequence.mtp_drafts.data());
+#endif
                         if (found != 0) { sequence.mtp_draft_count = found; }
                     }
                 }
@@ -1049,6 +1062,7 @@ runtime::PrefillStepResult ProgramImpl::advance_prefill(SequenceState& sequence,
                 .timing  = timing.finish(),
             };
         }
+        bind_sequence_kv(sequence);
         StateImageSelectors selectors = state_selectors(sequence);
         Tensor rewrite_capture_hidden;
         Tensor* rewrite_capture_hidden_ptr = nullptr;

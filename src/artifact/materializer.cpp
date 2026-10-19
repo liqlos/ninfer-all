@@ -2,26 +2,19 @@
 
 #include "artifact/framing.h"
 #include "artifact/transcode.h"
-#include "artifact/q6_fields.h"
-#include "artifact/q4_fields.h"
 #include "artifact/reader.h"
 #include "core/startup.h"
-#include "core/q6_fields.h"
-#include "core/q4_fields.h"
 
 #include <cuda_runtime.h>
 
 #include <algorithm>
 #include <bit>
 #include <chrono>
-#include <cstdlib>
-#include <cstring>
 #include <cmath>
 #include <limits>
 #include <vector>
 #include <string>
 #include <tuple>
-#include <iostream>
 
 namespace ninfer::artifact {
 namespace {
@@ -34,67 +27,6 @@ void check_cuda(cudaError_t status, const char* operation) {
         throw ArtifactError(std::string(operation) + ": " + cudaGetErrorName(status) + ": " +
                             cudaGetErrorString(status));
     }
-}
-
-void validate_q6_device(const WeightGeometry& geometry, const std::byte* data,
-                        std::span<const std::byte> source, cudaStream_t stream) {
-    Weight weight;
-    weight.qtype = QType::GGUF_Q6_K;
-    weight.layout = QuantLayout::GgufQ6Fields;
-    weight.n = int(geometry.shape[0]);
-    weight.k = int(geometry.shape[1]);
-    weight.qdata = data + geometry.code_offset;
-    weight.scales = data + geometry.scale_offset;
-    weight.q6_fields = geometry.q6_fields;
-    const auto row_bytes = std::size_t(weight.k / 256) * 210;
-    const auto capacity = std::min(source.size(), kQ6FieldsRawScratchBytes);
-    std::vector<std::byte> restored(capacity);
-    void* scratch = nullptr;
-    check_cuda(cudaMalloc(&scratch, capacity), "allocate Q6 validation scratch");
-    try {
-        for (int first = 0; first < weight.n;) {
-            const auto rows = std::min(weight.n - first, int(capacity / row_bytes));
-            if (rows <= 0) { throw ArtifactError("Q6 validation scratch cannot hold one row"); }
-            unpack_q6_fields(weight, first, rows, scratch, stream);
-            check_cuda(cudaStreamSynchronize(stream), "complete Q6 byte reconstruction");
-            check_cuda(cudaMemcpy(restored.data(), scratch, std::size_t(rows) * row_bytes,
-                                   cudaMemcpyDeviceToHost), "read Q6 validation bytes");
-            if (std::memcmp(restored.data(), source.data() + std::size_t(first) * row_bytes,
-                             std::size_t(rows) * row_bytes)) {
-                throw ArtifactError("Q6 full device byte reconstruction differs");
-            }
-            first += rows;
-        }
-    } catch (...) {
-        (void)cudaFree(scratch);
-        throw;
-    }
-    check_cuda(cudaFree(scratch), "free Q6 validation scratch");
-}
-
-void validate_q4_device(const WeightParent& parent, std::span<const std::byte> source,
-                        cudaStream_t stream) {
-    WeightView view;
-    view.shape = parent.geometry.shape;
-    view.parts.push_back({&parent, 0, parent.geometry.elements});
-    const auto weight = native_weight(view);
-    if (source.size() > kQ6FieldsRawScratchBytes) { throw ArtifactError("Q4 validation exceeds bounded scratch"); }
-    void* scratch = nullptr;
-    check_cuda(cudaMalloc(&scratch, source.size()), "allocate Q4 validation scratch");
-    try {
-        unpack_q4_fields(weight, 0, weight.n, scratch, stream);
-        check_cuda(cudaStreamSynchronize(stream), "complete Q4 byte reconstruction");
-        std::vector<std::byte> restored(source.size());
-        check_cuda(cudaMemcpy(restored.data(), scratch, restored.size(), cudaMemcpyDeviceToHost),
-                   "read Q4 validation bytes");
-        if (std::memcmp(restored.data(), source.data(), source.size())) {
-            throw ArtifactError("Q4 full device byte reconstruction differs");
-        }
-    } catch (...) {
-        (void)cudaFree(scratch);
-        throw;
-    }
-    check_cuda(cudaFree(scratch), "free Q4 validation scratch");
 }
 
 class Slot {
@@ -349,12 +281,11 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
     }
     std::vector<std::vector<CopyRange>> ranges_by_rank(rank_count);
     std::vector<const DevicePlacement*> transcoded;
-    std::vector<const DevicePlacement*> lossless_fields;
     std::vector<std::uint64_t> previous_device_end(rank_count, 0);
     for (const auto& placement : plan.device_objects) {
         const auto& stored_geometry = reader.geometry(placement.object);
         const auto geometry =
-            placement.q6_fields ? *placement.q6_fields : placement.q4_fields ? *placement.q4_fields : placement.transcode
+            placement.transcode
                 ? weight_geometry(*placement.transcode, QuantLayout::RowSplit,
                                   reader.directory().tensor(placement.object).shape)
                 : stored_geometry;
@@ -381,10 +312,6 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
                                  : read_divisor(reader, placement.object, geometry, {}, out.stats_);
         object.device = WeightParent{geometry, static_cast<const std::byte*>(storage.data),
                                      divisor, stored_geometry.format};
-        if (placement.q6_fields || placement.q4_fields) {
-            lossless_fields.push_back(&placement);
-            continue;
-        }
         if (placement.transcode) {
             transcoded.push_back(&placement);
             continue;
@@ -401,31 +328,6 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
     // They are the vocabulary-sized exceptions a startup option asked for, so bounded extra Host
     // memory (one object at a time) is acceptable and the direct-I/O pipeline stays unchanged.
     std::uint64_t transcoded_bytes = 0;
-    for (const DevicePlacement* placement : lossless_fields) {
-        const auto source = reader.read_object(placement->object);
-        out.stats_.read_bytes = checked_add(out.stats_.read_bytes, source.size(), "lossless field read bytes");
-        const auto encoded = placement->q6_fields ? encode_q6_fields(*placement->q6_fields, source)
-                                                  : encode_q4_fields(*placement->q4_fields, source);
-        const auto& parent = *out.objects_.at(placement->object.index).device;
-        const ScopedRank bound(device, placement->rank);
-        check_cuda(cudaMemcpy(const_cast<std::byte*>(parent.data), encoded.data(), encoded.size(),
-                              cudaMemcpyHostToDevice), "upload lossless fields");
-        const auto* validate = std::getenv("NINFER_LOSSLESS_VALIDATE");
-        const bool verified = validate && std::string_view(validate) == "1";
-        if (verified) {
-            if (placement->q6_fields) {
-                validate_q6_device(parent.geometry, parent.data, source, device.transfer_stream_for_rank(placement->rank));
-            } else {
-                validate_q4_device(parent, source, device.transfer_stream_for_rank(placement->rank));
-            }
-        }
-        std::cerr << (placement->q6_fields ? "lossless_q6 object=" : "lossless_q4 object=")
-                  << reader.directory().tensor(placement->object).id
-                  << " raw_bytes=" << source.size() << " resident_bytes=" << encoded.size()
-                  << " cpu_bytes_exact=1 gpu_bytes_exact=" << verified << '\n';
-        transcoded_bytes = checked_add(transcoded_bytes, encoded.size(), "lossless uploaded bytes");
-        phase.progress(transcoded_bytes, total);
-    }
     for (const DevicePlacement* placement : transcoded) {
         const auto source = reader.read_object(placement->object);
         out.stats_.read_bytes =

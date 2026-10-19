@@ -49,11 +49,6 @@ struct WeightGeometry {
     std::uint64_t scale_bytes         = 0;
     std::uint64_t divisor_offset      = 0;
     std::uint64_t divisor_count       = 1;
-    std::uint64_t code_offset         = 0;
-    Q6FieldEncoding q6_fields;
-    Q4FieldEncoding q4_fields;
-    std::uint64_t q4_d_offset = 0;
-    std::uint64_t q4_dmin_offset = 0;
 };
 
 [[nodiscard]] WeightGeometry weight_geometry(QType format, QuantLayout layout,

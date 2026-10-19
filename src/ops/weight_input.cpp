@@ -151,19 +151,9 @@ GgufProjectionWeights gguf_projection(std::span<const WeightInput> inputs,
         if (!result.parts.empty()) {
             auto& last = result.parts.back();
             const auto block = gguf_block_shape(last.weight.qtype);
-            const bool q6_fields = last.weight.layout == QuantLayout::GgufQ6Fields;
-            const bool q4_fields = last.weight.layout == QuantLayout::GgufQ4Fields;
-            const std::int64_t row_bytes = std::int64_t(last.weight.k / block.elements) *
-                                           (q6_fields ? 208 : q4_fields ? 128 : block.bytes);
+            const std::int64_t row_bytes = std::int64_t(last.weight.k / block.elements) * block.bytes;
             const auto* end = static_cast<const std::byte*>(last.weight.qdata) + last.weight.n * row_bytes;
-            const bool same_layout = part.weight.layout == last.weight.layout &&
-                (!q6_fields || (part.weight.scales == last.weight.scales &&
-                                part.weight.q6_field_row_begin == last.weight.q6_field_row_begin + last.weight.n)) &&
-                (!q4_fields || (part.weight.scales == static_cast<const std::byte*>(last.weight.scales) +
-                                   std::int64_t(last.weight.n) * (last.weight.k / block.elements) * 12 &&
-                                part.weight.q4_d == last.weight.q4_d && part.weight.q4_dmin == last.weight.q4_dmin &&
-                                part.weight.q4_field_row_begin == last.weight.q4_field_row_begin + last.weight.n));
-            if (part.weight.qtype == last.weight.qtype && same_layout && part.weight.qdata == end &&
+            if (part.weight.qtype == last.weight.qtype && part.weight.qdata == end &&
                 outputs[i] == last.output && rows[i] == last.row + last.weight.n) {
                 last.weight.n += part.weight.n;
                 last.weight.shape[0] = last.weight.padded_shape[0] = last.weight.n;

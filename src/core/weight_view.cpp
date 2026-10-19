@@ -244,7 +244,7 @@ WeightRowPlanes weight_row_planes(const WeightRegion& region) {
     out.code_row_bytes  = g.code_bytes_per_row;
     out.high_row_bytes  = g.high_bytes_per_row;
     out.scale_row_bytes = g.scale_bytes_per_row;
-    out.codes           = parent.data + g.code_offset + out.row_begin * out.code_row_bytes;
+    out.codes           = parent.data + out.row_begin * out.code_row_bytes;
     if (g.high_bytes) {
         out.high = parent.data + g.high_offset + out.row_begin * out.high_row_bytes;
     }
@@ -307,14 +307,6 @@ Weight native_weight(const WeightView& view, float input_divisor) {
     out.group                = g.group_size ? dimension(g.group_size) : 0;
     out.weight_scale_divisor = region.parent->weight_scale_divisor;
     out.input_scale_divisor  = input_divisor;
-    out.q6_fields            = g.q6_fields;
-    out.q6_field_row_begin   = planes.row_begin;
-    out.q4_fields            = g.q4_fields;
-    out.q4_field_row_begin   = planes.row_begin;
-    if (g.layout == QuantLayout::GgufQ4Fields) {
-        out.q4_d = region.parent->data + g.q4_d_offset;
-        out.q4_dmin = region.parent->data + g.q4_dmin_offset;
-    }
     if (is_row_split(g.layout)) {
         out.scale_dtype = DType::FP16;
         out.scale_ne[0] = dimension(g.padded_columns / g.group_size);
