@@ -1402,12 +1402,11 @@ int run_q4_t4_imma_regression() {
 #endif
 
 #if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
-void run_q6_t4_imma_case(std::int32_t rows, std::uint32_t seed,
+void run_q6_t4_imma_case(std::int32_t rows, std::int32_t k, std::uint32_t seed,
                          const std::vector<std::int32_t>& checked_rows) {
-    constexpr std::int32_t k = 5120;
     constexpr std::int32_t columns = 4;
-    constexpr std::int64_t base_row_bytes = std::int64_t(k / 256) * 210;
-    constexpr std::int64_t row_bytes = base_row_bytes + 210;
+    const std::int64_t base_row_bytes = std::int64_t(k / 256) * 210;
+    const std::int64_t row_bytes = base_row_bytes + 210;
     const TypeCase type{QType::GGUF_Q6_K, "q6_k", {208}};
     std::mt19937 rng(seed);
     std::normal_distribution<float> normal(0.0f, 0.4f);
@@ -1545,8 +1544,10 @@ int run_q6_t4_imma_regression() {
     check(cudaGetDevice(&device), "get Q6_K T4 IMMA device");
     check(cudaGetDeviceProperties(&properties, device), "get Q6_K T4 IMMA properties");
     if (properties.major != 8 || properties.minor != 6) { return 77; }
-    run_q6_t4_imma_case(1024, 89031, {0, 1, 127, 511, 1023});
-    run_q6_t4_imma_case(8193, 89032, {0, 1, 255, 256, 1023, 4095, 8191, 8192});
+    run_q6_t4_imma_case(1024, 5120, 89031, {0, 1, 127, 511, 1023});
+    run_q6_t4_imma_case(8193, 5120, 89032, {0, 1, 255, 256, 1023, 4095, 8191, 8192});
+    run_q6_t4_imma_case(5120, 17408, 89033, {0, 1, 127, 1023, 2559, 4095, 5119});
+    run_q6_t4_imma_case(513, 17408, 89034, {0, 1, 127, 255, 511, 512});
     return 0;
 }
 #endif

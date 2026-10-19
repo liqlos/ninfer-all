@@ -734,7 +734,8 @@ __device__ __forceinline__ void q6_t4_imma_step(const VecArgs& p, int row0, int 
     partial[1][J][R] += ds1.x * (weight_scale0 * float(dot_lo1) + weight_scale1 * float(dot_hi1));
 }
 
-__launch_bounds__(kVecWarps * 32) __global__ void kernel_q6_t4_imma_5120(VecArgs p) {
+template <int K>
+__launch_bounds__(kVecWarps * 32) __global__ void kernel_q6_t4_imma(VecArgs p) {
     const int warp = threadIdx.x >> 5;
     const int lane = threadIdx.x & 31;
     const int gid = lane >> 2;
@@ -748,7 +749,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q6_t4_imma_5120(VecArgs
             for (int j = 0; j < 4; ++j)
 #pragma unroll
                 for (int r = 0; r < 4; ++r) partial[s][j][r] = 0.0f;
-        for (int t = 0; t < 5; ++t) {
+        for (int t = 0; t < K / 1024; ++t) {
             q6_t4_imma_step<0, 0>(p, row0, gid, tig, t, partial);
             q6_t4_imma_step<0, 1>(p, row0, gid, tig, t, partial);
             q6_t4_imma_step<0, 2>(p, row0, gid, tig, t, partial);
@@ -1105,17 +1106,31 @@ void launch(const VecArgs& args, cudaStream_t stream) {
 #endif
 #if defined(NINFER_GGUF_Q6_T4_IMMA)
     if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused && (KS == 0 || KS == 5120)) {
-        if (device_facts().cc == 860 && args.k == 5120) {
+        if (device_facts().cc == 860 && (args.k == 5120 || args.k == 17408)) {
+            if (args.k == 5120) {
+                static const int resident = [] {
+                    int blocks = 0;
+                    check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                              &blocks, kernel_q6_t4_imma<5120>, kVecWarps * 32, 0),
+                          "Q6_K T4 IMMA occupancy");
+                    return std::max(blocks, 1);
+                }();
+                const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
+                const int blocks = std::min(groups, resident * device_facts().sm_count);
+                kernel_q6_t4_imma<5120><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+                check(cudaGetLastError(), "Q6_K T4 IMMA vector product launch");
+                return;
+            }
             static const int resident = [] {
                 int blocks = 0;
                 check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                          &blocks, kernel_q6_t4_imma_5120, kVecWarps * 32, 0),
+                          &blocks, kernel_q6_t4_imma<17408>, kVecWarps * 32, 0),
                       "Q6_K T4 IMMA occupancy");
                 return std::max(blocks, 1);
             }();
             const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
             const int blocks = std::min(groups, resident * device_facts().sm_count);
-            kernel_q6_t4_imma_5120<<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            kernel_q6_t4_imma<17408><<<blocks, kVecWarps * 32, 0, stream>>>(args);
             check(cudaGetLastError(), "Q6_K T4 IMMA vector product launch");
             return;
         }

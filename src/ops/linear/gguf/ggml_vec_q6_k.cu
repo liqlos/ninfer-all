@@ -19,10 +19,12 @@ void q6_t4_imma_baseline_for_test(const std::uint8_t* weight, std::int64_t row_b
                        VecStore{static_cast<__nv_bfloat16*>(output), nullptr,
                                 output_column_stride, Epilogue::Store, nullptr, 0}};
 #if defined(NINFER_GGUF_Q6_STATIC_K)
-    vec::launch_baseline<GGML_TYPE_Q6_K, 4, false, 5120>(args, stream);
-#else
-    vec::launch_baseline<GGML_TYPE_Q6_K, 4, false, 0>(args, stream);
+    if (k == 5120) {
+        vec::launch_baseline<GGML_TYPE_Q6_K, 4, false, 5120>(args, stream);
+        return;
+    }
 #endif
+    vec::launch_baseline<GGML_TYPE_Q6_K, 4, false, 0>(args, stream);
 }
 
 }
