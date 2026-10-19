@@ -33,13 +33,6 @@ static MatrixLaunch select_matrix_launch(int rows, int columns) {
     MatrixLaunch best;
     int best_tiles = INT_MAX;
     for (const int J : kMatrixColumnTiles) {
-#if defined(NINFER_GGUF_Q6_MMQ_J64_ALIGNED)
-        if constexpr (type == GGML_TYPE_Q6_K) {
-            if (device.cc == 860 && columns >= 128 && columns % 128 == 0 && J > 64) {
-                continue;
-            }
-        }
-#endif
 #if defined(NINFER_GGUF_SM86_MMQ_TILE_CAP)
         if constexpr (type == GGML_TYPE_Q4_K || type == GGML_TYPE_Q6_K) {
             if (device.cc == 860 && columns >= 64 && J > NINFER_GGUF_SM86_MMQ_MAX_J) {

@@ -1141,8 +1141,16 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
         for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += 8) {
             const int k0 = k00 + k01;
 
+#if defined(NINFER_GGUF_Q6_MMQ_X_BANK_SWIZZLE) && __CUDA_ARCH__ == 860
+            const int ka0 = J == 128 ? k0 ^ ((k0 & 32) >> 1) : k0;
+            const int ka1_logical = k0 + tile_A::J;
+            const int ka1 = J == 128 ? ka1_logical ^ ((ka1_logical & 32) >> 1) : ka1_logical;
+            load_ldmatrix(A[n][k01/4 + 0], x_qs + (i0 + n*tile_A::I)*sram_stride + ka0, sram_stride);
+            load_ldmatrix(A[n][k01/4 + 1], x_qs + (i0 + n*tile_A::I)*sram_stride + ka1, sram_stride);
+#else
             load_ldmatrix(A[n][k01/4 + 0], x_qs + (i0 + n*tile_A::I)*sram_stride + (k0 + 0),         sram_stride);
             load_ldmatrix(A[n][k01/4 + 1], x_qs + (i0 + n*tile_A::I)*sram_stride + (k0 + tile_A::J), sram_stride);
+#endif
         }
 
 #pragma unroll
