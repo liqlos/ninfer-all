@@ -741,14 +741,8 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
         const int qs0 = get_int_b4(bxi->qs, txi);
 
 #if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
-#if defined(NINFER_GGUF_Q4_MMQ_X_BANK_SWIZZLE) && __CUDA_ARCH__ == 860
-        const int bank_shift = J == 128 ? (txi & 16) >> 1 : 0;
-        x_qs[i*sram_stride + 16*(txi/8) + txi % 8 + bank_shift] = (qs0 >> 0) & 0x0F0F0F0F;
-        x_qs[i*sram_stride + 16*(txi/8) + txi % 8 + 8 - bank_shift] = (qs0 >> 4) & 0x0F0F0F0F;
-#else
         x_qs[i*sram_stride + 16*(txi/8) + txi % 8 + 0] = (qs0 >> 0) & 0x0F0F0F0F;
         x_qs[i*sram_stride + 16*(txi/8) + txi % 8 + 8] = (qs0 >> 4) & 0x0F0F0F0F;
-#endif
 #else
         x_qs[i*(MMQ_TILE_NE_K + 1) + txi] = qs0;
 #endif // defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)

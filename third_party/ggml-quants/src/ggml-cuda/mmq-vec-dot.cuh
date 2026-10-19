@@ -393,12 +393,7 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 
 #pragma unroll
             for (int n = 0; n < ntx; ++n) {
-#if defined(NINFER_GGUF_Q4_MMQ_X_BANK_SWIZZLE) && __CUDA_ARCH__ == 860
-                const int source_k = type == GGML_TYPE_Q4_K && J == 128 ? k0 ^ ((k0 & 32) >> 2) : k0;
-                load_ldmatrix(A[n], x_qs + (i0 + n*tile_A::I)*sram_stride + source_k, sram_stride);
-#else
                 load_ldmatrix(A[n], x_qs + (i0 + n*tile_A::I)*sram_stride + k0, sram_stride);
-#endif
 #pragma unroll
                 for (int l = 0; l < tile_C::ne/2; ++l) {
                     const int i = i0 + n*tile_A::I + tile_C::get_i(2*l);
@@ -445,12 +440,7 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
         for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += QI8_1) {
             const int k0 = k00 + k01;
 
-#if defined(NINFER_GGUF_Q4_MMQ_X_BANK_SWIZZLE) && __CUDA_ARCH__ == 860
-            const int source_k = type == GGML_TYPE_Q4_K && J == 128 ? k0 ^ ((k0 & 32) >> 2) : k0;
-            load_ldmatrix(A[n][k01/QI8_1], x_qs + (i0 + n*tile_A::I)*sram_stride + source_k, sram_stride);
-#else
             load_ldmatrix(A[n][k01/QI8_1], x_qs + (i0 + n*tile_A::I)*sram_stride + k0, sram_stride);
-#endif
         }
 
 #pragma unroll
