@@ -981,9 +981,21 @@ runtime::ExecutionTiming ProgramImpl::resolve_pending_raw(
                     // one-hot either way, so verify treats them identically and a wrong guess costs
                     // throughput rather than correctness.
                     if (lookup_ngram != 0) {
+#if defined(NINFER_MTP_LONGEST_SUFFIX_LOOKUP)
+                        const auto found = lookup_ngram <= kMtpLookupMaximumSuffix
+                                               ? ::ninfer::qwen3_5::lookup_draft_longest_suffix(
+                                                     std::span<const TokenId>(sequence.ledger),
+                                                     lookup_ngram, draft_window,
+                                                     sequence.mtp_drafts.data())
+                                               : ::ninfer::qwen3_5::lookup_draft(
+                                                     std::span<const TokenId>(sequence.ledger),
+                                                     lookup_ngram, draft_window,
+                                                     sequence.mtp_drafts.data());
+#else
                         const auto found = ::ninfer::qwen3_5::lookup_draft(std::span<const TokenId>(sequence.ledger),
                                                                  lookup_ngram, draft_window,
                                                                  sequence.mtp_drafts.data());
+#endif
                         if (found != 0) { sequence.mtp_draft_count = found; }
                     }
                 }
