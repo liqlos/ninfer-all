@@ -17,7 +17,21 @@
 
 #include <algorithm>
 
-namespace ninfer::ops::gguf::detail::off_probe {
+#if defined(NINFER_GGUF_Q6_T4_ACTIVATION_L1)
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ != 860
+#error Q6_K T4 activation L1 priority requires sm_86
+#endif
+#if !defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE)
+#error Q6_K T4 activation L1 priority requires cooperative Q6 decode
+#endif
+#if defined(NINFER_GGUF_Q6_STATIC_K) || defined(NINFER_GGUF_VECTOR_PREFETCH2) || \
+    defined(NINFER_GGUF_Q6_T4_SINGLE_ROW) || defined(NINFER_GGUF_Q6_T4_IMMA) || \
+    defined(NINFER_GGUF_Q6_PACKED_SCALE_LOAD) || defined(NINFER_GGUF_Q6_STREAMING_LOADS)
+#error Q6_K T4 activation L1 priority requires the generic two-row cooperative route
+#endif
+#endif
+
+namespace ninfer::ops::gguf::detail::activation_l1_on_probe {
 
 // Types whose vector kernels are also built for the static K of the 27B text matrices.
 template <ggml_type type>
@@ -29,6 +43,16 @@ inline constexpr bool kVecStaticK =
 inline constexpr int kVecWarps = 4;
 
 namespace vec {
+
+#if defined(NINFER_GGUF_Q6_T4_ACTIVATION_L1) && __CUDA_ARCH__ == 860
+__device__ __forceinline__ int4 q6_t4_activation_l1_load(const int4* p) {
+    int4 value;
+    asm("ld.global.L1::evict_last.v4.u32 {%0, %1, %2, %3}, [%4];"
+        : "=r"(value.x), "=r"(value.y), "=r"(value.z), "=r"(value.w)
+        : "l"(p));
+    return value;
+}
+#endif
 
 struct Slice {
     int w[8];
@@ -1141,28 +1165,6 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
         }
         const auto slice = [&](int it) {
             const int s = lane + 32 * it;
-#if defined(NINFER_GGUF_Q6_T4_DECODE_AHEAD_TOKEN_OUTER) && __CUDA_ARCH__ == 860
-            if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused && !Baseline && kRows == 2) {
-                Slice decoded[kRows];
-#pragma unroll
-                for (int r = 0; r < kRows; ++r) {
-                    D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes,
-                              sub, table, decoded[r]);
-                }
-#pragma unroll
-                for (int j = 0; j < T; ++j) {
-                    const float2 ds = __half22float2(p.ds[std::int64_t(j) * slices + s]);
-                    const auto* q = reinterpret_cast<const int4*>(p.qs + std::int64_t(j) * k + 32 * s);
-                    const int4 v0 = q[0], v1 = q[1];
-                    const int a[8] = {v0.x, v0.y, v0.z, v0.w, v1.x, v1.y, v1.z, v1.w};
-#pragma unroll
-                    for (int r = 0; r < kRows; ++r) {
-                        acc[r][j] += D::dot(decoded[r], a, ds.x, ds.y);
-                    }
-                }
-                return;
-            }
-#endif
             int a[T][8];
             float d[T], sum[T];
 #pragma unroll
@@ -1171,7 +1173,19 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 d[j]            = ds.x;
                 sum[j]          = ds.y;
                 const auto* q   = reinterpret_cast<const int4*>(p.qs + std::int64_t(j) * k + 32 * s);
+#if defined(NINFER_GGUF_Q6_T4_ACTIVATION_L1) && __CUDA_ARCH__ == 860
+                int4 v0, v1;
+                if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused && KS == 0 &&
+                              !Baseline && kRows == 2) {
+                    v0 = q6_t4_activation_l1_load(q);
+                    v1 = q6_t4_activation_l1_load(q + 1);
+                } else {
+                    v0 = q[0];
+                    v1 = q[1];
+                }
+#else
                 const int4 v0 = q[0], v1 = q[1];
+#endif
                 a[j][0] = v0.x; a[j][1] = v0.y; a[j][2] = v0.z; a[j][3] = v0.w;
                 a[j][4] = v1.x; a[j][5] = v1.y; a[j][6] = v1.z; a[j][7] = v1.w;
             }
