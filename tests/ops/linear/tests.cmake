@@ -51,6 +51,19 @@ ninfer_add_op_test(ninfer_linear_bf16_a16_test
 ninfer_add_op_test(ninfer_linear_gguf_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp"
   LIBRARIES ninfer_ops)
+set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
+  PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_CHILD_CTA_TEST=1)
+if(NINFER_GGUF_Q4_MMQ_K_STREAM)
+  add_test(NAME ninfer_linear_gguf_q4_mmq_k_stream_test
+    COMMAND ninfer_tests ninfer_linear_gguf_test --q4-mmq-k-stream-regression)
+  set_tests_properties(ninfer_linear_gguf_q4_mmq_k_stream_test PROPERTIES
+    SKIP_RETURN_CODE 77)
+endif()
+if(NINFER_GGUF_Q4_MMQ_CHILD_CTA)
+  add_test(NAME ninfer_linear_gguf_q4_mmq_child_cta_test
+    COMMAND ninfer_tests ninfer_linear_gguf_test --q4-mmq-child-cta-regression)
+  set_tests_properties(ninfer_linear_gguf_q4_mmq_child_cta_test PROPERTIES SKIP_RETURN_CODE 77)
+endif()
 if(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR_TEST=1)
@@ -64,6 +77,20 @@ if(NINFER_GGUF_Q4_T4_IMMA)
   add_test(NAME ninfer_linear_gguf_q4_t4_imma_test
     COMMAND ninfer_tests ninfer_linear_gguf_test --q4-t4-imma-regression)
   set_tests_properties(ninfer_linear_gguf_q4_t4_imma_test PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+if(NINFER_GGUF_Q6_T4_IMMA)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_IMMA_TEST=1)
+  add_test(NAME ninfer_linear_gguf_q6_t4_imma_test
+    COMMAND ninfer_tests ninfer_linear_gguf_test --q6-t4-imma-regression)
+  set_tests_properties(ninfer_linear_gguf_q6_t4_imma_test PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+if(NINFER_GGUF_Q4_T4_FUSED_IMMA)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST=1)
+  add_test(NAME ninfer_linear_gguf_q4_t4_fused_imma_test
+    COMMAND ninfer_tests ninfer_linear_gguf_test --q4-t4-fused-imma-regression)
+  set_tests_properties(ninfer_linear_gguf_q4_t4_fused_imma_test PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 if(NINFER_GGUF_VECTOR_PREFETCH2)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf.cpp" APPEND
@@ -104,6 +131,10 @@ if(NINFER_GGUF_MMQ_STORE_FUSION)
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
     LIBRARIES ninfer_ops)
 endif()
+ninfer_add_op_test(ninfer_linear_gguf_mmq_child_cta_public_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
+  LIBRARIES ninfer_ops
+  TEST_ARGS --q4-mmq-child-cta-regression)
 if(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
   ninfer_add_op_test(ninfer_linear_gguf_mmq_gate_epilogue_test
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_gate_epilogue.cu"

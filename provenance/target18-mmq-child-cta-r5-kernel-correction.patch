@@ -1,0 +1,13 @@
+diff --git "a/C:\\AI\\tuning\\ninfer-lab-20261015\\provenance\\child-cta-r4-raw-mmq-vec-dot.cuh" "b/C:\\AI\\tuning\\ninfer-lab-20261015\\work-target18-mmq-child-cta\\third_party\\ggml-quants\\src\\ggml-cuda\\mmq-vec-dot.cuh"
+index e6a4358..a5e0875 100644
+--- "a/C:\\AI\\tuning\\ninfer-lab-20261015\\provenance\\child-cta-r4-raw-mmq-vec-dot.cuh"
++++ "b/C:\\AI\\tuning\\ninfer-lab-20261015\\work-target18-mmq-child-cta\\third_party\\ggml-quants\\src\\ggml-cuda\\mmq-vec-dot.cuh"
+@@ -386,7 +386,7 @@ template <ggml_type type, int J, bool fallback, bool child_cta = false> static _
+     if constexpr (child_cta && type == GGML_TYPE_Q4_K && J == 128) {
+         constexpr int row_tiles_per_warp = 2;
+         constexpr int column_banks_per_warp = 4;
+-        y += (threadIdx.y % column_banks_per_warp) * (tile_C::J*MMQ_TILE_Y_K);
++        y += ((threadIdx.y % column_banks_per_warp) - (threadIdx.y % ntx)) * (tile_C::J*MMQ_TILE_Y_K);
+         const int * x_qs = x;
+         const half2 * x_dm = (const half2 *) x_qs + 2*MMQ_TILE_NE_K;
+         const int * y_qs = y + 4;

@@ -1,0 +1,50 @@
+{
+  "schema": "ninfer.child_cta.r5_kernel_correction_delta.v1",
+  "status": "FROZEN_SOURCE_DELTA",
+  "created_utc": "2026-10-17T07:10:15.0013253Z",
+  "parent": {
+    "base_head": "fffed819a1b97437da3891b4afbc280e42965405",
+    "r3_manifest_sha256": "2c5d1b1358633e0c7d296a4ced387580c3bb3a70a7c4d1a2206fe05b2ae0da07",
+    "r3_patch_sha256": "628d90bd77082519103035fbc5bb7fd3de3203c338f8f902919df532381d153f",
+    "r4_test_include_manifest_sha256": "57caad612ac9ec1123187e48dccfeacc77a9f7e928da3714d2c6188b63ac8e92",
+    "r4_test_include_patch_sha256": "d4e204e3d5279526b1b1af5118b67b540905decefa4d39f7706a7483120895b4"
+  },
+  "raw_file": {
+    "path": "provenance/child-cta-r4-raw-mmq-vec-dot.cuh",
+    "sha256": "58e37adf4a4d1f57c7d9a8416783e813f2f76366308516b35f6626dc577d0d96",
+    "bytes": 54369,
+    "role": "R3 original bytes; R4 manifest confirms this file was unchanged at the R4 test-include state"
+  },
+  "change": {
+    "path": "third_party/ggml-quants/src/ggml-cuda/mmq-vec-dot.cuh",
+    "old_sha256": "58e37adf4a4d1f57c7d9a8416783e813f2f76366308516b35f6626dc577d0d96",
+    "new_sha256": "948c54fa9052e96a83305d53b9aed9592e83628d00a9c9e689aabf5713da00a7",
+    "patch_path": "provenance/target18-mmq-child-cta-r5-kernel-correction.patch",
+    "patch_sha256": "8eeaa28fba015c819c2f4254eed396e9f871a88107a5a8f4faf216fc34ada04f",
+    "patch_bytes": 1065,
+    "description": "Correct the child Q4_K J128 shared-Y bank offset by subtracting the generic bank offset before applying the four-bank child offset; exact one-line correction only"
+  },
+  "review_receipts": [
+    {
+      "sha256": "64bb267d8873d8c75b230ef4f351d52ad5309e9e595c8d819a3d6037c868686e",
+      "path": "provenance/child-cta-r6-y-bank-offset-review-sm86-20261017.json"
+    },
+    {
+      "sha256": "59ec2409f3952483da1dd69bc0ccb9629dec0c85d83df3c419ac0d391578e3cc",
+      "path": "provenance/child-cta-r5-kernel-delta-review-20261017.json"
+    },
+    {
+      "sha256": "2ab0d50aab5c9b3bf2c2dbaa9e3410803d44d5786f93f700a8586900f8a697e0",
+      "path": "provenance/child-cta-y-bank-address-review-20261017-r1.json"
+    }
+  ],
+  "validation": {
+    "raw_vs_current_line_count": "1387/1387",
+    "diff": "one replacement only",
+    "other_kernel_files": "unchanged from R3 pins",
+    "source_edit": "no source edits in this task; correction already present in frozen child worktree",
+    "build": "NOT_RUN",
+    "gpu": "NOT_RUN",
+    "runtime": "NOT_RUN"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "artifact": "child-cta-review-math-20261017-r2",
+  "reviewed_head": "fffed819a1b97437da3891b4afbc280e42965405",
+  "prototype_manifest": "provenance/target18-mmq-child-cta-prototype-r2-20261017.json",
+  "prototype_manifest_sha256": "2a5340b3a91b48202463754ee2620b24484a8721b7e174e8c28b4c2e33e76c0d",
+  "patch": "provenance/target18-mmq-child-cta-r2.patch",
+  "patch_sha256": "39921b65afad3709bc5b6173b0c8077219f1a3df2c6a93ff5387aa374bf6c4f9",
+  "all_changed_file_hashes_match_manifest": true,
+  "r1_arithmetic_review": "Preserved; Q4/Q8 MMA mapping and ordered FP32 updates are unchanged from the R1 reviewed hashes.",
+  "scope": [
+    "Actual GGUF bridge template-instantiation route and runtime dispatch conditions",
+    "FP32 direct and stream-K fixup ownership",
+    "BF16 store, accumulate, and GateProduct row/column pointer arithmetic and operation order",
+    "Public-route test fixtures and oracle path"
+  ],
+  "findings": [],
+  "evidence": [
+    {
+      "file": "src/ops/linear/gguf/ggml_mmq_q4_k.cu",
+      "lines": "1-5",
+      "basis": "This translation unit includes ggml_bridge_mmq.cuh and explicitly instantiates the Q4_K bridge matrix implementation. sources.cmake places the child-CTA definition on this translation unit, so the launch_matrix child branch is compiled on the actual Q4_K bridge path."
+    },
+    {
+      "file": "src/ops/linear/gguf/ggml_bridge_mmq.cuh",
+      "lines": "44-72, 128-183",
+      "basis": "The selection retains logical I/J, block count, and fixup plan. The child path is reached only after the non-stream-K early-return branch, and requires Q4_K/J128, CC 860, and logical I128. It launches two physical y children for each unchanged stream-K x block. FP32 routes preserve the original fixup launch/reducer; BF16 routes reject fixup and instantiate the same store/accumulate/GateProduct kernel flags."
+    },
+    {
+      "file": "third_party/ggml-quants/src/ggml-cuda/mmq.cuh",
+      "lines": "1015-1019, 1193-1222",
+      "basis": "For the child specialization, logical_I remains 128 while local I is 64. Children write disjoint global logical rows. Scratch uses the original blockIdx.x, J*logical_I, and logical row indexing. Direct output adds the child base row once; local output and gate indices retain the existing column stride. Store applies GateProduct before optional BF16 residual accumulation, preserving the baseline expression order."
+    },
+    {
+      "file": "tests/ops/linear/test_gguf_mmq_store.cu",
+      "lines": "265-490",
+      "basis": "The public bridge regression covers rows 17408 and 384 at T1280/1281, compares full FP32 eager and captured-graph outputs bitwise, uses an independent Q4_K/Q8_1 represented-operation oracle on selected coordinates, and checks BF16 rounding, residual accumulation, and GateProduct outputs when the plan supports those routes."
+    },
+    {
+      "file": "tests/ops/linear/tests.cmake",
+      "lines": "128-135",
+      "basis": "Registers the public child-CTA test target and dedicated regression argument."
+    },
+    {
+      "file": "src/ops/linear/gguf/sources.cmake",
+      "lines": "23, 337-343",
+      "basis": "The experimental option remains default OFF and is restricted to CUDA architecture 86."
+    }
+  ],
+  "status": "STATIC_REVIEW_NO_ACTIONABLE_MATH_OR_STATE_FINDINGS",
+  "limits": [
+    "No build, test, GPU, sanitizer, SASS, or performance run was performed.",
+    "Static review does not establish runtime parity, stream-capture success, resource use, or speedup; all manifest gates remain required.",
+    "This is an isolated prototype review, not integration approval."
+  ]
+}

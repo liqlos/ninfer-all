@@ -1,0 +1,19 @@
+diff --git a/tests/ops/linear/test_gguf.cpp b/tests/ops/linear/test_gguf.cpp
+index 3846ad0c..7c5b55cb 100644
+--- a/tests/ops/linear/test_gguf.cpp
++++ b/tests/ops/linear/test_gguf.cpp
+@@ -2817,6 +2817,13 @@ int main(int argc, char** argv) {
+     if (q4_mmq_child_cta_regression && (!output_specified || !weight_directory_specified)) {
+         std::cout << "SKIP: Q4 MMQ child-CTA regression requires pinned real fixtures and exact output dump paths\n";
+         return 77;
+     }
++    if (q4_mmq_child_cta_regression) {
++        int device = 0;
++        cudaDeviceProp properties{};
++        check(cudaGetDevice(&device), "get Q4 MMQ child-CTA regression device");
++        check(cudaGetDeviceProperties(&properties, device), "get Q4 MMQ child-CTA regression properties");
++        if (properties.major != 8 || properties.minor != 6) { return 77; }
++    }
+ #endif
+     if ((output_specified &&
+          (!(real_shapes || mmq_real_shapes || mmq_q6_real_shapes || q4_mmq_k_stream_regression || vector_event_benchmark) || output_path.empty())) ||

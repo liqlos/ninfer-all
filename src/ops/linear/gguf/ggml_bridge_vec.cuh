@@ -11,7 +11,7 @@
 
 #include "ggml_bridge_internal.cuh"
 #include "../../common/memory.cuh"
-#if defined(NINFER_GGUF_Q4_T4_IMMA)
+#if defined(NINFER_GGUF_Q4_T4_IMMA) || defined(NINFER_GGUF_Q6_T4_IMMA) || defined(NINFER_GGUF_Q4_T4_FUSED_IMMA)
 #include "../../common/mma.cuh"
 #endif
 
@@ -92,6 +92,9 @@ __device__ __forceinline__ void scale_min_k4(const std::uint8_t* s, int j, int& 
 // the sum of its unquantized values.
 template <ggml_type type>
 struct Decoder;
+
+template <ggml_type type>
+struct BaselineDecoder : Decoder<type> {};
 
 template <>
 struct Decoder<GGML_TYPE_Q8_0> {
@@ -179,6 +182,7 @@ struct Decoder<GGML_TYPE_Q4_K> {
         int sc, m;
         scale_min_k4(b + 4, u, sc, m);
 #endif
+
         s.f[0]              = dm.x * float(sc);
         s.f[1]              = dm.y * float(m);
         const uint4* qs     = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
@@ -213,6 +217,41 @@ struct Decoder<GGML_TYPE_Q4_K> {
 #else
         return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
 #endif
+    }
+};
+
+template <>
+struct BaselineDecoder<GGML_TYPE_Q4_K> {
+    static constexpr int kBlockElems = 256, kBlockBytes = 144, kTableWords = 0;
+    __device__ static const std::uint32_t* table() { return nullptr; }
+    __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
+                                                  const std::uint32_t*, Slice& s) {
+        const float2 dm = __half22float2(*reinterpret_cast<const half2*>(b));
+        int sc, m;
+        scale_min_k4(b + 4, u, sc, m);
+        s.f[0] = dm.x * float(sc);
+        s.f[1] = dm.y * float(m);
+        const uint4* qs = reinterpret_cast<const uint4*>(b + 16 + 32 * (u / 2));
+#if defined(NINFER_GGUF_Q4_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
+        const uint4 own = qs[u & 1];
+        const unsigned mask = __activemask();
+        const uint4 peer = make_uint4(__shfl_xor_sync(mask, own.x, 1, 8),
+                                      __shfl_xor_sync(mask, own.y, 1, 8),
+                                      __shfl_xor_sync(mask, own.z, 1, 8),
+                                      __shfl_xor_sync(mask, own.w, 1, 8));
+        const uint4 a0 = (u & 1) ? peer : own;
+        const uint4 a1 = (u & 1) ? own : peer;
+#else
+        const uint4 a0 = qs[0];
+        const uint4 a1 = qs[1];
+#endif
+        const int shift = 4 * (u & 1);
+        const std::uint32_t v[8] = {a0.x, a0.y, a0.z, a0.w, a1.x, a1.y, a1.z, a1.w};
+#pragma unroll
+        for (int i = 0; i < 8; ++i) { s.w[i] = int((v[i] >> shift) & 0x0F0F0F0Fu); }
+    }
+    __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float sum) {
+        return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
     }
 };
 
@@ -301,6 +340,53 @@ struct Decoder<GGML_TYPE_Q6_K> {
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
         return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
+    }
+};
+
+template <>
+struct BaselineDecoder<GGML_TYPE_Q6_K> {
+    static constexpr int kBlockElems = 256, kBlockBytes = 210, kTableWords = 0;
+    __device__ static const std::uint32_t* table() { return nullptr; }
+    __device__ __forceinline__ static void decode(const std::uint8_t* b, int u,
+                                                  const std::uint32_t*, Slice& s) {
+        const int h = u / 4, q = u % 4;
+        const float d = half_at(b + 208);
+        const auto* scales = reinterpret_cast<const std::int8_t*>(b + 192 + 8 * h);
+        const int scale0 = scales[2 * q];
+        const int scale1 = scales[2 * q + 1];
+        s.f[0] = d * float(scale0);
+        s.f[1] = d * float(scale1);
+        const std::uint8_t* ql = b + 64 * h + 32 * (q & 1);
+        const std::uint8_t* qh = b + 128 + 32 * h;
+#if defined(NINFER_GGUF_Q6_COOPERATIVE_DECODE) && __CUDA_ARCH__ == 860
+        const unsigned mask = __activemask();
+#pragma unroll
+        for (int base = 0; base < 8; base += 4) {
+            const std::uint32_t hi = u32_a2(qh + 4 * (base + q));
+            const std::uint32_t lo0 = u32_a2(ql + 4 * (base + (q >> 1)));
+            const std::uint32_t lo1 = u32_a2(ql + 4 * (base + 2 + (q >> 1)));
+#pragma unroll
+            for (int j = 0; j < 4; ++j) {
+                const std::uint32_t high = __shfl_sync(mask, hi, j, 4);
+                const std::uint32_t low = __shfl_sync(mask, j < 2 ? lo0 : lo1,
+                                                       (q & 1) + 2 * (j & 1), 4);
+                const std::uint32_t v = ((low >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                        (((high >> (2 * q)) << 4) & 0x30303030u);
+                s.w[base + j] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
+            }
+        }
+#else
+#pragma unroll
+        for (int i = 0; i < 8; ++i) {
+            const std::uint32_t v = ((u32_a2(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+                                    (((u32_a2(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
+            s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
+        }
+#endif
+    }
+    __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
+        return d * (s.f[0] * float(dot4(s.w, a, 0)) +
+                    s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
     }
 };
 
@@ -659,6 +745,249 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_imma_5120(VecArgs
 }
 #endif
 
+#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA)
+template <int R, int J>
+__device__ __forceinline__ void q4_t4_fused_imma_step(const VecArgs& p, int row0, int gid,
+                                                     int tig, int t,
+                                                     float (&partial)[2][4][4]) {
+    using D = Decoder<GGML_TYPE_Q4_K>;
+    const int block = R + 4 * t;
+    const int output_row = row0 + (gid & 3);
+    const int weight_row = output_row + ((gid >> 2) ? p.rows : 0);
+    const bool valid_row = output_row < p.rows;
+    unsigned a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+    float weight_scale = 0.0f, weight_minimum = 0.0f;
+    const bool upper = tig >= 2;
+    const int u = 2 * J + int(upper);
+    if (valid_row) {
+        const std::uint8_t* rowp = p.weight + std::int64_t(weight_row) * p.row_bytes +
+                                   block * D::kBlockBytes;
+        const float2 dm = __half22float2(*reinterpret_cast<const half2*>(rowp));
+        int scale, minimum;
+        scale_min_k4(rowp + 4, u, scale, minimum);
+        weight_scale = dm.x * float(scale);
+        weight_minimum = dm.y * float(minimum);
+        const auto* packed = reinterpret_cast<const std::uint32_t*>(rowp + 16 + 32 * J);
+        const unsigned lo = packed[tig];
+        const unsigned hi = packed[tig + 4];
+        a0 = lo & 0x0F0F0F0Fu;
+        a1 = (lo >> 4) & 0x0F0F0F0Fu;
+        a2 = hi & 0x0F0F0F0Fu;
+        a3 = (hi >> 4) & 0x0F0F0F0Fu;
+    }
+    const int input_column = gid & 3;
+    const int input_u = 2 * J + (gid >> 2);
+    const std::int64_t input = std::int64_t(input_column) * p.k + block * 256 + input_u * 32;
+    const auto* x = reinterpret_cast<const std::uint32_t*>(p.qs + input);
+    const unsigned b0 = x[tig];
+    const unsigned b1 = x[tig + 4];
+    int c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+    ninfer::ops::mma_s8(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
+    const int token0 = 2 * (tig & 1);
+    const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + block * 8 + u]);
+    const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + block * 8 + u]);
+    if (upper) {
+        partial[0][J][R] += weight_scale * ds0.x * float(c2) - weight_minimum * ds0.y;
+        partial[1][J][R] += weight_scale * ds1.x * float(c3) - weight_minimum * ds1.y;
+    } else {
+        partial[0][J][R] += weight_scale * ds0.x * float(c0) - weight_minimum * ds0.y;
+        partial[1][J][R] += weight_scale * ds1.x * float(c1) - weight_minimum * ds1.y;
+    }
+}
+
+__launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_imma_5120(VecArgs p) {
+    const int warp = threadIdx.x >> 5;
+    const int lane = threadIdx.x & 31;
+    const int gid = lane >> 2;
+    const int tig = lane & 3;
+    for (int row0 = (blockIdx.x * kVecWarps + warp) * 4; row0 < p.rows;
+         row0 += gridDim.x * kVecWarps * 4) {
+        float partial[2][4][4];
+#pragma unroll
+        for (int s = 0; s < 2; ++s)
+#pragma unroll
+            for (int j = 0; j < 4; ++j)
+#pragma unroll
+                for (int r = 0; r < 4; ++r) partial[s][j][r] = 0.0f;
+        for (int t = 0; t < 5; ++t) {
+            q4_t4_fused_imma_step<0, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<0, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<0, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<0, 3>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<1, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<1, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<1, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<1, 3>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<2, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<2, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<2, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<2, 3>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<3, 0>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<3, 1>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<3, 2>(p, row0, gid, tig, t, partial);
+            q4_t4_fused_imma_step<3, 3>(p, row0, gid, tig, t, partial);
+        }
+        float reduced[2];
+#pragma unroll
+        for (int s = 0; s < 2; ++s) {
+            const float u0 = (partial[s][0][0] + partial[s][0][2]) +
+                             (partial[s][0][1] + partial[s][0][3]);
+            const float u1 = (partial[s][1][0] + partial[s][1][2]) +
+                             (partial[s][1][1] + partial[s][1][3]);
+            const float u2 = (partial[s][2][0] + partial[s][2][2]) +
+                             (partial[s][2][1] + partial[s][2][3]);
+            const float u3 = (partial[s][3][0] + partial[s][3][2]) +
+                             (partial[s][3][1] + partial[s][3][3]);
+            reduced[s] = (u0 + u2) + (u1 + u3);
+        }
+#pragma unroll
+        for (int s = 0; s < 2; ++s) {
+            reduced[s] += __shfl_xor_sync(0xFFFFFFFFu, reduced[s], 2);
+            const float up = __shfl_xor_sync(0xFFFFFFFFu, reduced[s], 16);
+            const int row = row0 + (gid & 3);
+            if ((gid & 4) == 0 && tig < 2 && row < p.rows) {
+                vec_store(p.out, row, 2 * tig + s, vec_silu(reduced[s]) * up);
+            }
+        }
+    }
+}
+#endif
+
+#if defined(NINFER_GGUF_Q6_T4_IMMA)
+__device__ __forceinline__ std::uint32_t q6_t4_imma_word(const std::uint8_t* block, int u,
+                                                         int word) {
+    using D = Decoder<GGML_TYPE_Q6_K>;
+    const int h = u / 4;
+    const int q = u % 4;
+    const std::uint8_t* ql = block + 64 * h + 32 * (q & 1);
+    const std::uint8_t* qh = block + 128 + 32 * h;
+    const std::uint32_t value =
+        ((D::load32(ql + 4 * word) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
+        (((D::load32(qh + 4 * word) >> (2 * q)) << 4) & 0x30303030u);
+    return value ^ 0xE0E0E0E0u ^ ((value & 0x20202020u) * 6u);
+}
+
+__device__ __forceinline__ float q6_t4_imma_scale(const std::uint8_t* block, int u, int half) {
+    const int h = u / 4;
+    const int q = u % 4;
+    const auto* scales = reinterpret_cast<const std::int8_t*>(block + 192 + 8 * h);
+    return half_at(block + 208) * float(scales[2 * q + half]);
+}
+
+template <int R, int J, int H>
+__device__ __forceinline__ void q6_t4_imma_dot(const VecArgs& p, int row0, int gid, int tig,
+                                               int t, int& dot0, int& dot1) {
+    using D = Decoder<GGML_TYPE_Q6_K>;
+    const int block_index = R + 4 * t;
+    const bool valid_row = row0 + gid < p.rows;
+    const int even_u = 2 * J;
+    const int odd_u = even_u + 1;
+    std::uint32_t a0 = 0;
+    std::uint32_t a1 = 0;
+    if (valid_row) {
+        const std::uint8_t* block = p.weight + std::int64_t(row0 + gid) * p.row_bytes +
+                                    block_index * D::kBlockBytes;
+        a0 = q6_t4_imma_word(block, even_u, tig + 4 * H);
+        a1 = q6_t4_imma_word(block, odd_u, tig + 4 * H);
+    }
+    const int input_column = gid & 3;
+    const int input_u = even_u + (gid >> 2);
+    const std::int64_t input = std::int64_t(input_column) * p.k + block_index * 256 + input_u * 32;
+    const auto* activation = reinterpret_cast<const std::uint32_t*>(p.qs + input);
+    const std::uint32_t b0 = activation[tig + 4 * H];
+    int c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+    ninfer::ops::mma_s8(c0, c1, c2, c3, a0, a1, 0, 0, b0, 0);
+    if (tig < 2) {
+        dot0 = c0;
+        dot1 = c1;
+    } else {
+        dot0 = c2;
+        dot1 = c3;
+    }
+}
+
+template <int R, int J>
+__device__ __forceinline__ void q6_t4_imma_step(const VecArgs& p, int row0, int gid, int tig,
+                                                int t, float (&partial)[2][4][4]) {
+    using D = Decoder<GGML_TYPE_Q6_K>;
+    const int block_index = R + 4 * t;
+    const bool upper = tig >= 2;
+    const int u = 2 * J + int(upper);
+    int dot_lo0 = 0, dot_lo1 = 0, dot_hi0 = 0, dot_hi1 = 0;
+    q6_t4_imma_dot<R, J, 0>(p, row0, gid, tig, t, dot_lo0, dot_lo1);
+    q6_t4_imma_dot<R, J, 1>(p, row0, gid, tig, t, dot_hi0, dot_hi1);
+    const int token0 = 2 * (tig & 1);
+    const std::int64_t scale_index = std::int64_t(block_index) * 8 + u;
+    const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + scale_index]);
+    const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + scale_index]);
+    float weight_scale0 = 0.0f;
+    float weight_scale1 = 0.0f;
+    if (row0 + gid < p.rows) {
+        const std::uint8_t* weight_block =
+            p.weight + std::int64_t(row0 + gid) * p.row_bytes + block_index * D::kBlockBytes;
+        weight_scale0 = q6_t4_imma_scale(weight_block, u, 0);
+        weight_scale1 = q6_t4_imma_scale(weight_block, u, 1);
+    }
+    partial[0][J][R] += ds0.x * (weight_scale0 * float(dot_lo0) + weight_scale1 * float(dot_hi0));
+    partial[1][J][R] += ds1.x * (weight_scale0 * float(dot_lo1) + weight_scale1 * float(dot_hi1));
+}
+
+template <int K>
+__launch_bounds__(kVecWarps * 32) __global__ void kernel_q6_t4_imma(VecArgs p) {
+    const int warp = threadIdx.x >> 5;
+    const int lane = threadIdx.x & 31;
+    const int gid = lane >> 2;
+    const int tig = lane & 3;
+    for (int row0 = (blockIdx.x * kVecWarps + warp) * 8; row0 < p.rows;
+         row0 += gridDim.x * kVecWarps * 8) {
+        float partial[2][4][4];
+#pragma unroll
+        for (int s = 0; s < 2; ++s)
+#pragma unroll
+            for (int j = 0; j < 4; ++j)
+#pragma unroll
+                for (int r = 0; r < 4; ++r) partial[s][j][r] = 0.0f;
+        for (int t = 0; t < K / 1024; ++t) {
+            q6_t4_imma_step<0, 0>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 1>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 2>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 3>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 0>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 1>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 2>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 3>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 0>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 1>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 2>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 3>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 0>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 1>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 2>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 3>(p, row0, gid, tig, t, partial);
+        }
+        float reduced[2];
+#pragma unroll
+        for (int s = 0; s < 2; ++s) {
+            const float u0 = (partial[s][0][0] + partial[s][0][2]) +
+                             (partial[s][0][1] + partial[s][0][3]);
+            const float u1 = (partial[s][1][0] + partial[s][1][2]) +
+                             (partial[s][1][1] + partial[s][1][3]);
+            const float u2 = (partial[s][2][0] + partial[s][2][2]) +
+                             (partial[s][2][1] + partial[s][2][3]);
+            const float u3 = (partial[s][3][0] + partial[s][3][2]) +
+                             (partial[s][3][1] + partial[s][3][3]);
+            reduced[s] = (u0 + u2) + (u1 + u3);
+        }
+        const int row = row0 + gid;
+#pragma unroll
+        for (int s = 0; s < 2; ++s) {
+            const float other = __shfl_xor_sync(0xFFFFFFFFu, reduced[s], 2);
+            if (tig < 2 && row < p.rows) { vec_store(p.out, row, 2 * tig + s, reduced[s] + other); }
+        }
+    }
+}
+#endif
+
 #if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
 template <int KS>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(VecArgs p) {
@@ -743,17 +1072,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
-template <ggml_type type, int T, bool Fused, int KS,
-          bool Prefetch2 = true, int Rows = vector_rows_per_warp<type, T, Fused>()>
+template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true,
+          bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
-    using D                 = Decoder<type>;
+    using D = std::conditional_t<Baseline, BaselineDecoder<type>, Decoder<type>>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
     constexpr int kPerBlock = D::kBlockElems / 32;
     constexpr int kRows = Rows;
     __shared__ __align__(16) std::uint32_t table[kTable];
 #if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
-    constexpr int kQ4StageBytes = 4 * D::kBlockBytes;
-    __shared__ __align__(16) std::uint8_t q4_stage[2][kVecWarps][kRows][kQ4StageBytes];
+    constexpr int kQ4StageBytes = Baseline ? 1 : 4 * D::kBlockBytes;
+    __shared__ __align__(16) std::uint8_t q4_stage[Baseline ? 1 : 2][kVecWarps][kRows][kQ4StageBytes];
 #endif
     if constexpr (D::kTableWords > 0) {
         const std::uint32_t* src = D::table();
@@ -809,7 +1138,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
             }
         };
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
-        if constexpr (Prefetch2 && T <= 4 &&
+        if constexpr (!Baseline && Prefetch2 && T <= 4 &&
                       ((type == GGML_TYPE_Q4_K &&
                         ((!Fused && (KS == 5120 || KS == 17408)) || (Fused && KS == 5120))) ||
                        (type == GGML_TYPE_Q6_K && !Fused && (KS == 5120 || KS == 17408)))) {
@@ -890,7 +1219,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
         };
 #endif
 #if defined(NINFER_GGUF_Q4_ASYNC_PIPELINE) && __CUDA_ARCH__ == 860
-        if constexpr (type == GGML_TYPE_Q4_K && KS == 5120) {
+        if constexpr (!Baseline && type == GGML_TYPE_Q4_K && KS == 5120) {
             prefetch(0, 0);
             ninfer::ops::cp_wait<0>();
             __syncwarp();
@@ -904,7 +1233,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 }
             }
 #if defined(NINFER_GGUF_Q4_ASYNC_EXTENDED_K)
-        } else if constexpr (type == GGML_TYPE_Q4_K && (KS == 6144 || KS == 17408)) {
+        } else if constexpr (!Baseline && type == GGML_TYPE_Q4_K && (KS == 6144 || KS == 17408)) {
             static_assert(KS % 1024 == 0);
             constexpr int kQ4Stages = KS / 1024;
             prefetch(0, 0);
@@ -963,42 +1292,59 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
     }
 }
 
-template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true>
+template <ggml_type type, int T, bool Fused, int KS>
 void launch_baseline(const VecArgs& args, cudaStream_t stream) {
-#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
-    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && Fused) {
-        static const int resident = [] {
-            int blocks = 0;
-            check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                      &blocks, kernel_q4_t4_fused_warp_pair<KS>, kVecWarps * 32, 0),
-                  "Q4_K fused vector occupancy");
-            return std::max(blocks, 1);
-        }();
-        const int groups = (args.rows + 1) / 2;
-        const int blocks = std::min(groups, resident * device_facts().sm_count);
-        kernel_q4_t4_fused_warp_pair<KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
-        check(cudaGetLastError(), "Q4_K fused vector product launch");
-    } else {
-#else
-    {
-#endif
     static const int resident = [] {
         int blocks = 0;
         check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                  &blocks, kernel<type, T, Fused, KS, Prefetch2>, kVecWarps * 32, 0),
-              "vector occupancy");
+                  &blocks, kernel<type, T, Fused, KS, false, true, 2>, kVecWarps * 32, 0),
+              "vector baseline occupancy");
         return std::max(blocks, 1);
     }();
-    constexpr int per_block = kVecWarps * (Fused ? 1 : vector_rows_per_warp<type, T, Fused>());
-    const int groups    = (args.rows + per_block - 1) / per_block;
-    const int blocks    = std::min(groups, resident * device_facts().sm_count);
-    kernel<type, T, Fused, KS, Prefetch2><<<blocks, kVecWarps * 32, 0, stream>>>(args);
-    check(cudaGetLastError(), "vector product launch");
-    }
+    constexpr int per_block = kVecWarps * (Fused ? 1 : 2);
+    const int groups = (args.rows + per_block - 1) / per_block;
+    const int blocks = std::min(groups, resident * device_facts().sm_count);
+    kernel<type, T, Fused, KS, false, true, 2><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+    check(cudaGetLastError(), "vector baseline launch");
+}
+
+template <ggml_type type, int T, bool Fused, int KS>
+void launch_fallback(const VecArgs& args, cudaStream_t stream) {
+    static const int resident = [] {
+        int blocks = 0;
+        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                  &blocks, kernel<type, T, Fused, KS>, kVecWarps * 32, 0),
+              "vector fallback occupancy");
+        return std::max(blocks, 1);
+    }();
+    constexpr int rows = Fused ? 1 : vector_rows_per_warp<type, T, Fused>();
+    constexpr int per_block = kVecWarps * rows;
+    const int groups = (args.rows + per_block - 1) / per_block;
+    const int blocks = std::min(groups, resident * device_facts().sm_count);
+    kernel<type, T, Fused, KS><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+    check(cudaGetLastError(), "vector fallback launch");
 }
 
 template <ggml_type type, int T, bool Fused, int KS>
 void launch(const VecArgs& args, cudaStream_t stream) {
+#if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA)
+    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && Fused && KS == 5120) {
+        if (device_facts().cc == 860 && args.k == 5120) {
+            static const int resident = [] {
+                int blocks = 0;
+                check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &blocks, kernel_q4_t4_fused_imma_5120, kVecWarps * 32, 0),
+                      "Q4_K T4 fused IMMA occupancy");
+                return std::max(blocks, 1);
+            }();
+            const int groups = (args.rows + kVecWarps * 4 - 1) / (kVecWarps * 4);
+            const int blocks = std::min(groups, resident * device_facts().sm_count);
+            kernel_q4_t4_fused_imma_5120<<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            check(cudaGetLastError(), "Q4_K T4 fused IMMA vector SwiGLU launch");
+            return;
+        }
+    }
+#endif
 #if defined(NINFER_GGUF_Q4_T4_IMMA)
     if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Fused && KS == 5120) {
         if (device_facts().cc == 860 && args.k == 5120) {
@@ -1017,7 +1363,61 @@ void launch(const VecArgs& args, cudaStream_t stream) {
         }
     }
 #endif
-    launch_baseline<type, T, Fused, KS>(args, stream);
+#if defined(NINFER_GGUF_Q6_T4_IMMA)
+    if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused &&
+                  (KS == 0 || KS == 5120 || KS == 17408)) {
+        if (device_facts().cc == 860 && (args.k == 5120 || args.k == 17408)) {
+            if (args.k == 5120) {
+                static const int resident = [] {
+                    int blocks = 0;
+                    check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                              &blocks, kernel_q6_t4_imma<5120>, kVecWarps * 32, 0),
+                          "Q6_K T4 IMMA occupancy");
+                    return std::max(blocks, 1);
+                }();
+                const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
+                const int blocks = std::min(groups, resident * device_facts().sm_count);
+                kernel_q6_t4_imma<5120><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+                check(cudaGetLastError(), "Q6_K T4 IMMA vector product launch");
+                return;
+            }
+            static const int resident = [] {
+                int blocks = 0;
+                check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &blocks, kernel_q6_t4_imma<17408>, kVecWarps * 32, 0),
+                      "Q6_K T4 IMMA occupancy");
+                return std::max(blocks, 1);
+            }();
+            const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
+            const int blocks = std::min(groups, resident * device_facts().sm_count);
+            kernel_q6_t4_imma<17408><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            check(cudaGetLastError(), "Q6_K T4 IMMA vector product launch");
+            return;
+        }
+    }
+#endif
+
+#if defined(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR)
+    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && Fused && KS == 5120) {
+        if (device_facts().cc == 860 && args.k == 5120) {
+            static const int resident = [] {
+                int blocks = 0;
+                check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &blocks, kernel_q4_t4_fused_warp_pair<5120>, kVecWarps * 32, 0),
+                      "Q4_K T4 fused warp-pair occupancy");
+                return std::max(blocks, 1);
+            }();
+            constexpr int per_block = kVecWarps / 2;
+            const int groups = (args.rows + per_block - 1) / per_block;
+            const int blocks = std::min(groups, resident * device_facts().sm_count);
+            kernel_q4_t4_fused_warp_pair<5120><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            check(cudaGetLastError(), "Q4_K T4 fused warp-pair vector SwiGLU launch");
+            return;
+        }
+    }
+#endif
+
+    launch_fallback<type, T, Fused, KS>(args, stream);
 }
 
 template <ggml_type type, int T, bool Fused>

@@ -1,0 +1,72 @@
+{
+  "artifact": "child-cta-review-sm86-20261017-r1",
+  "reviewer": "final_review_sm86_dispatch",
+  "source_head": "fffed819a1b97437da3891b4afbc280e42965405",
+  "branch": "lab/target18-mmq-child-cta",
+  "worktree": "C:/AI/tuning/ninfer-lab-20261015/work-target18-mmq-child-cta",
+  "manifest": "provenance/target18-mmq-child-cta-prototype-20261017.json",
+  "manifest_sha256": "e1342ecc950d72046dd4876eab3624fc93d347adc068b9fe85e038b0b864384a",
+  "input_files": [
+    {
+      "path": "tests/ops/linear/tests.cmake",
+      "sha256": "3095a8bf12f350b8bc569bdc73fb54fed5971f545c202dbe86ac230dce42734b"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq-load-tiles.cuh",
+      "sha256": "80a7e02c1b2019db4ebdc1ef398a405c0249174dcf13a3d74b5d29af0347e3cf"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq.cuh",
+      "sha256": "20926fd898c1d289d36071e5948bc8545e58a46b476b902ddd6b5f1e51c376d6"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq-vec-dot.cuh",
+      "sha256": "58e37adf4a4d1f57c7d9a8416783e813f2f76366308516b35f6626dc577d0d96"
+    },
+    {
+      "path": "src/ops/linear/gguf/sources.cmake",
+      "sha256": "3a65ed9e8b005d0bf56f3e0d42c760a8720f14bfa08b886f480469d3eb48a11f"
+    },
+    {
+      "path": "tests/ops/linear/test_gguf.cpp",
+      "sha256": "1f774bbc6f2a13805388ee7c64b1f7b2a460bd3436ae65602b496088bb9a2b25"
+    }
+  ],
+  "status": "BLOCKED_STATIC_REVIEW_ROUTE_UNREACHABLE",
+  "static_only": true,
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Child-CTA dispatch is not on the NInfer matrix-product route",
+      "evidence": [
+        "src/ops/linear/gguf/ggml_bridge_mmq.cuh:79-84 declares NInfer launch_matrix",
+        "src/ops/linear/gguf/ggml_bridge_mmq.cuh:141-172 handles stream-K and launches mul_mat_q<type,J,false> or the BF16 specialization directly; there is no call to upstream launch_mul_mat_q and no child-CTA template argument",
+        "third_party/ggml-quants/src/ggml-cuda/mmq.cuh:1814-1839 contains the new child-CTA dispatch only inside upstream launch_mul_mat_q"
+      ],
+      "trigger": "Use the NInfer GGUF matrix_product/linear path with Q4_K, J128, SM86 and stream-K conditions",
+      "consequence": "The candidate two-child launch is not reached by this project route; its flag can be ON while serving still executes the prior single-CTA launch. Any performance or route claim for NInfer is invalid until the actual wrapper is wired to this dispatch or equivalent logic."
+    },
+    {
+      "priority": "P1",
+      "title": "Regression option does not prove or execute the child-CTA path",
+      "evidence": [
+        "tests/ops/linear/tests.cmake:62-65 registers --q4-mmq-child-cta-regression",
+        "tests/ops/linear/test_gguf.cpp:2750-2754 parses this option and enables q4_mmq_k_stream_regression",
+        "tests/ops/linear/test_gguf.cpp:2948-2951 calls run_mmq_real_shape; that invokes ops::linear (lines 2599-2605), which enters the NInfer bridge above"
+      ],
+      "trigger": "Run the new child-CTA regression",
+      "consequence": "The test exercises the current public NInfer path and independent Q8_1 oracle, but not the child-CTA launch. It may pass without compiling/executing the intended kernel and cannot qualify its row remap or fixup."
+    }
+  ],
+  "review_notes": [
+    "The option is default OFF and CMake rejects non-SM86 builds when enabled (src/ops/linear/gguf/sources.cmake:23,336-342).",
+    "Within the currently unreachable upstream launcher, code keeps logical I=128 for stream-K fixup sizing and uses child physical I=64; static fixup plane indexing appears intended to scatter both children into the original logical tile. This is not runtime-validated.",
+    "Manifest resource numbers and child shared/register thresholds are hypotheses, not compiled resource or achieved-occupancy evidence."
+  ],
+  "limits": [
+    "No build, tests, SASS, GPU, or benchmark run.",
+    "Static source review cannot establish compilation, exact output, graph parity, safety under runtime scheduling, resource usage, or performance.",
+    "No edits made."
+  ],
+  "created_utc": "2026-10-17T02:42:50.1355603Z"
+}

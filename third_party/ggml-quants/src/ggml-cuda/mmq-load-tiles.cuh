@@ -708,11 +708,11 @@ static __device__ __forceinline__ int unpack_scales_q45_K(const int * scales, co
            ((scales[ksc/2]              >> (2 * (ksc % 2)))       & 0x30303030);  // upper 2 bits
 }
 
-template <ggml_type type, int J, bool fallback> static __device__ __forceinline__ void ggml_cuda_mmq_load_tiles_q4_K(
+template <ggml_type type, int J, bool fallback, int I_OVERRIDE = -1> static __device__ __forceinline__ void ggml_cuda_mmq_load_tiles_q4_K(
         const char * __restrict__ x, int * __restrict__ x_tile, const int kbx0, const int i_max, const int stride) {
     constexpr int warp_size   = ggml_cuda_get_physical_warp_size();
     constexpr int nwarps      = ggml_cuda_mmq_get_nthreads(type, J, fallback) / warp_size;
-    constexpr int I           = ggml_cuda_mmq_get_I(type, J, fallback);
+    constexpr int I           = I_OVERRIDE > 0 ? I_OVERRIDE : ggml_cuda_mmq_get_I(type, J, fallback);
     constexpr int sram_stride = ggml_cuda_mmq_get_sram_stride(type, J, fallback);
 
 #if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)

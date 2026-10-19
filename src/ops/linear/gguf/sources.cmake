@@ -7,9 +7,11 @@ option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 ve
 option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Cooperatively load packed Q6_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q6_PACKED_SCALE_LOAD "Load each Q6_K scale pair with one aligned SM86 word transaction" OFF)
 option(NINFER_GGUF_Q6_T4_SINGLE_ROW "Assign one non-fused SM86 Q6_K T4 output row to each warp" OFF)
+option(NINFER_GGUF_Q6_T4_IMMA "Use exact-chain SM86 Q6_K T4 INT8 MMA for non-fused K5120 and K17408 vector products" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR "Assign adjacent SM86 Q4_K T4 fused gate/up rows to separate warps" OFF)
 option(NINFER_GGUF_Q4_T4_IMMA "Use exact-chain SM86 Q4_K T4 INT8 MMA for non-fused K5120 vector products" OFF)
+option(NINFER_GGUF_Q4_T4_FUSED_IMMA "Use exact-chain SM86 Q4_K T4 INT8 MMA for fused K5120 SwiGLU" OFF)
 option(NINFER_GGUF_Q4_T4_SINGLE_ROW "Assign one non-fused SM86 Q4_K T4 output row to each warp" OFF)
 option(NINFER_GGUF_Q4_VECTOR_HEADER_LOAD "Load the aligned Q4_K vector block header in one SM86 vector transaction" OFF)
 option(NINFER_GGUF_Q4_SPLIT_DP4A "Split SM86 Q4_K vector dots into independent DP4A chains" OFF)
@@ -17,6 +19,8 @@ option(NINFER_GGUF_Q4_ASYNC_PIPELINE "Pipeline SM86 GGUF Q4_K K5120 vector weigh
 option(NINFER_GGUF_VECTOR_PREFETCH2 "Prefetch one SM86 Q4_K/Q6_K vector weight slice in registers" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_X "Use SM86 cp.async raw-weight staging for GGUF Q4_K MMQ" OFF)
+option(NINFER_GGUF_Q4_MMQ_K_STREAM "Stream SM86 Q4_K MMQ K slices to shorten live A fragments" OFF)
+option(NINFER_GGUF_Q4_MMQ_CHILD_CTA "Split SM86 Q4_K J128 MMQ logical row tiles across two physical child CTAs" OFF)
 option(NINFER_GGUF_Q6_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q6_K MMQ" OFF)
 option(NINFER_GGUF_SM86_MMQ_TILE_CAP "Limit the column tile of wide SM86 Q4_K/Q6_K MMQ products" OFF)
 set(NINFER_GGUF_SM86_MMQ_MAX_J "64" CACHE STRING "Maximum column tile for the SM86 MMQ experiment")
@@ -198,6 +202,25 @@ if(NINFER_GGUF_Q4_T4_IMMA)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
     PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/src")
 endif()
+if(NINFER_GGUF_Q6_T4_IMMA)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q6_K T4 IMMA vector products require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_IMMA=1 NINFER_GGUF_Q6_T4_IMMA_TEST=1)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/src")
+endif()
+if(NINFER_GGUF_Q4_T4_FUSED_IMMA)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q4_K T4 fused IMMA vector SwiGLU requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_T4_FUSED_IMMA=1
+      NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST=1)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/src")
+endif()
 if(NINFER_GGUF_Q6_STATIC_K)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF static Q6 experiment requires sm_86")
@@ -301,6 +324,21 @@ if(NINFER_GGUF_Q4_MMQ_ASYNC_X)
   endif()
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_ASYNC_X=1)
+endif()
+if(NINFER_GGUF_Q4_MMQ_K_STREAM)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF Q4 MMQ K-slice streaming requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_dual_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_K_STREAM=1)
+endif()
+if(NINFER_GGUF_Q4_MMQ_CHILD_CTA)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF Q4 MMQ child-CTA row remap requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_CHILD_CTA=1)
 endif()
 add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"

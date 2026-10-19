@@ -1,0 +1,77 @@
+{
+  "artifact": "child-cta-review-sm86-20261017-r2",
+  "reviewer": "final_review_sm86_dispatch",
+  "base_head": "fffed819a1b97437da3891b4afbc280e42965405",
+  "worktree": "C:/AI/tuning/ninfer-lab-20261015/work-target18-mmq-child-cta",
+  "status": "STATIC_ROUTE_REVIEW_PASS_WITH_RUNTIME_GATES_PENDING",
+  "static_only": true,
+  "manifest": "provenance/target18-mmq-child-cta-r2.patch",
+  "manifest_sha256": "2a5340b3a91b48202463754ee2620b24484a8721b7e174e8c28b4c2e33e76c0d",
+  "r2_patch_sha256": "39921b65afad3709bc5b6173b0c8077219f1a3df2c6a93ff5387aa374bf6c4f9",
+  "input_files": [
+    {
+      "path": "tests/ops/linear/test_gguf_mmq_store.cu",
+      "sha256": "3f903e54227a35f5abd12d0f55d4aaa6fc008cef6e8d0e8837150a98b090b566"
+    },
+    {
+      "path": "tests/ops/linear/test_gguf.cpp",
+      "sha256": "1f774bbc6f2a13805388ee7c64b1f7b2a460bd3436ae65602b496088bb9a2b25"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq-load-tiles.cuh",
+      "sha256": "80a7e02c1b2019db4ebdc1ef398a405c0249174dcf13a3d74b5d29af0347e3cf"
+    },
+    {
+      "path": "tests/ops/linear/tests.cmake",
+      "sha256": "a9f969313959e8194a867158f4a9fda70fa0bf44e1c45c6f81c4d4d9eb64d71e"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_mmq.cuh",
+      "sha256": "9d62222201d76f45521f44da6a42790fcfaab4dcc4736ca3f89e6d69f478e539"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq.cuh",
+      "sha256": "20926fd898c1d289d36071e5948bc8545e58a46b476b902ddd6b5f1e51c376d6"
+    },
+    {
+      "path": "src/ops/linear/gguf/sources.cmake",
+      "sha256": "3a65ed9e8b005d0bf56f3e0d42c760a8720f14bfa08b886f480469d3eb48a11f"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq-vec-dot.cuh",
+      "sha256": "58e37adf4a4d1f57c7d9a8416783e813f2f76366308516b35f6626dc577d0d96"
+    }
+  ],
+  "findings": [],
+  "resolved_from_r1": [
+    {
+      "finding": "NInfer bridge previously bypassed upstream child-CTA launcher",
+      "status": "RESOLVED_STATICALLY",
+      "evidence": [
+        "src/ops/linear/gguf/ggml_bridge_mmq.cuh:141-199 now contains the gated child launch directly inside launch_matrix after the non-stream-K return and before native stream-K fallback",
+        "The child branch calls mul_mat_q with child_cta=true for FP32 and BF16 template variants; preserves native fallback when guards do not match",
+        "tests/ops/linear/test_gguf_mmq_store.cu:315-338 exercises public gguf::matrix_product through the same bridge for eager and graph routes"
+      ]
+    },
+    {
+      "finding": "Regression could pass without exercising candidate",
+      "status": "RESOLVED_STATICALLY_FOR_ROUTE",
+      "evidence": [
+        "tests/ops/linear/test_gguf_mmq_store.cu:315-478 invokes the public bridge and checks eager/graph parity, sampled independent Q8_1 oracle, BF16 store/accumulate, and gate product; runtime route execution still awaits build/GPU proof"
+      ]
+    }
+  ],
+  "static_checks": [
+    "Option default is OFF; when ON, CMake requires CMAKE_CUDA_ARCHITECTURES exactly 86 and binds the feature macro to ggml_mmq_q4_k.cu (sources.cmake:23,336-342).",
+    "Runtime specialization guard is Q4_K/J128, device cc 860, logical launch I128, stream-K route, with async X/Y excluded; the branch is placed after the non-stream-K early-return and before the original native stream-K launch (ggml_bridge_mmq.cuh:114-199).",
+    "For FP32, the bridge passes fixup only when planned, launches grid (launch.blocks,2,1), then runs the unchanged logical-I fixup reducer when needed. For BF16 it rejects fixup and dispatches matching store/accumulate/gate template booleans.",
+    "Static mapping retains logical I128 scheduling and scratch, while child physical I64 is used for shared config and template. Kernel code applies blockIdx.y child row offset to output/gate stores and records fixup at logical-row indices. Static review found no concrete indexing or guard defect.",
+    "Test uses T1280/T1281 with row counts 17408 and384; plan eligibility/actual enqueued specialization must be confirmed by runtime trace, not inferred from test naming."
+  ],
+  "caveats": [
+    "No build, test, SASS, GPU, route trace, or timing run.",
+    "No resource, occupancy, correctness, graph-safety, or speed claim is made. The estimated shared-memory/register gate remains a hypothesis until compiled resources and runtime evidence are recorded.",
+    "Static inspection supports wiring and fallback/guard structure only; exact FP32/BF16 numerical behavior remains unverified."
+  ],
+  "created_utc": "2026-10-17T02:51:40.0916180Z"
+}

@@ -1,0 +1,12 @@
+diff --git a/provenance/child-cta-r3-raw-test_gguf_mmq_store.cu b/tests/ops/linear/test_gguf_mmq_store.cu
+index 7786c173..bed5458e 100644
+--- a/provenance/child-cta-r3-raw-test_gguf_mmq_store.cu
++++ b/tests/ops/linear/test_gguf_mmq_store.cu
+@@ -12,6 +12,7 @@
+ #include <cmath>
+ #include <cstdint>
+ #include <cstring>
++#include <filesystem>
+ #include <fstream>
+ #include <iostream>
+ #include <random>

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "STATIC_REVIEW_PASS_WITH_P2_REAL_FIXTURE_TEST_BINDING_GAP",
+  "reviewed_at": "2026-10-17",
+  "source_base": {"head":"fffed819a1b97437da3891b4afbc280e42965405","branch":"lab/target18-mmq-child-cta","worktree":"C:/AI/tuning/ninfer-lab-20261015/work-target18-mmq-child-cta"},
+  "input_pins": {
+    "r2_manifest": {"path":"provenance/target18-mmq-child-cta-prototype-r2-20261017.json","sha256":"2a5340b3a91b48202463754ee2620b24484a8721b7e174e8c28b4c2e33e76c0d"},
+    "r2_patch": {"path":"provenance/target18-mmq-child-cta-r2.patch","sha256":"39921b65afad3709bc5b6173b0c8077219f1a3df2c6a93ff5387aa374bf6c4f9"},
+    "r1_review": {"path":"provenance/child-cta-review-coverage-20261017-r1.json","sha256":"70dae949d0c308f77cf75481997c313347e5da217e8ca31ae4bf8eb0586f8466"}
+  },
+  "manifest_file_hashes": "PASS: all eight changed-file SHA-256 values match the R2 manifest.",
+  "review": {
+    "r1_runtime_guard": "PARTIALLY RESOLVED: new test_gguf_mmq_store.cu checks runtime device major/minor 8.6 and returns skip 77 before running the public matrix_product regression. This test also checks FP32 eager/graph bitwise equality and samples an independent Q8_1 oracle.",
+    "bridge_dispatch": "PASS STATIC: the compile-time option defaults OFF and is applied to ggml_mmq_q4_k.cu, which includes ggml_bridge_mmq.cuh. Dispatch from the NInfer bridge is gated to SM86, Q4_K/J128, logical I=128 and stream-K; async-X/Y builds bypass it. Child kernels keep original logical launch count and reducer, split rows into two child CTAs, and route BF16 store/accumulate/GateProduct through the matching template specialization.",
+    "real_fixture_path": "PASS STATIC WITH EXECUTION REQUIREMENT: test_gguf.cpp's child regression requires both --weight-dir and --output, loads q4-k5120.bin for N=17408 and the 384-row prefix, tests T=1280/1281, checks full eager output canaries, sampled independent Q8_1 oracle, graph/eager exact parity, and emits exact output dumps for external candidate-vs-all-OFF comparison. Missing fixture files cannot pass because the test requires two successful fixture loads.",
+    "new_public_test_data": "The new test_gguf_mmq_store.cu public-bridge test generates deterministic Q4_K weights (not the pinned model fixture) for N=17408/384 and T=1280/1281; it can emit exact FP32 dumps for cross-build comparison. No model-weight claim is made for this generated corpus.",
+    "finding": {"severity":"P2","file":"tests/ops/linear/tests.cmake","lines":"62-65, 134-137","description":"There are two differently gated child-CTA regression tests. The feature-specific ninfer_linear_gguf_q4_mmq_child_cta_test invokes test_gguf.cpp, whose child path has no runtime SM86 check; when called without fixture/output args it returns skip 77, and the external real-fixture invocation can still exercise the ordinary fallback on a non-SM86 runtime. The new guarded public test is registered unconditionally and uses generated weights, so it does not itself establish the real-fixture exact-dump path. Thus no single registered test binds runtime-8.6 proof to the real-fixture/equality-dump test.","suggested_resolution":"Add the same 8.6 runtime skip guard to test_gguf.cpp when --q4-mmq-child-cta-regression is selected. Preserve the separate generated-data public bridge test, but make the real-fixture external invocation require the guard and record its output for exact all-OFF comparison."},
+    "limits": "No code was compiled or executed; tests, linked route, exact dump parity, fixture execution and runtime device binding remain unverified."
+  },
+  "validation": {"git_head":"fffed819a1b97437da3891b4afbc280e42965405","manifest_hashes":"PASS","patch_sha256":"39921b65afad3709bc5b6173b0c8077219f1a3df2c6a93ff5387aa374bf6c4f9","build":"NOT RUN","tests":"NOT RUN","GPU":"NOT RUN","integration":"NOT RUN"}
+}

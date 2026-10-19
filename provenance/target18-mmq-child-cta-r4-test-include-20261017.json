@@ -1,0 +1,44 @@
+{
+  "schema": "ninfer.child_cta.r4_test_include_delta.v1",
+  "status": "FROZEN_SOURCE_DELTA",
+  "created_utc": "2026-10-17T06:18:43.3533026Z",
+  "parent": {
+    "r3_manifest_sha256": "2c5d1b1358633e0c7d296a4ced387580c3bb3a70a7c4d1a2206fe05b2ae0da07",
+    "r3_manifest_path": "provenance/target18-mmq-child-cta-prototype-r3-20261017.json",
+    "r3_patch_sha256": "628d90bd77082519103035fbc5bb7fd3de3203c338f8f902919df532381d153f",
+    "r3_patch_path": "provenance/target18-mmq-child-cta-r3.patch"
+  },
+  "raw_r3_file": {
+    "sha256": "3f903e54227a35f5abd12d0f55d4aaa6fc008cef6e8d0e8837150a98b090b566",
+    "path": "provenance/child-cta-r3-raw-test_gguf_mmq_store.cu"
+  },
+  "change": {
+    "description": "Adds the missing standard <filesystem> include required by std::filesystem::exists in the public child-CTA output fixture; no test or kernel logic changed",
+    "old_sha256": "3f903e54227a35f5abd12d0f55d4aaa6fc008cef6e8d0e8837150a98b090b566",
+    "patch_sha256": "d4e204e3d5279526b1b1af5118b67b540905decefa4d39f7706a7483120895b4",
+    "new_sha256": "b9a2dce32719542359ea0641b72c7283acc7f50b8d3b95f4f6a78568b63e479f",
+    "patch_path": "provenance/target18-mmq-child-cta-r4-test-include.patch",
+    "path": "tests/ops/linear/test_gguf_mmq_store.cu"
+  },
+  "unchanged_r3_source_files": {
+    "tests/ops/linear/test_gguf.cpp": "121fac80e6bc023fbd4f26593335e7b62b88f7f153f3ee432a7f138bc31bf908",
+    "third_party/ggml-quants/src/ggml-cuda/mmq-load-tiles.cuh": "80a7e02c1b2019db4ebdc1ef398a405c0249174dcf13a3d74b5d29af0347e3cf",
+    "tests/ops/linear/tests.cmake": "a9f969313959e8194a867158f4a9fda70fa0bf44e1c45c6f81c4d4d9eb64d71e",
+    "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "9d62222201d76f45521f44da6a42790fcfaab4dcc4736ca3f89e6d69f478e539",
+    "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "20926fd898c1d289d36071e5948bc8545e58a46b476b902ddd6b5f1e51c376d6",
+    "src/ops/linear/gguf/sources.cmake": "3a65ed9e8b005d0bf56f3e0d42c760a8720f14bfa08b886f480469d3eb48a11f",
+    "third_party/ggml-quants/src/ggml-cuda/mmq-vec-dot.cuh": "58e37adf4a4d1f57c7d9a8416783e813f2f76366308516b35f6626dc577d0d96"
+  },
+  "validation": {
+    "raw_pre_edit_copy": "PASS",
+    "source_manifest_r3": "preserved byte-for-byte",
+    "build": "NOT_RUN",
+    "runtime": "NOT_RUN",
+    "gpu": "NOT_RUN",
+    "other_seven_source_hashes": "PASS"
+  },
+  "review_lineage": {
+    "kernel_review_parent": "R3 child-CTA kernel review receipts remain unchanged and are inherited as parent evidence only",
+    "fresh_r4_kernel_reviews": "NOT_CLAIMED"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "STATIC_REVIEW_PASS_WITH_P2_RUNTIME_COVERAGE_GAP",
+  "reviewed_at": "2026-10-17",
+  "source_pin": {"head":"fffed819a1b97437da3891b4afbc280e42965405","branch":"lab/target18-mmq-child-cta","worktree":"C:/AI/tuning/ninfer-lab-20261015/work-target18-mmq-child-cta"},
+  "prototype_manifest": {"path":"provenance/target18-mmq-child-cta-prototype-20261017.json","sha256":"e1342ecc950d72046dd4876eab3624fc93d347adc068b9fe85e038b0b864384a"},
+  "changed_file_manifest_hashes_verified": true,
+  "changed_files": {
+    "tests/ops/linear/tests.cmake":"3095a8bf12f350b8bc569bdc73fb54fed5971f545c202dbe86ac230dce42734b",
+    "third_party/ggml-quants/src/ggml-cuda/mmq-load-tiles.cuh":"80a7e02c1b2019db4ebdc1ef398a405c0249174dcf13a3d74b5d29af0347e3cf",
+    "third_party/ggml-quants/src/ggml-cuda/mmq.cuh":"20926fd898c1d289d36071e5948bc8545e58a46b476b902ddd6b5f1e51c376d6",
+    "third_party/ggml-quants/src/ggml-cuda/mmq-vec-dot.cuh":"58e37adf4a4d1f57c7d9a8416783e813f2f76366308516b35f6626dc577d0d96",
+    "src/ops/linear/gguf/sources.cmake":"3a65ed9e8b005d0bf56f3e0d42c760a8720f14bfa08b886f480469d3eb48a11f",
+    "tests/ops/linear/test_gguf.cpp":"1f774bbc6f2a13805388ee7c64b1f7b2a460bd3436ae65602b496088bb9a2b25"
+  },
+  "review": {
+    "switch_and_compile_scope": "PASS STATIC: option NINFER_GGUF_Q4_MMQ_CHILD_CTA is default OFF; CMake rejects non-86 configured architectures and defines the runtime implementation macro only on ggml_mmq_q4_k.cu. Template parameters are defaulted false and loader I override defaults -1, preserving existing caller specialization behavior. Dispatch is constrained to Q4_K/J128/cc86/no ids_dst and falls back when Q4 async X/Y macros are enabled. It is reached only after the existing stream-K path selection.",
+    "mapping_and_fixup": "PASS STATIC: child grid splits each existing logical I=128 tile into two physical I=64 CTAs while preserving the existing stream-K x partition. Child row offsets are applied to source loads and direct stores; fixup writes use the original logical J*I scratch layout and existing reducer. Row-bound checks use the baseline inclusive max-index convention.",
+    "test_binding_and_corpus": "PASS STATIC: regression CLI requires both a weight directory and output path, calls public ops::linear with Q4_K, and requires two real fixture loads (N=17408 and 384 prefix) so synthetic fallback cannot satisfy the run. It covers T=1280/1281, full finite output, sampled CPU FP64 and independent Q8_1 oracle comparisons, graph/eager bitwise parity and output canaries. The 17408 fixture is used for both shapes; no repeated-row fixture is represented as real full-head data. Exact complete dump comparison against baseline remains an external qualification gate, not established by this static review.",
+    "finding": {"severity":"P2","file":"tests/ops/linear/test_gguf.cpp","lines":"2700-2703, 2816-2820","description":"The new regression checks only that some CUDA device exists and that real fixtures/output paths were supplied. It does not require runtime compute capability 8.6, while dispatch in mmq.cuh:1817 is explicitly guarded by cc==86. Running the regression on another CUDA architecture can exercise the unchanged fallback and still report the child-CTA test as successful. CMake's architecture setting does not prove runtime device selection.","suggested_resolution":"Before accepting this test as candidate-route coverage, check the selected runtime device properties and return the test's skip code unless major/minor are 8/6, or bind a separate route receipt to the actual executed kernel."},
+    "compile_guard_findings": "No other missing declarations or template-default regressions identified by source inspection; compile was intentionally not run."
+  },
+  "validation": {"git_head":"fffed819a1b97437da3891b4afbc280e42965405","worktree_changes":"six intended source files plus provenance manifest only","compile":"NOT RUN","tests":"NOT RUN","GPU":"NOT RUN","benchmark":"NOT RUN"},
+  "limitations": ["Static review only; no NVCC specialization/link/runtime evidence.","Candidate launch, occupancy, exact dump parity and full runtime dispatch are unverified.","The P2 runtime-architecture test gap should be closed before interpreting a regression pass as proof the child path ran."]
+}

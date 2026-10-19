@@ -138,6 +138,65 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro
         check(cudaGetLastError(), "matrix product launch");
         return;
     }
+#if defined(NINFER_GGUF_Q4_MMQ_CHILD_CTA) && !defined(NINFER_GGUF_Q4_MMQ_ASYNC_X) && !defined(NINFER_GGUF_Q4_MMQ_ASYNC_Y)
+    if constexpr (type == GGML_TYPE_Q4_K && J == 128) {
+        const DeviceFacts& device = device_facts();
+        if (device.cc == 860 && launch.I == 128) {
+            if (out_bf16 != nullptr && launch.fixup) {
+                throw std::invalid_argument("gguf BF16 matrix product requires no fixup");
+            }
+            ggml_cuda_mmq_config child_config = ggml_cuda_mmq_get_config(type, J, false, device.cc);
+            child_config.I = 64;
+            const std::size_t child_shared = mmq_get_nbytes_shared(child_config, device.cc);
+            const dim3 child_blocks(launch.blocks, 2, 1);
+            int child_device = 0;
+            check(cudaGetDevice(&child_device), "child-CTA device");
+            if (out_bf16 != nullptr) {
+                static std::once_flag child_bf16_raised[16];
+                std::call_once(child_bf16_raised[child_device & 15], [&] {
+                    check(cudaFuncSetAttribute(
+                              mul_mat_q<type, J, false, GGML_PREC_Q8, true,
+                                        bf16_accumulate, bf16_gate_product, true>,
+                              cudaFuncAttributeMaxDynamicSharedMemorySize,
+                              static_cast<int>(child_shared)),
+                          "child-CTA BF16 matrix shared memory");
+                });
+                mul_mat_q<type, J, false, GGML_PREC_Q8, true, bf16_accumulate,
+                          bf16_gate_product, true><<<child_blocks, block_dims, child_shared, stream>>>(
+                    weight, activation, nullptr, nullptr, out, out_bf16,
+                    launch.fixup ? fixup : nullptr, bf16_gate_product ? gate : nullptr,
+                    blocks_fd, rows, columns, stride_row_blocks, columns, stride,
+                    one_fd, one_fd, 0, 0,
+                    bf16_gate_product ? static_cast<int>(gate_column_stride) : 0,
+                    one_fd, one_fd, 0, 0, 0, ntx_fd);
+            } else {
+                static std::once_flag child_float_raised[16];
+                std::call_once(child_float_raised[child_device & 15], [&] {
+                    check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8,
+                                                               false, false, false, true>,
+                                               cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                               static_cast<int>(child_shared)),
+                          "child-CTA FP32 matrix shared memory");
+                });
+                mul_mat_q<type, J, false, GGML_PREC_Q8, false, false, false, true>
+                    <<<child_blocks, block_dims, child_shared, stream>>>(
+                        weight, activation, nullptr, nullptr, out, nullptr,
+                        launch.fixup ? fixup : nullptr, nullptr, blocks_fd, rows, columns,
+                        stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,
+                        one_fd, one_fd, 0, 0, 0, ntx_fd);
+            }
+            check(cudaGetLastError(), "child-CTA matrix product launch");
+            if (!launch.fixup || out_bf16 != nullptr) { return; }
+            const dim3 fixup_blocks(launch.blocks, launch.I / WARP_SIZE, 1);
+            const dim3 fixup_dims(block_dims.x, block_dims.y / 2, 1);
+            mul_mat_q_stream_k_fixup<type, J, false><<<fixup_blocks, fixup_dims, 0, stream>>>(
+                nullptr, nullptr, out, fixup, blocks_fd, rows, columns, stride, one_fd, 0,
+                one_fd, 0, ntx_fd);
+            check(cudaGetLastError(), "child-CTA matrix fixup launch");
+            return;
+        }
+    }
+#endif
     if (launch.fixup && fixup == nullptr) {
         throw std::invalid_argument("gguf matrix product: this launch needs a fixup plane");
     }

@@ -1,0 +1,21 @@
+{
+  "artifact": "child-cta-review-math-20261017-r3",
+  "base_head": "fffed819a1b97437da3891b4afbc280e42965405",
+  "input_manifest": "provenance/target18-mmq-child-cta-prototype-r3-20261017.json",
+  "input_manifest_sha256": "2c5d1b1358633e0c7d296a4ced387580c3bb3a70a7c4d1a2206fe05b2ae0da07",
+  "delta_patch": "provenance/target18-mmq-child-cta-r3.patch",
+  "delta_patch_sha256": "628d90bd77082519103035fbc5bb7fd3de3203c338f8f902919df532381d153f",
+  "r2_basis": "R2 math/state review retained; production source hashes unchanged.",
+  "r2_changed_files_verified_unchanged_except_test": true,
+  "finding_closed": {
+    "file": "tests/ops/linear/test_gguf.cpp",
+    "lines": "2817-2825",
+    "evidence": "After requiring the pinned fixture directory and output dump, the dedicated child-CTA regression queries the active CUDA device and returns skip code 77 unless compute capability is exactly 8.6. The R3 patch contains only these seven added guard lines; the remaining seven R2 source/test hashes are unchanged, and the test file matches the R3 manifest hash."
+  },
+  "findings": [],
+  "status": "STATIC_DELTA_REVIEW_PASS",
+  "limits": [
+    "No build, test, GPU, or runtime execution was performed.",
+    "The guard closes a test-device-selection gap; it does not provide runtime qualification or performance evidence."
+  ]
+}
