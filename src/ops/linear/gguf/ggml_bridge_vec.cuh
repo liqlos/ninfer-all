@@ -184,13 +184,7 @@ struct Decoder<GGML_TYPE_Q4_K> {
         for (int i = 0; i < 8; ++i) { s.w[i] = int((v[i] >> shift) & 0x0F0F0F0Fu); }
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float sum) {
-#if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
-        const int dot_lo = dot4(s.w, a, 0);
-        const int dot_hi = dot4(s.w + 4, a + 4, 0);
-        return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
-#else
         return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
-#endif
     }
 };
 
