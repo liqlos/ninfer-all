@@ -5,6 +5,7 @@
 .idea
 .pytest_cache
 .vscode
+.venv-convert
 
 build
 build-*

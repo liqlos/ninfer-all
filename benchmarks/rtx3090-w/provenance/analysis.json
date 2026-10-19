@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-10-18T16:58:11.060089+00:00",
+  "status": "GOAL_MET",
+  "protocol_id": "historic-w-b0-20pair-20261017",
+  "candidate_source_head": "eb82d92d37c7e3fd8dcaef74a4286158c66808f8",
+  "production_reference": {
+    "source_head": "873d5e73d693793d1d64c5798c04295a7384ceb4",
+    "image_id": "sha256:872466f1af777b597d94e57635b0768809bcb37ed1ab9a167646c3f02a5b8cb9"
+  },
+  "input_hashes": {
+    "preregistration": "c0a414ad5b91789f2cbc115547d5bc64914605f84274c0ec1a2d3fb62ef2c394",
+    "schedule": "7ec9f4317130525611f7dbe8d00a7ffe3c9c15236c1779ed045e5e3fc0db80de",
+    "comparison": "5f7712fa57b44aba6fff3d7c67d1ec196764fdf4ae42c74f014485951b5c5d43",
+    "mapping": "401aa6ff6353dffa05d907bb6b1bd3233e2b9030e69f9a47d0c98b16bdb1d13b",
+    "prereg": "c0a414ad5b91789f2cbc115547d5bc64914605f84274c0ec1a2d3fb62ef2c394",
+    "compare": "d9e92c55de5030f5c3df4cfc5098c3fd764ce7e03e09bc553d4016c9812aa849",
+    "bench": "f383a7320b90d28fc7f09d5bd3d1cdabad52604b7943c084f5282c7109f42003",
+    "identity:hw20-20261017-p01-b0": "79a7af0c55a4fc3d304d4ff8b2b2abf8d30da2d52e33ec51e94d7194c5364393",
+    "identity:hw20-20261017-p01-w": "975f9fa1776f52fcdff9eea64311f95da6060ccd49fa925f7ae9a62d6d000b07",
+    "identity:hw20-20261017-p02-b0": "6de44a91f9b4841145673de5901ccba0e51763d77f9c143d25fa1c9dd60f0ab5",
+    "identity:hw20-20261017-p02-w": "7b1b236ac5265f964dd9e57d8c588a89e4b9596f171f734531cf41027cd9b335",
+    "identity:hw20-20261017-p03-b0": "b70f63519a949e3265e3e5cf22edf4bb3f7ce34d9fb7fb3e4238030792549314",
+    "identity:hw20-20261017-p03-w": "1547d463a4e5a56233dc0e5631707a3a70770056a1ce59515640a3062b4866b0",
+    "identity:hw20-20261017-p04-b0": "61992c0370ef0f4c40c1bc2b96cc6d98f9a73102726b176a70c6de55da2b389c",
+    "identity:hw20-20261017-p04-w": "2c46a5138f2e329b0b932cef7ec897c3ce3d40c967e3da632e267ce4a4b2c679",
+    "identity:hw20-20261017-p05-b0": "07cb2d70c2ee61e4557acb847a36c06329e167cfda2137500bbd345d9cea8a31",
+    "identity:hw20-20261017-p05-w": "bd575f2dd420c0afffe520673cf7e7ed869158e4758ed36d609ca5217bf6b245",
+    "identity:hw20-20261017-p06-b0": "e54bf6c874ab335623b72c7b8fe16fdb64ad5c149eafd90627bc182f8a7ddc72",
+    "identity:hw20-20261017-p06-w": "73d06685497caf96e9cbb4bc489b3f069f8abebef86766783b6bd4fe42e65c8b",
+    "identity:hw20-20261017-p07-b0": "8c1480c1cb19106a2781f7608d89f5fde0deddc6bc181e60d1f5c5b319581612",
+    "identity:hw20-20261017-p07-w": "a0bb95e025ed0867c7cc304cd83a0dcd1cda0b703c9b2b3e6a30d4121edcde76",
+    "identity:hw20-20261017-p08-b0": "553254d57ad43b78c67e48783cdbfe6af4f5e05725aa1a5831c42d0b3bae3e14",
+    "identity:hw20-20261017-p08-w": "44a9462fb9efa5fa693d1e6b2b58dd6d312d65b551d29047cdfb2315e901c030",
+    "identity:hw20-20261017-p09-b0": "594079287c1de02258bb1c6aa836fde9f7aa083b8ad8805de5856c5c87250d57",
+    "identity:hw20-20261017-p09-w": "9f2ed633736f841656dec11ff6ccad893b7e2823021770d9582256fcf065ae4a",
+    "identity:hw20-20261017-p10-b0": "da3b6a094b9207b02d115cba72c451e4662411bf8d144b486a2c8210bddc226b",
+    "identity:hw20-20261017-p10-w": "c11a5987a1b8e6d937bf1632ec9d8af2d59d7310f2398e5011ee03dea9f68766",
+    "identity:hw20-20261017-p11-b0": "293a1b1e47677437f53600a5a1f26ff7a1058f569728049da9b4f8a48502d6b1",
+    "identity:hw20-20261017-p11-w": "2d5b5b3fa556a360d860470d637dd424a6504271f2adcce150866ef065fe30c2",
+    "identity:hw20-20261017-p12-b0": "9ac200627bbada9001e9dfed6a9c2e9758eae64bb01be5accfba35dadbd91f72",
+    "identity:hw20-20261017-p12-w": "f3e95dfd0ce44711b52b982448916797da18c0e0a452c11596b38140e1293731",
+    "identity:hw20-20261017-p13-b0": "39430b0fe2f50fa14206c4bdf7e91f86d89b65ec5399486302a8347fc4027be9",
+    "identity:hw20-20261017-p13-w": "0c79c045e9f01e0a53a15c6c8f5f16c792b3c8fbaadb6d52de87d6a47eee7753",
+    "identity:hw20-20261017-p14-b0": "b26b8f2d5830140a3fd5ffc557215630f8a456ec192a73a71610f01883d57b72",
+    "identity:hw20-20261017-p14-w": "ecbbcb85552299d25cfc6affe300c6d2b6a0c351332e2f4960087071a8128d98",
+    "identity:hw20-20261017-p15-b0": "cdba06e90859d5a76eaf91b1d5df9a41abdbef9f30fccca3435d09cda55832c2",
+    "identity:hw20-20261017-p15-w": "942875cb9ff2cd7ab6a84ed48956a2cb0632329c7dab3af17f15f22d24691626",
+    "identity:hw20-20261017-p16-b0": "55fd4e06b5a94687ad219f75a79b3e03ed0a7eaf74929ec4c7b83fe052f63894",
+    "identity:hw20-20261017-p16-w": "61581f22119b5e26d34127fcac13a2ceb30613a7d70495389bde816d19c099cc",
+    "identity:hw20-20261017-p17-b0": "3a6bfb359ab0d25e4b37ebbb5f36c842b1c2e91ab1b77b7cb73be89a113383c2",
+    "identity:hw20-20261017-p17-w": "7f937e60bad64001e2dd7a565cf2adc673fd308454b52154cf8094a1a4efce16",
+    "identity:hw20-20261017-p18-b0": "3078ac4c94ae3165368b36ac30fa5e5fe5f232fcf10eccc0cfd2c79dbc27399f",
+    "identity:hw20-20261017-p18-w": "9d120066cefd8d641f10e781bb00a8e870589bad2f45dc1aebd43455a69174f9",
+    "identity:hw20-20261017-p19-b0": "a1f6868eecd8ad99e96951805255c89c6dae870f6bcb1686dd3eb4699cca0e6c",
+    "identity:hw20-20261017-p19-w": "d90e07e2797581a4290483da5eda33a5529ca1562e01cbff4fb5c96916d8fc0a",
+    "identity:hw20-20261017-p20-b0": "c79e5de5934e47f50df51d93981ea29542b689b37e7a4b414c139bee9ae514f6",
+    "identity:hw20-20261017-p20-w": "8597ed22bc9e68f5ef8d28b4e150372465278ff024c9b060e4c1adba7a4f0eb0"
+  },
+  "planned_blocks": 5,
+  "complete_pairs": 20,
+  "pairs_per_block": 4,
+  "category_pair_scores_percent": {
+    "hw20b01p01": 5.598115344924244,
+    "hw20b01p02": 4.742087036613514,
+    "hw20b01p03": 6.042811884322038,
+    "hw20b01p04": 5.504549411670653,
+    "hw20b02p01": 8.104267904648,
+    "hw20b02p02": 5.219866060345392,
+    "hw20b02p03": 5.204143099704526,
+    "hw20b02p04": 5.246396600327369,
+    "hw20b03p01": 5.195521460961315,
+    "hw20b03p02": 5.057979257756727,
+    "hw20b03p03": 5.14701881818663,
+    "hw20b03p04": 5.2624226169380695,
+    "hw20b04p01": 5.215280829206295,
+    "hw20b04p02": 5.5155002628234415,
+    "hw20b04p03": 5.198861002202874,
+    "hw20b04p04": 5.203551641322761,
+    "hw20b05p01": 5.133866765559499,
+    "hw20b05p02": 5.146570560167564,
+    "hw20b05p03": 4.952539932152834,
+    "hw20b05p04": 5.448768892045623
+  },
+  "block_scores_percent": [
+    {
+      "block_id": "hw20-block-01",
+      "block_index": 0,
+      "mean_percent": 5.471890919382612
+    },
+    {
+      "block_id": "hw20-block-02",
+      "block_index": 1,
+      "mean_percent": 5.943668416256322
+    },
+    {
+      "block_id": "hw20-block-03",
+      "block_index": 2,
+      "mean_percent": 5.165735538460686
+    },
+    {
+      "block_id": "hw20-block-04",
+      "block_index": 3,
+      "mean_percent": 5.283298433888843
+    },
+    {
+      "block_id": "hw20-block-05",
+      "block_index": 4,
+      "mean_percent": 5.17043653748138
+    }
+  ],
+  "primary_inference": {
+    "unit": "complete block mean; four pair scores and four equally weighted categories per block",
+    "confidence": 0.95,
+    "degrees_of_freedom": 4,
+    "student_t_critical": 2.7764451051977943,
+    "mean_percent": 5.4070059690939685,
+    "sample_sd_percentage_points": 0.3246908952782036,
+    "standard_error_percentage_points": 0.14520618270346575,
+    "low_percent": 5.003848973882475,
+    "high_percent": 5.810162964305462,
+    "acceptance_lower_bound_percent": 3.0,
+    "acceptance_passed": true
+  },
+  "cluster_bootstrap_sensitivity": {
+    "low_percent": 5.191128517154595,
+    "high_percent": 5.693726341322453,
+    "method": "percentile resample of complete block means",
+    "samples": 100000,
+    "seed": 20261017
+  },
+  "serial_sensitivity": {
+    "first_half_mean_percent": 5.707779667819467,
+    "second_half_mean_percent": 5.206490169943637,
+    "second_minus_first_percentage_points": -0.5012894978758302,
+    "lag1_autocorrelation_descriptive": -0.08429535044836162,
+    "warning": "Block labels and temporal separation do not prove independent or exchangeable scores."
+  },
+  "hard_gates": {
+    "all_required_comparison_gates_passed": true,
+    "production_B0_identity_and_image_pinned": true,
+    "exact_fixed_pair_set_and_balanced_order": true,
+    "mapping_and_identity_hashes_verified": true
+  },
+  "limitations": [
+    "Time/session block labels and ordering do not prove statistical independence or exchangeability.",
+    "The block t interval and block-cluster bootstrap assume exchangeable block scores; serial sensitivity is descriptive, not a correction that establishes independence.",
+    "This analyzer cannot prove efficacy results were not inspected before the fixed sample count completed.",
+    "Exploratory screen observations are excluded; only the hash-bound preregistered confirmation comparison is analyzed.",
+    "Category medians and paired deltas are trusted as derived by the hash-pinned frozen compare.py report; raw per-tag timing rows are not recomputed here.",
+    "The separately defined longer holdout is not pooled with the frozen 4096/256 primary corpus.",
+    "Randomization method/seed and timestamps are pinned, but this analyzer does not independently prove how the schedule was generated or that outcomes remained blinded.",
+    "A fixed planned N is accepted from preregistration but its power adequacy is not recomputed here."
+  ]
+}

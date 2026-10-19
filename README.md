@@ -1,5 +1,8 @@
 # NInfer-all
 
+This fork adds opt-in RTX 3090 kernels that share Q4_K/Q6_K loads between lanes and fuse MMQ BF16 stores.
+[Build and GPU checks](docs/performance-rtx3090-w.md) · [Measurements of the archived W v6 version](benchmarks/rtx3090-w/README.md).
+
 One line of [NInfer](https://github.com/Neroued/ninfer) for the RTX 3090, RTX 4090 and RTX 5090,
 consolidated from the forks that carry it and extended with this repository's own work. The base is
 the `master` of [ashalliants/ninfer-3090](https://github.com/ashalliants/ninfer-3090): v0.11.0 and
@@ -46,9 +49,6 @@ otherwise; each number's setup and the full tables are in the
   RTX 5090, and `rk4v4` decode after it is 11 to 13% faster on the 24 GB cards. Decode at short
   context is unchanged, since it is bound by reading the weights, and Qwen3.8's 8K to 32K prompts on
   the RTX 5090 take 8 to 10% longer.
-- **The RTX 3090's device profile** runs the `rk4v4` verify attention at 262K 3.2 times faster than
-  the compiled route, and the fast prompt kernel with FP16 P·V takes 19 to 30% less prompt-attention
-  time on all three cards.
 - **Draft length.** DFlash2 with seven drafts is fastest on short answers, while after long
   documents the best count lies between three and seven; MTP runs up to fifteen drafts now but is
   fastest at three to five.
