@@ -1160,7 +1160,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 #pragma unroll
                 for (int j = 0; j < T; ++j) {
 #if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Baseline) {
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
                         acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
                     } else {
                         acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
@@ -1210,7 +1210,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 #pragma unroll
                     for (int j = 0; j < T; ++j) {
 #if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Baseline) {
+                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
                             acc[r][j] += D::dot_short_chain(staged[it & 1][r], a[j], d[j], sum[j]);
                         } else {
                             acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
@@ -1245,7 +1245,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 #pragma unroll
                 for (int j = 0; j < T; ++j) {
 #if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && !Baseline) {
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
                         acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
                     } else {
                         acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);

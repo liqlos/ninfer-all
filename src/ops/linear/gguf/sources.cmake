@@ -1,7 +1,7 @@
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
-option(NINFER_GGUF_DP4A_SHORT_CHAINS "Split SM86 generic Q4_K T4 vector dot chains" OFF)
+option(NINFER_GGUF_DP4A_SHORT_CHAINS "Split SM86 generic Q4_K K5120 T4 vector dot chains" OFF)
 if(NINFER_GGUF_DP4A_SHORT_CHAINS)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "GGUF short DP4A chains require sm_86")
