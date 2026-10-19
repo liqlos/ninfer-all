@@ -1,5 +1,6 @@
 #include "ops/linear/gguf/gguf_linear.h"
 #include "ops/linear/gguf/ggml_bridge_dual_mmq.h"
+#include "ops/linear/gguf/ggml_bridge_ffn_pair.h"
 
 #include "core/layout.h"
 
@@ -872,6 +873,20 @@ void gguf_swiglu(const Tensor& x, const Weight& gate, const Weight* up, Tensor& 
         }
         up_rows = *up;
     }
+#if defined(NINFER_GGUF_FFN_PAIR_MMQ_FUSION)
+    if (t == 1280 && rows == 17408 && x.ne[0] == 5120 && gate_rows.k == 5120 &&
+        gate_rows.qtype == QType::GGUF_Q4_K && up_rows.qtype == QType::GGUF_Q4_K &&
+        gate_rows.input_columns == nullptr && up_rows.input_columns == nullptr) {
+        auto pair_scope = workspace.scope();
+        void* activation = workspace.alloc_bytes(gguf::matrix_activation_bytes(5120, t)).data;
+        gguf::quantize_matrix_activation(gguf::GgmlType::Q4_K,
+            static_cast<const __nv_bfloat16*>(x.data), 5120, t, nullptr, activation, stream);
+        if (gguf::ffn_q4_k_mmq_pair(gate_rows.qdata, up_rows.qdata, row_bytes(gate_rows),
+                activation, t, static_cast<__nv_bfloat16*>(out.data), stream)) {
+            return;
+        }
+    }
+#endif
     auto* gate_plane =
         static_cast<float*>(workspace.alloc_bytes(std::size_t(rows) * t * sizeof(float)).data);
     GgufProduct products[2];

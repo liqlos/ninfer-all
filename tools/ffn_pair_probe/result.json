@@ -1,0 +1,92 @@
+{
+  "schema": "ffn-pair-mmq-screen-v1",
+  "decision": "REJECT",
+  "scope": "exploratory operator only; no full-model result",
+  "geometry": {
+    "K": 5120,
+    "N": 17408,
+    "T": 1280
+  },
+  "switch": "NINFER_GGUF_FFN_PAIR_MMQ_FUSION",
+  "default": "OFF",
+  "fixture_sha256": "be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790",
+  "baseline": "native J128 separate Q4_K FP32 gate/up MMQs + native GateProduct store; common DS4 pack excluded from both timings",
+  "candidate": "J64 paired full-K MMQ, independent FP32 gate/up accumulators, fused SiLU*up BF16 store",
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 8.494784509e-05,
+    "fp64_max_rel_error": 0.08026333358,
+    "input_seed": 214253511,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r2-968de571f2d148dbae65fc5d52a45a3d"
+  },
+  "timing_blocks": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.471152067,
+      "candidate_ms": 8.166996002,
+      "speedup_percent": -82.65976821
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.50611186,
+      "candidate_ms": 7.972095966,
+      "speedup_percent": -76.91740049
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.736128092,
+      "candidate_ms": 8.069348335,
+      "speedup_percent": -70.37859152
+    }
+  ],
+  "geometric_operator_latency_increase_pct": 76.58053371065105,
+  "resources": {
+    "j64": {
+      "registers_per_thread": 255,
+      "stack_bytes": 0,
+      "spill_load_bytes": 0,
+      "spill_store_bytes": 0
+    },
+    "j128_compile_only": {
+      "registers_per_thread": 255,
+      "stack_bytes": 912,
+      "spill_store_bytes": 2112,
+      "spill_load_bytes": 2116,
+      "gpu_timing": "NOT_RUN; resource gate rejected"
+    }
+  },
+  "interpretation": "The J64 implementation is 70-83% slower across three balanced blocks. No independent confirmation or full-server build is justified. J128 avoids the smaller column tile but fails the spill gate. This rejects these schedules, not every possible paired FFN algorithm. Static source suggests reduced column reuse and extra live weights/accumulators; hardware bottleneck attribution was not measured.",
+  "history_review": "Distinct from E5 Q8 SwiGLU/down fusion, E10 vector T1-8 persistent FFN, N6144 paired attention MMQ and up-only gate epilogue.",
+  "initial_correctness_repair": "Moved architecture-dependent launch constants into the device kernel; host launch uses live SM86 config.I/nthreads. Initial guard failure excluded from timing.",
+  "binary_sha256": "3bcf7046e96a91cb5ce750ccee203cc1f7d66f80f1de24d6e3d7c6be01ea3671",
+  "production_config_unchanged": true,
+  "owned_container_removed": true,
+  "reservation_released": true,
+  "source_sha256": {
+    "src\\ops\\linear\\gguf\\ggml_mmq_ffn_pair.cu": "d944d5590c1350046fb274c0e86986d564a5ae636bf727d551acfff8e99d878e",
+    "src\\ops\\linear\\gguf\\ggml_bridge_ffn_pair.h": "c78956039ff1168b2953d702d8777571fb44b25196df9df6b851bae396e4506b",
+    "src\\ops\\linear\\gguf\\gguf_linear.cpp": "dbdc9738871b5b95ab74e4893e792c5a796658472d01931641097ca0c88d445f",
+    "src\\ops\\linear\\gguf\\sources.cmake": "660f167f96d7cef19e78c36d307c9cb331067734711048701d913b9113e25c03"
+  }
+}
