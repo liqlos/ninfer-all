@@ -88,5 +88,14 @@
     "src\\ops\\linear\\gguf\\ggml_bridge_ffn_pair.h": "c78956039ff1168b2953d702d8777571fb44b25196df9df6b851bae396e4506b",
     "src\\ops\\linear\\gguf\\gguf_linear.cpp": "dbdc9738871b5b95ab74e4893e792c5a796658472d01931641097ca0c88d445f",
     "src\\ops\\linear\\gguf\\sources.cmake": "660f167f96d7cef19e78c36d307c9cb331067734711048701d913b9113e25c03"
+  },
+  "lessons": {
+    "confirmed": [
+      "J64 exact-output screen is negative; J128 compiler spills.",
+      "J64 doubles logical weight tile loads,5440 vs2720; logical tile counts are not DRAM traffic."
+    ],
+    "causal_limit": "Baseline J128 and candidate J64 differ in fusion and tile geometry; the77% regression cannot be assigned quantitatively to a single cause. No hardware-counter attribution was measured.",
+    "future_filter": "Lower priority for dual-heavy accumulators requiring smaller tiles or spills. Prefer distinct single-product layout/scheduling or producer/epilogue changes that preserve reuse. Reject-repeat rule applies to these schedules,not all fusion.",
+    "isolation": "Rejected code may remain behind compile-time default-OFF flags. Verify actual cached options/compile definitions and executable receipt,not defaults alone. No blanket historical revert; preserve measured conclusions and commit history."
   }
 }
