@@ -5,6 +5,9 @@ their fine-tunes and Ternary Bonsai 2), Qwen3.8-Flash-Next and Gemma 4 26B-A4B, 
 Volta to consumer Blackwell, from 8 GB of memory. It serves the OpenAI, Anthropic and llama.cpp APIs
 from one GPU, or from up to eight as pipeline stages on Linux.
 
+Opt-in SM86 Q4_K/Q6_K kernels: [options and validation](docs/performance-rtx3090-w.md),
+[historical measurements](benchmarks/rtx3090-w/README.md).
+
 [Quick start](#quick-start) · [Supported GPUs](#supported-gpus) · [Models](#artifacts) ·
 [Highlights](#highlights) · [Features](#features) · [Docker](#docker) · [Building](#building) ·
 [Documentation](docs/README.md)

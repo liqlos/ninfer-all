@@ -946,6 +946,37 @@ void moe_matrix_product(GgmlType type, const MoeTable& table, const MoeRouting& 
     throw std::invalid_argument("gguf moe matrix product: no integer kernel for this block type");
 }
 
+bool matrix_product_bf16_store(GgmlType type, const void* weight, std::int64_t row_bytes,
+                               int rows, int k, const void* activation, int columns,
+                               __nv_bfloat16* out, std::int64_t out_column_stride,
+                               cudaStream_t stream, bool accumulate) {
+#if defined(NINFER_GGUF_MMQ_STORE_FUSION)
+    switch (type) {
+    case GgmlType::Q4_K:
+        return detail::matrix_product_bf16_store_impl<GGML_TYPE_Q4_K>(
+            weight, row_bytes, rows, k, activation, columns, out, out_column_stride, stream, accumulate);
+    case GgmlType::Q6_K:
+        return detail::matrix_product_bf16_store_impl<GGML_TYPE_Q6_K>(
+            weight, row_bytes, rows, k, activation, columns, out, out_column_stride, stream, accumulate);
+    default:
+        return false;
+    }
+#else
+    (void)type;
+    (void)weight;
+    (void)row_bytes;
+    (void)rows;
+    (void)k;
+    (void)activation;
+    (void)columns;
+    (void)out;
+    (void)out_column_stride;
+    (void)stream;
+    (void)accumulate;
+    return false;
+#endif
+}
+
 void store_plane(const float* in, std::int64_t in_column_stride, int rows, int columns,
                  const VectorOutput& out, cudaStream_t stream) {
     if ((out.bf16 == nullptr) == (out.f32 == nullptr) ||

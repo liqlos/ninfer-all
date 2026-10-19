@@ -1,6 +1,29 @@
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
+option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Share packed Q4_K loads across SM86 lanes" OFF)
+option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Share packed Q6_K loads across SM86 lanes" OFF)
+option(NINFER_GGUF_MMQ_STORE_FUSION "Fuse Q4_K/Q6_K MMQ output conversion into BF16 stores" OFF)
+foreach(feature NINFER_GGUF_Q4_COOPERATIVE_DECODE NINFER_GGUF_Q6_COOPERATIVE_DECODE NINFER_GGUF_MMQ_STORE_FUSION)
+  if(${feature} AND NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "${feature} requires sm_86")
+  endif()
+endforeach()
+if(NINFER_GGUF_Q4_COOPERATIVE_DECODE)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_COOPERATIVE_DECODE=1)
+endif()
+if(NINFER_GGUF_Q6_COOPERATIVE_DECODE)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_COOPERATIVE_DECODE=1)
+endif()
+if(NINFER_GGUF_MMQ_STORE_FUSION)
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_bridge.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu"
+    "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_MMQ_STORE_FUSION=1)
+endif()
 add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_bridge.cu"
   "${CMAKE_CURRENT_LIST_DIR}/ggml_fattn.cu"

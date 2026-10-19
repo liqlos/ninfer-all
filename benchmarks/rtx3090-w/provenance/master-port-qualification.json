@@ -1,0 +1,169 @@
+{
+  "status": "PASS_TRANSLATION_UNIT_COMPILATION_ONLY",
+  "qualified_utc": "2026-10-19T11:36:03.221876+00:00",
+  "upstream_base": "5ed86dff9fe3a5a0776f40a7aea86cf381da990d",
+  "environment": {
+    "os": "Ubuntu 24.04, Docker on WSL2",
+    "cuda": "13.1.115",
+    "host_compiler": "GNU 13.3.0",
+    "architecture": "86"
+  },
+  "configuration": [
+    "cmake",
+    "-S",
+    ".",
+    "-B",
+    "build-pr-port",
+    "-G",
+    "Ninja",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DCMAKE_CUDA_ARCHITECTURES=86",
+    "-DNINFER_BUILD_APPS=OFF",
+    "-DBUILD_TESTING=ON",
+    "-DNINFER_BUILD_BENCHMARKS=OFF",
+    "-DNINFER_GGUF_Q4_COOPERATIVE_DECODE=ON",
+    "-DNINFER_GGUF_Q6_COOPERATIVE_DECODE=ON",
+    "-DNINFER_GGUF_MMQ_STORE_FUSION=ON",
+    "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+  ],
+  "method": "Compile the selected translation-unit commands from CMake compile_commands.json to distinct object files. OFF strips only -DNINFER_GGUF_* definitions from those commands. Q8_0 is an unselected-format compile check. No linking or execution.",
+  "checks": [
+    {
+      "source": "gguf_linear.cpp",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_bridge.cu",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_vec_q4_k.cu",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_vec_q6_k.cu",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "test_gguf_mmq_store.cu",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "gguf_linear.cpp",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_bridge.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_vec_q4_k.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_vec_q6_k.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "test_gguf_mmq_store.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_mmq_q4_k.cu",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_mmq_q6_k.cu",
+      "mode": "ON",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_mmq_q4_k.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_mmq_q6_k.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    },
+    {
+      "source": "ggml_mmq_q8_0.cu",
+      "mode": "OFF",
+      "exit_code": 0
+    }
+  ],
+  "source_files": [
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge.cu",
+      "sha256": "4a1bee9e7d9ffa9da53b0eaf0f269e7e2abdb660b4e33a07cf27cabc6b3e2ab4"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge.h",
+      "sha256": "38e73105de3533f904577cbcd84e1738a212846a1fbbe99a9c81fbf7fee7d5e8"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_internal.cuh",
+      "sha256": "f738982036e635fb74bd2d1fd9391dbd4618397c436381bfb0cba4a86008e003"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_mmq.cuh",
+      "sha256": "055c4c94840cd24a8cf9ca6c5962f1e91dbe733a848eca380abab817cde5e973"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_bridge_vec.cuh",
+      "sha256": "3ab2128c37ecd599e1e8db10f74012518338fae1f1095d24f9d971a37869fb0d"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_mmq_q4_k.cu",
+      "sha256": "76ed5dc7ea83b0157c3b44880e973e5528e44c94744b29544c006ba8b778a59a"
+    },
+    {
+      "path": "src/ops/linear/gguf/ggml_mmq_q6_k.cu",
+      "sha256": "235062a8d49b9a0878812dc7e394f94622f04d791a87352f14567b7d839e13ee"
+    },
+    {
+      "path": "src/ops/linear/gguf/gguf_linear.cpp",
+      "sha256": "9812ec8b2c2fb885b65037e9616a9f84ec288ae30c5edfb3ca3093bbd390bffe"
+    },
+    {
+      "path": "src/ops/linear/gguf/gguf_linear.h",
+      "sha256": "edefdd785ee80158c8556c31a0c0461c3679383592ffec26ab664a867472cb94"
+    },
+    {
+      "path": "src/ops/linear/gguf/sources.cmake",
+      "sha256": "5dabca7647f0b6bbac7103c7d1c9a7f1a49c742a0031e44015731af0ecda1081"
+    },
+    {
+      "path": "tests/ops/linear/test_gguf_mmq_store.cu",
+      "sha256": "43bc0931f4ea0d58d02c2503b22bfc02fdce9f5fc6a2812138a6c8ac47ac2104"
+    },
+    {
+      "path": "tests/ops/linear/tests.cmake",
+      "sha256": "ac6218446a9742e117aa2784258081726d1710039348f6e1c5cd384ead9c58d7"
+    },
+    {
+      "path": "third_party/ggml-quants/src/ggml-cuda/mmq.cuh",
+      "sha256": "ebf7c2e3d9b376d2a277b57ecd4ab2ab9d5b993ee235208bac2512b750ddb50a"
+    }
+  ],
+  "not_run": [
+    "Full application/test linkage",
+    "GPU numerical and route checks on this port",
+    "Operator timings on this port",
+    "Full-model A/B timings on this port",
+    "Other architecture builds"
+  ],
+  "historical_evidence": "The W request-latency result and the earlier focused-port GPU qualification are separate records; neither qualifies this port."
+}
