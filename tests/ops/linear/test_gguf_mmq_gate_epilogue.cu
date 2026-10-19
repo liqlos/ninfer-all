@@ -11,10 +11,13 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -28,6 +31,16 @@ namespace detail = ninfer::ops::detail;
 using detail::GgufEpilogue;
 using detail::GgufProduct;
 using detail::GgufShape;
+
+struct PackedQ8MmqDs4 {
+    __half2 ds4[4];
+    std::int8_t qs[128];
+};
+
+enum class MatrixActivationDsLayout : int { D4, DS4, D2S6 };
+
+static_assert(offsetof(PackedQ8MmqDs4, qs) == sizeof(__half2) * 4);
+static_assert(sizeof(PackedQ8MmqDs4) == 144);
 
 void check(cudaError_t status, const char* label) {
     if (status != cudaSuccess) {
@@ -113,8 +126,9 @@ bool same_bf16_output(const __nv_bfloat16* expected, const __nv_bfloat16* actual
     return true;
 }
 
-void decode_reference_rows(const std::vector<std::uint8_t>& blocks, int rows, int k,
-                           const std::vector<__nv_bfloat16>& input, int columns,
+void decode_reference_rows(const std::vector<std::uint8_t>& blocks,
+                           const std::vector<std::uint8_t>& packed_activation,
+                           int rows, int k, int columns,
                            const std::vector<float>& gate, std::vector<float>& reference) {
     const auto shape = gguf::block_shape(gguf::GgmlType::Q4_K);
     const int blocks_per_row = k / shape.elements;
@@ -144,13 +158,26 @@ void decode_reference_rows(const std::vector<std::uint8_t>& blocks, int rows, in
                     }
                     const auto* packed = quants + (subblock / 2) * 32;
                     const int shift = 4 * (subblock & 1);
+                    const int activation_block = block_index * 2 + subblock / 4;
+                    const auto* q8 = packed_activation.data() +
+                        (std::size_t(activation_block) * columns + column) *
+                            sizeof(PackedQ8MmqDs4);
+                    const int q8_subblock = subblock % 4;
+                    const std::size_t ds_offset =
+                        offsetof(PackedQ8MmqDs4, ds4) + q8_subblock * sizeof(__half2);
+                    const double activation_d = half_value(q8 + ds_offset);
+                    const double activation_sum = half_value(q8 + ds_offset + sizeof(__half));
+                    const auto* q8_codes = q8 + offsetof(PackedQ8MmqDs4, qs);
+                    int dot_q4_q8 = 0;
                     for (int index = 0; index < 32; ++index) {
                         const int quant = (packed[index] >> shift) & 15;
-                        const double weight = d * scale * quant - dmin * minimum;
-                        const int k_index = block_index * 256 + subblock * 32 + index;
-                        dot += weight * __bfloat162float(
-                            input[std::size_t(column) * k + k_index]);
+                        std::int8_t activation_quant = 0;
+                        std::memcpy(&activation_quant, q8_codes + q8_subblock * 32 + index,
+                                    sizeof(activation_quant));
+                        dot_q4_q8 += quant * activation_quant;
                     }
+                    dot += double(dot_q4_q8) * d * scale * activation_d -
+                           dmin * minimum * activation_sum;
                 }
             }
             const double gate_value = gate[std::size_t(column) * rows + row];
@@ -179,6 +206,13 @@ bool compare_case(int rows, int columns, bool prepared, bool graph, int row_offs
     gguf::quantize_matrix_activation(
         gguf::GgmlType::Q4_K, static_cast<const __nv_bfloat16*>(input_device.p), k, columns,
         nullptr, activation_device.p, nullptr);
+    if (gguf::matrix_activation_layout(gguf::GgmlType::Q4_K) !=
+        static_cast<int>(MatrixActivationDsLayout::DS4)) {
+        throw std::runtime_error("Q4_K oracle requires the source-defined Q8_1 DS4 activation layout");
+    }
+    check(cudaDeviceSynchronize(), "synchronize packed Q8_1 DS4 activation");
+    std::vector<std::uint8_t> host_packed_activation(activation_device.bytes);
+    activation_device.copy_to_host(host_packed_activation.data(), activation_device.bytes);
     gguf::MatrixBf16StorePlan plan;
     const bool plan_supported =
         gguf::matrix_bf16_gate_store_plan(gguf::GgmlType::Q4_K, rows, columns, plan);
@@ -276,9 +310,10 @@ bool compare_case(int rows, int columns, bool prepared, bool graph, int row_offs
     if (!same_bf16_output(expected.data(), actual.data(), expected.size())) {
         throw std::runtime_error("MMQ GateProduct differs from native FP32 plus vec_silu BF16 store");
     }
-    const auto cpu_samples = [&] {
+    const auto oracle_samples = [&] {
         std::vector<float> result;
-        decode_reference_rows(host_weight, rows, k, host_input, columns, host_gate, result);
+        decode_reference_rows(host_weight, host_packed_activation, rows, k, columns, host_gate,
+                              result);
         return result;
     }();
     std::size_t sample = 0;
@@ -286,7 +321,7 @@ bool compare_case(int rows, int columns, bool prepared, bool graph, int row_offs
     const int selected_columns[] = {0, columns / 2, columns - 1};
     for (int row : selected_rows) {
         for (int column : selected_columns) {
-            const float expected_math = cpu_samples[sample++];
+            const float expected_math = oracle_samples[sample++];
             const float actual_math = __bfloat162float(
                 actual[std::size_t(column) * output_stride + row_offset + row]);
             const float tolerance = std::max(0.12f, std::abs(expected_math) * 0.04f);
@@ -297,7 +332,15 @@ bool compare_case(int rows, int columns, bool prepared, bool graph, int row_offs
                   (expected_math == 0.0f && actual_math == 0.0f &&
                    std::signbit(expected_math) != std::signbit(actual_math))));
             if (invalid) {
-                throw std::runtime_error("MMQ GateProduct failed the independent Q4_K FP64 oracle");
+                const float native_math = __bfloat162float(
+                    expected[std::size_t(column) * output_stride + row_offset + row]);
+                std::ostringstream message;
+                message << std::setprecision(9)
+                        << "MMQ GateProduct failed the packed Q4_K/Q8_1 DS4 FP64 oracle"
+                        << " at row=" << row << " column=" << column
+                        << " oracle=" << expected_math << " actual=" << actual_math
+                        << " native_expected=" << native_math << " tolerance=" << tolerance;
+                throw std::runtime_error(message.str());
             }
         }
     }
