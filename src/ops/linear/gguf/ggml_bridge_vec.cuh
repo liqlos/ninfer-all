@@ -11,7 +11,7 @@
 
 #include "ggml_bridge_internal.cuh"
 #include "../../common/memory.cuh"
-#if defined(NINFER_GGUF_Q4_T4_IMMA) || defined(NINFER_GGUF_Q6_T4_IMMA) || defined(NINFER_GGUF_Q4_T4_FUSED_IMMA)
+#if defined(NINFER_GGUF_Q4_T4_IMMA) || defined(NINFER_GGUF_Q6_T4_IMMA) || defined(NINFER_GGUF_Q6_T4_IMMA_K16) || defined(NINFER_GGUF_Q4_T4_FUSED_IMMA)
 #include "../../common/mma.cuh"
 #endif
 
@@ -64,18 +64,6 @@ __device__ __forceinline__ int dot4(const int* w, const int* a, int acc) {
 #pragma unroll
     for (int i = 0; i < 4; ++i) { acc = ggml_cuda_dp4a(w[i], a[i], acc); }
     return acc;
-}
-
-__device__ __forceinline__ int dot4_short_chain(const int* w, const int* a, int acc) {
-#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-    int even = ggml_cuda_dp4a(w[0], a[0], 0);
-    int odd = ggml_cuda_dp4a(w[1], a[1], 0);
-    even = ggml_cuda_dp4a(w[2], a[2], even);
-    odd = ggml_cuda_dp4a(w[3], a[3], odd);
-    return acc + even + odd;
-#else
-    return dot4(w, a, acc);
-#endif
 }
 
 __device__ __forceinline__ int sum4(const int* a) {
@@ -228,18 +216,6 @@ struct Decoder<GGML_TYPE_Q4_K> {
         return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
 #else
         return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
-#endif
-    }
-    __device__ __forceinline__ static float dot_short_chain(const Slice& s, const int* a, float d,
-                                                            float sum) {
-#if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
-        const int dot_lo = dot4_short_chain(s.w, a, 0);
-        const int dot_hi = dot4_short_chain(s.w + 4, a + 4, 0);
-        return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
-#else
-        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4,
-                                                    dot4_short_chain(s.w, a, 0))) -
-               s.f[1] * sum;
 #endif
     }
 };
@@ -877,7 +853,13 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_imma_5120(V
 }
 #endif
 
-#if defined(NINFER_GGUF_Q6_T4_IMMA)
+#if defined(NINFER_GGUF_Q6_T4_IMMA) || defined(NINFER_GGUF_Q6_T4_IMMA_K16)
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16_COOPERATIVE_METADATA)
+inline constexpr bool kQ6T4ImmaK16CooperativeMetadata = true;
+#else
+inline constexpr bool kQ6T4ImmaK16CooperativeMetadata = false;
+#endif
+
 __device__ __forceinline__ std::uint32_t q6_t4_imma_word(const std::uint8_t* block, int u,
                                                          int word) {
     using D = Decoder<GGML_TYPE_Q6_K>;
@@ -898,7 +880,7 @@ __device__ __forceinline__ float q6_t4_imma_scale(const std::uint8_t* block, int
     return half_at(block + 208) * float(scales[2 * q + half]);
 }
 
-template <int R, int J, int H>
+template <int R, int J, int H, bool K16 = false>
 __device__ __forceinline__ void q6_t4_imma_dot(const VecArgs& p, int row0, int gid, int tig,
                                                int t, int& dot0, int& dot1) {
     using D = Decoder<GGML_TYPE_Q6_K>;
@@ -920,7 +902,11 @@ __device__ __forceinline__ void q6_t4_imma_dot(const VecArgs& p, int row0, int g
     const auto* activation = reinterpret_cast<const std::uint32_t*>(p.qs + input);
     const std::uint32_t b0 = activation[tig + 4 * H];
     int c0 = 0, c1 = 0, c2 = 0, c3 = 0;
-    ninfer::ops::mma_s8(c0, c1, c2, c3, a0, a1, 0, 0, b0, 0);
+    if constexpr (K16) {
+        ninfer::ops::mma_s8_k16(c0, c1, c2, c3, a0, a1, b0);
+    } else {
+        ninfer::ops::mma_s8(c0, c1, c2, c3, a0, a1, 0, 0, b0, 0);
+    }
     if (tig < 2) {
         dot0 = c0;
         dot1 = c1;
@@ -930,7 +916,7 @@ __device__ __forceinline__ void q6_t4_imma_dot(const VecArgs& p, int row0, int g
     }
 }
 
-template <int R, int J>
+template <int R, int J, bool K16 = false, bool CooperativeMetadata = false>
 __device__ __forceinline__ void q6_t4_imma_step(const VecArgs& p, int row0, int gid, int tig,
                                                 int t, float (&partial)[2][4][4]) {
     using D = Decoder<GGML_TYPE_Q6_K>;
@@ -938,25 +924,29 @@ __device__ __forceinline__ void q6_t4_imma_step(const VecArgs& p, int row0, int 
     const bool upper = tig >= 2;
     const int u = 2 * J + int(upper);
     int dot_lo0 = 0, dot_lo1 = 0, dot_hi0 = 0, dot_hi1 = 0;
-    q6_t4_imma_dot<R, J, 0>(p, row0, gid, tig, t, dot_lo0, dot_lo1);
-    q6_t4_imma_dot<R, J, 1>(p, row0, gid, tig, t, dot_hi0, dot_hi1);
+    q6_t4_imma_dot<R, J, 0, K16>(p, row0, gid, tig, t, dot_lo0, dot_lo1);
+    q6_t4_imma_dot<R, J, 1, K16>(p, row0, gid, tig, t, dot_hi0, dot_hi1);
     const int token0 = 2 * (tig & 1);
     const std::int64_t scale_index = std::int64_t(block_index) * 8 + u;
     const float2 ds0 = __half22float2(p.ds[std::int64_t(token0) * (p.k / 32) + scale_index]);
     const float2 ds1 = __half22float2(p.ds[std::int64_t(token0 + 1) * (p.k / 32) + scale_index]);
     float weight_scale0 = 0.0f;
     float weight_scale1 = 0.0f;
-    if (row0 + gid < p.rows) {
+    if (row0 + gid < p.rows && (!CooperativeMetadata || (tig & 1) == 0)) {
         const std::uint8_t* weight_block =
             p.weight + std::int64_t(row0 + gid) * p.row_bytes + block_index * D::kBlockBytes;
         weight_scale0 = q6_t4_imma_scale(weight_block, u, 0);
         weight_scale1 = q6_t4_imma_scale(weight_block, u, 1);
     }
+    if constexpr (CooperativeMetadata) {
+        weight_scale0 = __shfl_sync(0xFFFFFFFFu, weight_scale0, tig & ~1, 4);
+        weight_scale1 = __shfl_sync(0xFFFFFFFFu, weight_scale1, tig & ~1, 4);
+    }
     partial[0][J][R] += ds0.x * (weight_scale0 * float(dot_lo0) + weight_scale1 * float(dot_hi0));
     partial[1][J][R] += ds1.x * (weight_scale0 * float(dot_lo1) + weight_scale1 * float(dot_hi1));
 }
 
-template <int K>
+template <int K, bool K16 = false, bool CooperativeMetadata = false>
 __launch_bounds__(kVecWarps * 32) __global__ void kernel_q6_t4_imma(VecArgs p) {
     const int warp = threadIdx.x >> 5;
     const int lane = threadIdx.x & 31;
@@ -972,22 +962,22 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q6_t4_imma(VecArgs p) {
 #pragma unroll
                 for (int r = 0; r < 4; ++r) partial[s][j][r] = 0.0f;
         for (int t = 0; t < K / 1024; ++t) {
-            q6_t4_imma_step<0, 0>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<0, 1>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<0, 2>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<0, 3>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<1, 0>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<1, 1>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<1, 2>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<1, 3>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<2, 0>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<2, 1>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<2, 2>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<2, 3>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<3, 0>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<3, 1>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<3, 2>(p, row0, gid, tig, t, partial);
-            q6_t4_imma_step<3, 3>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 0, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 1, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 2, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<0, 3, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 0, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 1, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 2, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<1, 3, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 0, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 1, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 2, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<2, 3, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 0, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 1, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 2, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
+            q6_t4_imma_step<3, 3, K16, CooperativeMetadata>(p, row0, gid, tig, t, partial);
         }
         float reduced[2];
 #pragma unroll
@@ -1158,17 +1148,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) {
-#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
-                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
-                    } else {
-                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
-                    }
-#else
-                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
-#endif
-                }
+                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
             }
         };
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
@@ -1209,15 +1189,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int r = 0; r < kRows; ++r) {
 #pragma unroll
                     for (int j = 0; j < T; ++j) {
-#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
-                            acc[r][j] += D::dot_short_chain(staged[it & 1][r], a[j], d[j], sum[j]);
-                        } else {
-                            acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
-                        }
-#else
                         acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
-#endif
                     }
                 }
             }
@@ -1243,17 +1215,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) {
-#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
-                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
-                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
-                    } else {
-                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
-                    }
-#else
-                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
-#endif
-                }
+                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
             }
         };
         const auto prefetch = [&](int it, int buffer) {
@@ -1415,6 +1377,48 @@ void launch(const VecArgs& args, cudaStream_t stream) {
         }
     }
 #endif
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16)
+    if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused &&
+                  (KS == 0 || KS == 5120 || KS == 17408)) {
+        if (device_facts().cc == 860 && (args.k == 5120 || args.k == 17408)) {
+            if (args.k == 5120) {
+                static const int resident = [] {
+                    int blocks = 0;
+                    check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                              &blocks,
+                              kernel_q6_t4_imma<5120, true,
+                                                kQ6T4ImmaK16CooperativeMetadata>,
+                              kVecWarps * 32, 0),
+                          "Q6_K T4 K16 IMMA occupancy");
+                    return std::max(blocks, 1);
+                }();
+                const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
+                const int blocks = std::min(groups, resident * device_facts().sm_count);
+                kernel_q6_t4_imma<5120, true, kQ6T4ImmaK16CooperativeMetadata>
+                    <<<blocks, kVecWarps * 32, 0, stream>>>(args);
+                check(cudaGetLastError(), "Q6_K T4 K16 IMMA vector product launch");
+                return;
+            }
+            static const int resident = [] {
+                int blocks = 0;
+                check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &blocks,
+                          kernel_q6_t4_imma<17408, true,
+                                            kQ6T4ImmaK16CooperativeMetadata>,
+                          kVecWarps * 32, 0),
+                      "Q6_K T4 K16 IMMA occupancy");
+                return std::max(blocks, 1);
+            }();
+            const int groups = (args.rows + kVecWarps * 8 - 1) / (kVecWarps * 8);
+            const int blocks = std::min(groups, resident * device_facts().sm_count);
+            kernel_q6_t4_imma<17408, true, kQ6T4ImmaK16CooperativeMetadata>
+                <<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            check(cudaGetLastError(), "Q6_K T4 K16 IMMA vector product launch");
+            return;
+        }
+    }
+#endif
+
 #if defined(NINFER_GGUF_Q6_T4_IMMA)
     if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused &&
                   (KS == 0 || KS == 5120 || KS == 17408)) {

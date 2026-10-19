@@ -1186,7 +1186,7 @@ double q4_k_q8_1_dot_cpu(const std::uint8_t* row_data, std::int32_t k,
 }
 #endif
 
-#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST) || defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
 int q6_k_value_cpu(const std::uint8_t* block, int u, int index) {
     const int h = u / 4;
     const int q = u % 4;
@@ -1400,10 +1400,10 @@ int run_q4_t4_imma_regression() {
 }
 #endif
 
-#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
-void run_q6_t4_imma_case(std::int32_t rows, std::int32_t k, std::uint32_t seed,
+#if defined(NINFER_GGUF_Q6_T4_IMMA_TEST) || defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
+void run_q6_t4_imma_case(std::int32_t rows, std::int32_t k, std::int32_t columns,
+                         std::uint32_t seed,
                          const std::vector<std::int32_t>& checked_rows) {
-    constexpr std::int32_t columns = 4;
     const std::int64_t base_row_bytes = std::int64_t(k / 256) * 210;
     const std::int64_t row_bytes = base_row_bytes + 210;
     const TypeCase type{QType::GGUF_Q6_K, "q6_k", {208}};
@@ -1446,9 +1446,10 @@ void run_q6_t4_imma_case(std::int32_t rows, std::int32_t k, std::uint32_t seed,
                                                 nullptr, 0};
     ops::gguf::vector_product(ops::gguf::GgmlType::Q6_K, weights.p, row_bytes, rows, k,
                               input.p, columns, actual_out, nullptr);
-    ops::gguf::detail::q6_t4_imma_baseline_for_test(
+    ops::gguf::detail::q6_vector_baseline_for_test(
         static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
-        static_cast<const std::uint8_t*>(input.p), baseline.data(), padded_output_stride, nullptr);
+        static_cast<const std::uint8_t*>(input.p), columns, baseline.data(), padded_output_stride,
+        nullptr);
     check(cudaDeviceSynchronize(), "Q6_K T4 IMMA baseline parity");
     const auto eager = actual.read("read Q6_K T4 IMMA output");
     const auto expected = baseline.read("read Q6_K T4 IMMA baseline output");
@@ -1522,10 +1523,10 @@ void run_q6_t4_imma_case(std::int32_t rows, std::int32_t k, std::uint32_t seed,
         actual, "read Q6_K T4 IMMA graph output");
     const auto baseline_graph = replay(
         [&](cudaStream_t stream) {
-            ops::gguf::detail::q6_t4_imma_baseline_for_test(
+            ops::gguf::detail::q6_vector_baseline_for_test(
                 static_cast<const std::uint8_t*>(weights.p), row_bytes, rows, k,
-                static_cast<const std::uint8_t*>(input.p), baseline.data(), padded_output_stride,
-                stream);
+                static_cast<const std::uint8_t*>(input.p), columns, baseline.data(),
+                padded_output_stride, stream);
         },
         baseline, "read Q6_K T4 IMMA baseline graph output");
     if (candidate_graph.size() != eager.size() || baseline_graph.size() != expected.size() ||
@@ -1543,10 +1544,30 @@ int run_q6_t4_imma_regression() {
     check(cudaGetDevice(&device), "get Q6_K T4 IMMA device");
     check(cudaGetDeviceProperties(&properties, device), "get Q6_K T4 IMMA properties");
     if (properties.major != 8 || properties.minor != 6) { return 77; }
-    run_q6_t4_imma_case(1024, 5120, 89031, {0, 1, 127, 511, 1023});
-    run_q6_t4_imma_case(8193, 5120, 89032, {0, 1, 255, 256, 1023, 4095, 8191, 8192});
-    run_q6_t4_imma_case(5120, 17408, 89033, {0, 1, 127, 1023, 2559, 4095, 5119});
-    run_q6_t4_imma_case(513, 17408, 89034, {0, 1, 127, 255, 511, 512});
+    run_q6_t4_imma_case(1024, 5120, 4, 89031, {0, 1, 127, 511, 1023});
+    run_q6_t4_imma_case(8193, 5120, 4, 89032, {0, 1, 255, 256, 1023, 4095, 8191, 8192});
+    run_q6_t4_imma_case(5120, 17408, 4, 89033, {0, 1, 127, 1023, 2559, 4095, 5119});
+    run_q6_t4_imma_case(513, 17408, 4, 89034, {0, 1, 127, 255, 511, 512});
+    return 0;
+}
+#endif
+
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
+int run_q6_t4_imma_k16_regression() {
+    int device = 0;
+    cudaDeviceProp properties{};
+    check(cudaGetDevice(&device), "get Q6_K T4 K16 IMMA device");
+    check(cudaGetDeviceProperties(&properties, device), "get Q6_K T4 K16 IMMA properties");
+    if (properties.major != 8 || properties.minor != 6) { return 77; }
+    for (std::int32_t columns = 1; columns <= 4; ++columns) {
+        run_q6_t4_imma_case(513, 5120, columns, 89100 + columns,
+                            {0, 1, 127, 255, 511, 512});
+        run_q6_t4_imma_case(513, 17408, columns, 89200 + columns,
+                            {0, 1, 127, 255, 511, 512});
+    }
+    run_q6_t4_imma_case(8193, 5120, 4, 89304,
+                        {0, 1, 255, 256, 1023, 4095, 8191, 8192});
+    run_q6_t4_imma_case(248320, 5120, 4, 89404, {0, 1, 8191, 8192, 248319});
     return 0;
 }
 #endif
@@ -2694,6 +2715,9 @@ int main(int argc, char** argv) {
 #if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
     bool q6_t4_imma_regression = false;
 #endif
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
+    bool q6_t4_imma_k16_regression = false;
+#endif
 #if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
     bool q4_t4_fused_imma_regression = false;
 #endif
@@ -2743,6 +2767,10 @@ int main(int argc, char** argv) {
 #if defined(NINFER_GGUF_Q6_T4_IMMA_TEST)
         } else if (argument == "--q6-t4-imma-regression" && !q6_t4_imma_regression) {
             q6_t4_imma_regression = true;
+#endif
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
+        } else if (argument == "--q6-t4-imma-k16-regression" && !q6_t4_imma_k16_regression) {
+            q6_t4_imma_k16_regression = true;
 #endif
 #if defined(NINFER_GGUF_Q4_T4_FUSED_IMMA_TEST)
         } else if (argument == "--q4-t4-fused-imma-regression" && !q4_t4_fused_imma_regression) {
@@ -2826,6 +2854,12 @@ int main(int argc, char** argv) {
              rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
              weight_directory_specified))
 #endif
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
+        || (q6_t4_imma_k16_regression &&
+            (real_shapes || mmq_real_shapes || mmq_q6_real_shapes || q4_mmq_k_stream_regression || vector_event_benchmark || swiglu_q8_fusion ||
+             rmsnorm_q8_fusion || rmsnorm_mmq_q8_fusion || dual_mmq_fusion || output_specified ||
+             weight_directory_specified))
+#endif
         ) {
         std::cerr << "usage: ninfer_linear_gguf_test [--rmsnorm-q8-fusion | --rmsnorm-mmq-q8-fusion | --dual-mmq-fusion | --swiglu-q8-fusion | --swiglu-q8-benchmark | --mmq-real-shapes | --mmq-q6-real-shapes | --real-shapes [--output <file>] "
                      "[--weight-dir <dir>]]\n";
@@ -2857,6 +2891,18 @@ int main(int argc, char** argv) {
             }
             std::cout << (failures == 0 ? "OK" : "FAIL")
                       << " GGUF Q6_K T4 IMMA regression\n";
+            return failures == 0 ? 0 : 1;
+        }
+#endif
+#if defined(NINFER_GGUF_Q6_T4_IMMA_K16_TEST)
+        if (q6_t4_imma_k16_regression) {
+            const int failures = run_q6_t4_imma_k16_regression();
+            if (failures == 77) {
+                std::cout << "SKIP: Q6_K T4 K16 IMMA regression requires SM86\n";
+                return 77;
+            }
+            std::cout << (failures == 0 ? "OK" : "FAIL")
+                      << " GGUF Q6_K T4 K16 IMMA regression\n";
             return failures == 0 ? 0 : 1;
         }
 #endif

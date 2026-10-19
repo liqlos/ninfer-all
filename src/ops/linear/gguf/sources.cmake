@@ -1,16 +1,6 @@
-option(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM "Load Q6_K SM86 MMQ A fragments at each K step" OFF)
-option(NINFER_GGUF_Q6_MMQ_Y_LDMATRIX "Use LDSM for Q6_K SM86 MMQ activation fragments" OFF)
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
-option(NINFER_GGUF_DP4A_SHORT_CHAINS "Split SM86 generic Q4_K K5120 T4 vector dot chains" OFF)
-if(NINFER_GGUF_DP4A_SHORT_CHAINS)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "GGUF short DP4A chains require sm_86")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q4_k.cu"
-    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_DP4A_SHORT_CHAINS=1)
-endif()
 option(NINFER_GGUF_Q4_STREAMING_LOADS "Use streaming cache loads for GGUF Q4_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STREAMING_LOADS "Use streaming cache loads for GGUF Q6_K vector weights" OFF)
 option(NINFER_GGUF_Q6_STATIC_K "Specialize SM86 GGUF Q6_K K5120 decode and T4 verification" OFF)
@@ -18,6 +8,8 @@ option(NINFER_GGUF_Q6_COOPERATIVE_DECODE "Cooperatively load packed Q6_K blocks 
 option(NINFER_GGUF_Q6_PACKED_SCALE_LOAD "Load each Q6_K scale pair with one aligned SM86 word transaction" OFF)
 option(NINFER_GGUF_Q6_T4_SINGLE_ROW "Assign one non-fused SM86 Q6_K T4 output row to each warp" OFF)
 option(NINFER_GGUF_Q6_T4_IMMA "Use exact-chain SM86 Q6_K T4 INT8 MMA for non-fused K5120 and K17408 vector products" OFF)
+option(NINFER_GGUF_Q6_T4_IMMA_K16 "Use the SM86 Q6_K T4 K16 INT8 MMA candidate for non-fused K5120 and K17408 vector products" OFF)
+option(NINFER_GGUF_Q6_T4_IMMA_K16_COOPERATIVE_METADATA "Share Q6_K T4 K16 IMMA block scales across lane pairs" OFF)
 option(NINFER_GGUF_Q4_COOPERATIVE_DECODE "Cooperatively load packed Q4_K blocks across SM86 warp lanes" OFF)
 option(NINFER_GGUF_Q4_T4_FUSED_WARP_PAIR "Assign adjacent SM86 Q4_K T4 fused gate/up rows to separate warps" OFF)
 option(NINFER_GGUF_Q4_T4_IMMA "Use exact-chain SM86 Q4_K T4 INT8 MMA for non-fused K5120 vector products" OFF)
@@ -220,6 +212,22 @@ if(NINFER_GGUF_Q6_T4_IMMA)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
     PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/src")
 endif()
+if(NINFER_GGUF_Q6_T4_IMMA_K16_COOPERATIVE_METADATA AND NOT NINFER_GGUF_Q6_T4_IMMA_K16)
+  message(FATAL_ERROR "Q6_K T4 K16 cooperative metadata requires NINFER_GGUF_Q6_T4_IMMA_K16")
+endif()
+if(NINFER_GGUF_Q6_T4_IMMA_K16)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "Q6_K T4 K16 IMMA vector products require sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_IMMA_K16=1)
+  if(NINFER_GGUF_Q6_T4_IMMA_K16_COOPERATIVE_METADATA)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+      PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_T4_IMMA_K16_COOPERATIVE_METADATA=1)
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_q6_k.cu" APPEND
+    PROPERTY INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/src")
+endif()
 if(NINFER_GGUF_Q4_T4_FUSED_IMMA)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "Q4_K T4 fused IMMA vector SwiGLU requires sm_86")
@@ -388,19 +396,3 @@ target_compile_options(ninfer_ggml_quants PRIVATE
 target_link_libraries(ninfer_ggml_quants PRIVATE CUDA::cudart CUDA::cublas)
 target_link_libraries(ninfer_ops PRIVATE ninfer_ggml_quants)
 target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp")
-
-if(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "Q6_K MMQ schedule requires sm_86")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM=1)
-endif()
-
-if(NINFER_GGUF_Q6_MMQ_Y_LDMATRIX)
-  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "Q6_K MMQ schedule requires sm_86")
-  endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_Y_LDMATRIX=1)
-endif()

@@ -1058,16 +1058,6 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
     }
 }
 
-#if defined(NINFER_GGUF_Q6_MMQ_Y_LDMATRIX) && __CUDA_ARCH__ == 860
-static __device__ __forceinline__ void q6_mmq_load_b_ldsm(
-        ggml_cuda_mma::tile<8, 4, int>& fragment, const int* source, int stride) {
-    const unsigned address = static_cast<unsigned>(__cvta_generic_to_shared(
-        source + (threadIdx.x % 8) * stride));
-    asm volatile("ldmatrix.sync.aligned.m8n8.x1.b16 {%0}, [%1];"
-        : "=r"(fragment.x[0]) : "r"(address));
-}
-#endif
-
 template <ggml_type type, int J, bool fallback> static __device__ __forceinline__ void ggml_cuda_mmq_vec_dot_q6_K_q8_1_mma(
         const int * __restrict__ x, const int * __restrict__ y, float * __restrict__ sum, const int k00) {
 #if defined(AMD_MFMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
@@ -1141,15 +1131,12 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 
     const int i0 = (threadIdx.y / ntx) * (ntx*tile_A::I);
 
-#if !defined(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM) || __CUDA_ARCH__ != 860
     tile_A   A[ntx][8];
-#endif
     int    scA[ntx][tile_C::ne/2][8];
     float   dA[ntx][tile_C::ne/2];
 
 #pragma unroll
     for (int n = 0; n < ntx; ++n) {
-#if !defined(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM) || __CUDA_ARCH__ != 860
 #pragma unroll
         for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += 8) {
             const int k0 = k00 + k01;
@@ -1157,7 +1144,6 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
             load_ldmatrix(A[n][k01/4 + 0], x_qs + (i0 + n*tile_A::I)*sram_stride + (k0 + 0),         sram_stride);
             load_ldmatrix(A[n][k01/4 + 1], x_qs + (i0 + n*tile_A::I)*sram_stride + (k0 + tile_A::J), sram_stride);
         }
-#endif
 
 #pragma unroll
         for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += 16) {
@@ -1195,13 +1181,8 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
             float dB[tile_C::ne/2];
 
             // Here load_generic is faster than load_ldmatrix.
-#if defined(NINFER_GGUF_Q6_MMQ_Y_LDMATRIX) && __CUDA_ARCH__ == 860
-            q6_mmq_load_b_ldsm(B[0], y_qs + j0*MMQ_TILE_Y_K + k01, MMQ_TILE_Y_K);
-            q6_mmq_load_b_ldsm(B[1], y_qs + j0*MMQ_TILE_Y_K + tile_B::J + k01, MMQ_TILE_Y_K);
-#else
             load_generic(B[0], y_qs + j0*MMQ_TILE_Y_K + 0         + k01, MMQ_TILE_Y_K);
             load_generic(B[1], y_qs + j0*MMQ_TILE_Y_K + tile_B::J + k01, MMQ_TILE_Y_K);
-#endif
 
 #pragma unroll
             for (int l = 0; l < tile_C::ne/2; ++l) {
@@ -1213,17 +1194,8 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
 #pragma unroll
             for (int n = 0; n < ntx; ++n) {
                 tile_C C[2];
-#if defined(NINFER_GGUF_Q6_MMQ_FRAGMENT_STREAM) && __CUDA_ARCH__ == 860
-                tile_A local_A[2];
-                const int k0 = k00 + k01;
-                load_ldmatrix(local_A[0], x_qs + (i0 + n*tile_A::I)*sram_stride + k0, sram_stride);
-                load_ldmatrix(local_A[1], x_qs + (i0 + n*tile_A::I)*sram_stride + k0 + tile_A::J, sram_stride);
-                mma(C[0], local_A[0], B[0]);
-                mma(C[1], local_A[1], B[1]);
-#else
                 mma(C[0], A[n][k01/4 + 0], B[0]);
                 mma(C[1], A[n][k01/4 + 1], B[1]);
-#endif
 
 #pragma unroll
                 for (int l = 0; l < tile_C::ne; ++l) {
