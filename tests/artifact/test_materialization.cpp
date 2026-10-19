@@ -1,6 +1,5 @@
 #include "artifact/binder.h"
 #include "artifact/fixture.h"
-#include "artifact/q6_head_aligned_planes.h"
 #include "artifact/views.h"
 #include "core/device.h"
 #include "core/evictable_weight_pool.h"
@@ -26,29 +25,6 @@ namespace {
 using namespace ninfer;
 using namespace ninfer::artifact;
 using namespace ninfer::test::artifact_fixture;
-
-void q6_head_aligned_transform() {
-    constexpr std::size_t rows = 3;
-    std::vector<std::byte> source(rows * 4200);
-    for (std::size_t i = 0; i < source.size(); ++i) {
-        source[i] = std::byte((i * 131 + 17) & 0xff);
-    }
-    std::vector<std::byte> planes(rows * 4224);
-    std::vector<std::byte> restored(source.size());
-    pack_q6_head_aligned_planes(source, rows, planes);
-    for (std::size_t row = 0; row < rows; ++row) {
-        const auto* row_planes = planes.data() + row * 4224;
-        auto* row_restored = restored.data() + row * 4200;
-        for (std::size_t block = 0; block < 20; ++block) {
-            auto* block_restored = row_restored + block * 210;
-            std::memcpy(block_restored, row_planes + block * 128, 128);
-            std::memcpy(block_restored + 128, row_planes + 2560 + block * 64, 64);
-            std::memcpy(block_restored + 192, row_planes + 3840 + block * 16, 16);
-            std::memcpy(block_restored + 208, row_planes + 4160 + block * 2, 2);
-        }
-    }
-    require(source == restored, "Q6 head aligned transform changed canonical block bytes");
-}
 
 void materialization(DeviceContext& device) {
     Fixture fixture;
@@ -391,7 +367,6 @@ void pipeline_rank_placement() {
 
 int main(int argc, char** argv) {
     try {
-        q6_head_aligned_transform();
         int count         = 0;
         const auto result = cudaGetDeviceCount(&count);
         if (result == cudaErrorNoDevice || result == cudaErrorInsufficientDriver ||

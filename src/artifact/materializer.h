@@ -37,16 +37,6 @@ struct PinnedPlacement {
     std::uint64_t alignment = 256;
 };
 
-enum class DeviceAuxiliaryKind { Q6HeadAlignedPlanes };
-
-struct DeviceAuxiliaryPlacement {
-    ObjectHandle source;
-    std::uint64_t offset = 0;
-    std::uint64_t bytes = 0;
-    std::uint64_t alignment = 256;
-    DeviceAuxiliaryKind kind = DeviceAuxiliaryKind::Q6HeadAlignedPlanes;
-};
-
 struct HostPlacement {
     ObjectHandle object;
     // Already-read resources move into final storage without invalidating their byte views.
@@ -68,7 +58,6 @@ struct MaterializationPlan {
     std::uint64_t evictable_tail_bytes  = 0;
     std::uint64_t pinned_capacity_bytes = 0;
     std::vector<DevicePlacement> device_objects;
-    std::vector<DeviceAuxiliaryPlacement> device_auxiliaries;
     std::vector<PinnedPlacement> pinned_objects;
     std::vector<HostPlacement> host_objects;
 
@@ -113,8 +102,6 @@ public:
     [[nodiscard]] bool has_device(ObjectHandle handle) const noexcept;
     [[nodiscard]] const WeightParent& pinned_parent(ObjectHandle handle) const;
     [[nodiscard]] std::span<const std::byte> pinned_block() const noexcept;
-    [[nodiscard]] DeviceSpan device_auxiliary(DeviceAuxiliaryKind kind) const;
-    [[nodiscard]] bool has_device_auxiliary(DeviceAuxiliaryKind kind) const noexcept;
     // Present when the device backing was supplied by an eviction pool.
     [[nodiscard]] EvictableWeightPool* weight_pool() const noexcept { return pool_.get(); }
 
@@ -140,7 +127,6 @@ private:
     std::vector<std::unique_ptr<DeviceArena>> arenas_;
     std::unique_ptr<PinnedHostBuffer> pinned_;
     std::vector<ObjectStorage> objects_;
-    std::vector<DeviceSpan> device_auxiliaries_;
     MaterializationStats stats_;
 };
 

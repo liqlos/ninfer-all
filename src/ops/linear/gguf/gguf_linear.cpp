@@ -262,16 +262,6 @@ bool gguf_project(const Tensor& x, std::span<const GgufProduct> products,
                 activations.push_back({w.input_columns, data});
                 found = activations.end() - 1;
             }
-#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
-            if (w.q6_head_aligned_planes != nullptr && w.qtype == QType::GGUF_Q6_K &&
-                w.n == 248320 && k == 5120 && (t == 1 || t == 4) &&
-                w.input_columns == nullptr && p.row == 0 &&
-                p.epilogue == GgufEpilogue::Store && p.f32 == nullptr &&
-                gguf::q6_head_aligned_vector_product(w.q6_head_aligned_planes, w.n, k,
-                                                     found->data, t, output(p, 0), stream)) {
-                continue;
-            }
-#endif
             gguf::vector_product(gguf_type(w.qtype), w.qdata, row_bytes(w), w.n, k, found->data,
                                  t, output(p, 0), stream);
         }

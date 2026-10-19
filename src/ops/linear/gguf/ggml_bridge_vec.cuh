@@ -66,6 +66,18 @@ __device__ __forceinline__ int dot4(const int* w, const int* a, int acc) {
     return acc;
 }
 
+__device__ __forceinline__ int dot4_short_chain(const int* w, const int* a, int acc) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+    int even = ggml_cuda_dp4a(w[0], a[0], 0);
+    int odd = ggml_cuda_dp4a(w[1], a[1], 0);
+    even = ggml_cuda_dp4a(w[2], a[2], even);
+    odd = ggml_cuda_dp4a(w[3], a[3], odd);
+    return acc + even + odd;
+#else
+    return dot4(w, a, acc);
+#endif
+}
+
 __device__ __forceinline__ int sum4(const int* a) {
     int acc = 0;
 #pragma unroll
@@ -218,6 +230,18 @@ struct Decoder<GGML_TYPE_Q4_K> {
         return s.f[0] * d * float(dot4(s.w + 4, a + 4, dot4(s.w, a, 0))) - s.f[1] * sum;
 #endif
     }
+    __device__ __forceinline__ static float dot_short_chain(const Slice& s, const int* a, float d,
+                                                            float sum) {
+#if defined(NINFER_GGUF_Q4_SPLIT_DP4A) && __CUDA_ARCH__ == 860
+        const int dot_lo = dot4_short_chain(s.w, a, 0);
+        const int dot_hi = dot4_short_chain(s.w + 4, a + 4, 0);
+        return s.f[0] * d * float(dot_lo + dot_hi) - s.f[1] * sum;
+#else
+        return s.f[0] * d * float(dot4_short_chain(s.w + 4, a + 4,
+                                                    dot4_short_chain(s.w, a, 0))) -
+               s.f[1] * sum;
+#endif
+    }
 };
 
 template <>
@@ -337,24 +361,6 @@ struct Decoder<GGML_TYPE_Q6_K> {
             s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
         }
 #endif
-    }
-    __device__ __forceinline__ static void decode_aligned(const std::uint8_t* row, int block,
-                                                          int u, Slice& s) {
-        const int h = u / 4, q = u % 4;
-        const float d = half_at(row + 4160 + 2 * block);
-        const auto* scales = reinterpret_cast<const std::int8_t*>(row + 3840 + 16 * block + 8 * h);
-        const int scale0 = scales[2 * q];
-        const int scale1 = scales[2 * q + 1];
-        s.f[0] = d * float(scale0);
-        s.f[1] = d * float(scale1);
-        const std::uint8_t* ql = row + 128 * block + 64 * h + 32 * (q & 1);
-        const std::uint8_t* qh = row + 2560 + 64 * block + 32 * h;
-#pragma unroll
-        for (int i = 0; i < 8; ++i) {
-            const std::uint32_t v = ((load32(ql + 4 * i) >> (4 * (q >> 1))) & 0x0F0F0F0Fu) |
-                                    (((load32(qh + 4 * i) >> (2 * q)) << 4) & 0x30303030u);
-            s.w[i] = int(v ^ 0xE0E0E0E0u ^ ((v & 0x20202020u) * 6u));
-        }
     }
     __device__ __forceinline__ static float dot(const Slice& s, const int* a, float d, float) {
         return d * (s.f[0] * float(dot4(s.w, a, 0)) + s.f[1] * float(dot4(s.w + 4, a + 4, 0)));
@@ -1091,8 +1097,14 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel_q4_t4_fused_warp_pair(V
 // KS: the static K the slice loop unrolls over, or 0 for the runtime K. Fused: the weight is one
 // [gate; up] parent and each output row is silu(gate row) * up row.
 template <ggml_type type, int T, bool Fused, int KS, bool Prefetch2 = true,
-          bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>()>
-__launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
+          bool Baseline = false, int Rows = Baseline ? 2 : vector_rows_per_warp<type, T, Fused>(),
+          bool HeadOccupancyFive = false>
+#if defined(NINFER_GGUF_Q6_T4_HEAD_OCCUPANCY_FIVE) && __CUDA_ARCH__ == 860
+__launch_bounds__(kVecWarps * 32, HeadOccupancyFive ? 5 : 1)
+#else
+__launch_bounds__(kVecWarps * 32)
+#endif
+__global__ void kernel(VecArgs p) {
     using D = std::conditional_t<Baseline, BaselineDecoder<type>, Decoder<type>>;
     constexpr int kTable    = D::kTableWords > 0 ? D::kTableWords : 4;
     constexpr int kPerBlock = D::kBlockElems / 32;
@@ -1124,18 +1136,7 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
         } else {
 #pragma unroll
             for (int r = 0; r < kRows; ++r) {
-#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
-                if constexpr (type == GGML_TYPE_Q6_K && !Fused) {
-                    rowp[r] = p.weight + std::int64_t(min(row0 + r, p.rows - 1)) * p.row_bytes +
-                              (p.q6_head_aligned_planes ? 0 : lane_offset);
-                } else {
-                    rowp[r] = p.weight + std::int64_t(min(row0 + r, p.rows - 1)) * p.row_bytes +
-                              lane_offset;
-                }
-#else
-                rowp[r] = p.weight + std::int64_t(min(row0 + r, p.rows - 1)) * p.row_bytes +
-                          lane_offset;
-#endif
+                rowp[r] = p.weight + std::int64_t(min(row0 + r, p.rows - 1)) * p.row_bytes + lane_offset;
             }
         }
         float acc[kRows][T];
@@ -1161,25 +1162,19 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
 #pragma unroll
             for (int r = 0; r < kRows; ++r) {
                 Slice sl;
-#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
-                if constexpr (type == GGML_TYPE_Q6_K && !Fused) {
-                    if (p.q6_head_aligned_planes) {
-                        D::decode_aligned(rowp[r], lane / kPerBlock + (32 / kPerBlock) * it,
-                                          sub, sl);
-                    } else {
-                        D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes,
-                                  sub, table, sl);
-                    }
-                } else {
-                    D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes,
-                              sub, table, sl);
-                }
-#else
-                D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes,
-                          sub, table, sl);
-#endif
+                D::decode(rowp[r] + std::int64_t(32 / kPerBlock) * it * D::kBlockBytes, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2) && __CUDA_ARCH__ == 860
@@ -1220,7 +1215,15 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 for (int r = 0; r < kRows; ++r) {
 #pragma unroll
                     for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                        if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                            acc[r][j] += D::dot_short_chain(staged[it & 1][r], a[j], d[j], sum[j]);
+                        } else {
+                            acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+                        }
+#else
                         acc[r][j] += D::dot(staged[it & 1][r], a[j], d[j], sum[j]);
+#endif
                     }
                 }
             }
@@ -1246,7 +1249,17 @@ __launch_bounds__(kVecWarps * 32) __global__ void kernel(VecArgs p) {
                 Slice sl;
                 D::decode(q4_stage[buffer][warp][r] + lane_offset, sub, table, sl);
 #pragma unroll
-                for (int j = 0; j < T; ++j) { acc[r][j] += D::dot(sl, a[j], d[j], sum[j]); }
+                for (int j = 0; j < T; ++j) {
+#if defined(NINFER_GGUF_DP4A_SHORT_CHAINS) && __CUDA_ARCH__ == 860
+                    if constexpr (type == GGML_TYPE_Q4_K && T == 4 && KS == 5120 && !Baseline) {
+                        acc[r][j] += D::dot_short_chain(sl, a[j], d[j], sum[j]);
+                    } else {
+                        acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+                    }
+#else
+                    acc[r][j] += D::dot(sl, a[j], d[j], sum[j]);
+#endif
+                }
             }
         };
         const auto prefetch = [&](int it, int buffer) {
@@ -1355,6 +1368,24 @@ void launch_baseline(const VecArgs& args, cudaStream_t stream) {
 
 template <ggml_type type, int T, bool Fused, int KS>
 void launch_fallback(const VecArgs& args, cudaStream_t stream) {
+#if defined(NINFER_GGUF_Q6_T4_HEAD_OCCUPANCY_FIVE)
+    if constexpr (type == GGML_TYPE_Q6_K && T == 4 && !Fused && KS == 0) {
+        if (device_facts().cc == 860 && args.k == 5120) {
+            static const int resident = [] {
+                int blocks = 0;
+                check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                          &blocks, kernel<type, T, false, 0, true, false, 2, true>, kVecWarps * 32, 0),
+                      "Q6 head occupancy schedule");
+                return std::max(blocks, 1);
+            }();
+            const int groups = (args.rows + kVecWarps * 2 - 1) / (kVecWarps * 2);
+            const int blocks = std::min(groups, resident * device_facts().sm_count);
+            kernel<type, T, false, 0, true, false, 2, true><<<blocks, kVecWarps * 32, 0, stream>>>(args);
+            check(cudaGetLastError(), "Q6 head occupancy launch");
+            return;
+        }
+    }
+#endif
     static const int resident = [] {
         int blocks = 0;
         check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(

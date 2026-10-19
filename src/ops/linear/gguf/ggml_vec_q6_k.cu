@@ -5,48 +5,6 @@
 
 NINFER_GGUF_VECTOR_INSTANCE(GGML_TYPE_Q6_K);
 
-#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
-namespace ninfer::ops::gguf::detail {
-namespace {
-
-template <int T>
-void launch_q6_head_aligned(const VecArgs& args, cudaStream_t stream) {
-    if (args.k != 5120 || device_facts().cc != 860) {
-        throw std::invalid_argument("Q6 head aligned vector route requires SM86 K5120");
-    }
-    VecArgs aligned = args;
-    aligned.q6_head_aligned_planes = true;
-    static const int resident = [] {
-        int blocks = 0;
-        check(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                  &blocks, vec::kernel<GGML_TYPE_Q6_K, T, false, 5120, false>,
-                  kVecWarps * 32, 0),
-              "Q6 head aligned vector occupancy");
-        return std::max(blocks, 1);
-    }();
-    constexpr int per_block = kVecWarps * 2;
-    const int groups = (aligned.rows + per_block - 1) / per_block;
-    const int blocks = std::min(groups, resident * device_facts().sm_count);
-    vec::kernel<GGML_TYPE_Q6_K, T, false, 5120, false>
-        <<<blocks, kVecWarps * 32, 0, stream>>>(aligned);
-    check(cudaGetLastError(), "Q6 head aligned vector launch");
-}
-
-}
-
-void q6_head_aligned_vec_launch(const VecArgs& args, int columns, cudaStream_t stream) {
-    if (args.rows <= 0 || args.row_bytes != 4224 || (columns != 1 && columns != 4)) {
-        throw std::invalid_argument("Q6 head aligned vector route has unsupported geometry");
-    }
-    switch (columns) {
-    case 1: return launch_q6_head_aligned<1>(args, stream);
-    case 4: return launch_q6_head_aligned<4>(args, stream);
-    default: throw std::invalid_argument("Q6 head aligned vector route supports T1 or T4");
-    }
-}
-}
-#endif
-
 #if defined(NINFER_GGUF_VECTOR_PREFETCH2_TEST)
 namespace ninfer::ops::gguf::detail {
 

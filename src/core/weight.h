@@ -133,7 +133,6 @@ struct Weight {
     // INT32 [K] input gather of a GGUF matrix whose stored columns are a permutation of its
     // input's: column c multiplies input element input_columns[c]. Null for every other matrix.
     const std::int32_t* input_columns = nullptr;
-    const void* q6_head_aligned_planes = nullptr;
 };
 
 } // namespace ninfer

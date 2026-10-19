@@ -96,9 +96,6 @@ struct VectorOutput {
 void vector_product(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
                     const void* activation, int columns, const VectorOutput& out,
                     cudaStream_t stream);
-bool q6_head_aligned_vector_product(const void* weight, int rows, int k,
-                                    const void* activation, int columns,
-                                    const VectorOutput& out, cudaStream_t stream);
 
 // out[r, c] = silu(gate_r . x_c) * (up_r . x_c) where gate row r and up row r are rows r and
 // rows + r of one parent of this type.

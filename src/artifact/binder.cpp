@@ -88,20 +88,6 @@ void Binder::require_device(ObjectHandle object, std::uint64_t alignment) {
     demand.alignment = std::max({demand.alignment, alignment, geometry.alignment});
 }
 
-void Binder::reserve_q6_head_aligned_planes(ObjectHandle object) {
-    const auto& tensor = reader_.directory().tensor(object);
-    const auto& geometry = reader_.geometry(object);
-    if (tensor.shape != Shape{248320, 5120} || geometry.format != QType::GGUF_Q6_K ||
-        geometry.layout != QuantLayout::GgufBlocks || geometry.bytes != 1042944000ULL ||
-        !demands_.at(object.index).device || demands_.at(object.index).evict_rank != 0) {
-        throw ArtifactError("Q6 head aligned cache requires the resident canonical Q6_K output head");
-    }
-    if (q6_head_aligned_planes_ && *q6_head_aligned_planes_ != object) {
-        throw ArtifactError("only one Q6 head aligned cache can be reserved");
-    }
-    q6_head_aligned_planes_ = object;
-}
-
 void Binder::transcode_device(ObjectHandle object, QType target) {
     const auto& geometry = reader_.geometry(object);
     const auto& tensor   = reader_.directory().tensor(object);
@@ -280,14 +266,6 @@ MaterializationPlan Binder::finish(std::uint64_t evictable_alignment) && {
         }
     }
     for (const std::size_t index : resident[0]) { place_device(index); }
-    if (q6_head_aligned_planes_) {
-        constexpr std::uint64_t cache_bytes = 1048903680ULL;
-        auto& capacity = plan.device_capacity_by_rank[0];
-        const auto offset = align_up(capacity, 256, "Q6 head aligned cache offset");
-        plan.device_auxiliaries.push_back({*q6_head_aligned_planes_, offset, cache_bytes, 256,
-                                           DeviceAuxiliaryKind::Q6HeadAlignedPlanes});
-        capacity = checked_add(offset, cache_bytes, "Q6 head aligned device capacity");
-    }
     if (!evictable.empty()) {
         std::stable_sort(evictable.begin(), evictable.end(), [&](std::size_t a, std::size_t b) {
             return demands_[a].evict_rank < demands_[b].evict_rank;

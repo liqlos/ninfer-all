@@ -408,32 +408,6 @@ void vector_product(GgmlType type, const void* weight, std::int64_t row_bytes, i
         false, stream);
 }
 
-bool q6_head_aligned_vector_product(const void* weight, int rows, int k,
-                                    const void* activation, int columns,
-                                    const VectorOutput& out, cudaStream_t stream) {
-#if defined(NINFER_GGUF_Q6_HEAD_ALIGNED_PLANES)
-    if (weight == nullptr || activation == nullptr || rows != 248320 || k != 5120 ||
-        (columns != 1 && columns != 4) || detail::device_facts().cc != 860 ||
-        (out.bf16 == nullptr) == (out.f32 == nullptr) || out.epilogue != Epilogue::Store) {
-        return false;
-    }
-    const detail::VecStore store{out.bf16, out.f32, out.column_stride,
-                                 out.epilogue, out.gate, out.gate_column_stride};
-    const auto args = detail::vector_args(weight, 4224, rows, k, activation, columns, store);
-    detail::q6_head_aligned_vec_launch(args, columns, stream);
-    return true;
-#else
-    (void)weight;
-    (void)rows;
-    (void)k;
-    (void)activation;
-    (void)columns;
-    (void)out;
-    (void)stream;
-    return false;
-#endif
-}
-
 void vector_swiglu(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
                    const void* activation, int columns, __nv_bfloat16* out,
                    std::int64_t out_column_stride, cudaStream_t stream) {
