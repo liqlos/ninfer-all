@@ -188,12 +188,6 @@ ninfer_add_op_test(ninfer_gdn_state_fp16_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gdn_state_fp16.cpp"
   LIBRARIES ninfer_ops)
 
-if(NINFER_GDN_PERSISTENT_MIXER)
-  ninfer_add_op_test(ninfer_gdn_persistent_mixer_test
-    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gdn_persistent_mixer.cpp"
-    LIBRARIES ninfer_ops)
-endif()
-
 ninfer_add_op_test(ninfer_vocabulary_transcode_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_vocabulary_transcode.cpp"
   LIBRARIES ninfer_ops ninfer_artifact)

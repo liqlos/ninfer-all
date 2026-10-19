@@ -41,10 +41,6 @@ endif()
 option(NINFER_BUILD_APPS "Build the NInfer CLI, server and perplexity evaluator" ON)
 option(BUILD_TESTING "Build NInfer tests" OFF)
 option(NINFER_BUILD_BENCHMARKS "Build NInfer benchmarks" OFF)
-option(NINFER_SPECULATIVE_SELECT_SCATTER_FUSION
-       "Fuse accepted-hidden selection and continuation-state scatter" OFF)
-option(NINFER_MTP_LONGEST_SUFFIX_LOOKUP
-       "Use bounded longest-suffix context lookup for MTP drafts" OFF)
 option(NINFER_SFU_SIGMOID_SILU
        "Evaluate sigmoid and SiLU on the SFU instead of with expf and a divide" OFF)
 if(NINFER_SFU_SIGMOID_SILU)

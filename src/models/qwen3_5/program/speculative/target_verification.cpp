@@ -38,16 +38,10 @@ void target_verify_accept(ExecutionCore& execution, Tensor& continuation_hidden_
             dimension(execution.parameters.model.resources().public_token_count), frame.sampling,
             execution.work, execution.device.stream);
     }
-#if defined(NINFER_SPECULATIVE_SELECT_SCATTER_FUSION)
-    ops::speculative_select_accepted_hidden_scatter(
-        frame.target_hidden, frame.accepted_drafts, frame.state_destination_slots,
-        continuation_hidden_store, execution.device.stream);
-#else
     ops::speculative_select_accepted_hidden(frame.target_hidden, frame.accepted_drafts,
                                             frame.selected_hidden, execution.device.stream);
     ops::scatter(frame.selected_hidden, frame.state_destination_slots, continuation_hidden_store,
                  execution.device.stream);
-#endif
 }
 
 } // namespace ninfer::models::qwen3_5::execution

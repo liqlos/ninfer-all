@@ -7,6 +7,28 @@ logical bindings and frontend resources.
 
 Run the commands below from the repository root.
 
+## Add Vision to an existing v3 artifact
+
+An existing text/MTP artifact can retain its stored weights and frontend resources while adding
+the Vision tower from a compatible local Qwen3.5-family checkpoint:
+
+```bash
+python3 -m tools.convert.add_vision \
+  --artifact models/text-mtp.ninfer \
+  --source /path/to/local-checkpoint-with-vision \
+  --out models/text-mtp-vision.ninfer \
+  --device cuda
+```
+
+The tool checks text geometry and tokenizer compatibility, converts only Vision using the official
+Q4/Q5/Q6/Q8 recipe, and verifies every retained object byte for byte. It preserves the original
+text template and publishes a `.vision.json` receipt. The output must use a new path. CPU conversion
+is the default; CUDA conversion needs an available GPU. This checks structural compatibility;
+the selected source must also be an appropriate companion for the text checkpoint.
+
+Serve the result with `--vision`. On memory-tight GPUs, `--vision-residency overlay` keeps the tower
+in host memory; see [Vision residency](serving.md#vision-residency).
+
 ## Upgrade an existing v2 artifact
 
 The offline upgrade tool supports the official Qwen3.6/3.8-27B groupwise-int and NVFP4 artifacts,
