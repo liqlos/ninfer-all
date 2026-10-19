@@ -113,10 +113,10 @@ void call_variant(bool on, const Q6MmqProbePlan& plan, const char* weights, int 
     const int row_blocks = k / 256;
     const int stride_row_blocks = row_blocks;
     if (on) {
-        q6_mmq_packed_scales_on_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
+        q6_mmq_j64_aligned_on_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
                               out, bf16, stride, fixup, stream);
     } else {
-        q6_mmq_packed_scales_off_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
+        q6_mmq_j64_aligned_off_run(&plan, weights, stride_row_blocks, rows, k, activation, columns,
                                out, bf16, stride, fixup, stream);
     }
 }
@@ -225,12 +225,11 @@ void run_case(const Case& c, int columns, std::ostream& jsonl) {
 
     Q6MmqProbePlan off_plan{};
     Q6MmqProbePlan on_plan{};
-    if (!q6_mmq_packed_scales_off_plan(c.rows, columns, &off_plan) ||
-        !q6_mmq_packed_scales_on_plan(c.rows, columns, &on_plan)) {
+    if (!q6_mmq_j64_aligned_off_plan(c.rows, columns, &off_plan) ||
+        !q6_mmq_j64_aligned_on_plan(c.rows, columns, &on_plan)) {
         throw std::runtime_error("native Q6 MMQ plan unavailable");
     }
-    if (off_plan.J != 128 || on_plan.J != 128 || off_plan.I != on_plan.I ||
-        off_plan.fixup != on_plan.fixup || off_plan.blocks != on_plan.blocks) {
+    if (off_plan.J != 128 || on_plan.J != (columns % 128 == 0 ? 64 : 128)) {
         throw std::runtime_error("native selector mismatch or unexpected J/I plan");
     }
     const int stride = c.rows + 13;
@@ -240,7 +239,9 @@ void run_case(const Case& c, int columns, std::ostream& jsonl) {
     const std::size_t fixup_bytes = off_plan.fixup
         ? std::size_t(off_plan.blocks) * off_plan.J * off_plan.I * sizeof(float) : 0;
     Buffer off_fixup(fixup_bytes);
-    Buffer on_fixup(fixup_bytes);
+    const std::size_t on_fixup_bytes = on_plan.fixup
+        ? std::size_t(on_plan.blocks) * on_plan.J * on_plan.I * sizeof(float) : 0;
+    Buffer on_fixup(on_fixup_bytes);
     Buffer off_bf16(std::size_t(output_count) * sizeof(__nv_bfloat16));
     Buffer on_bf16(std::size_t(output_count) * sizeof(__nv_bfloat16));
     const auto* weight_data = static_cast<const char*>(device_weights.p);
@@ -268,7 +269,7 @@ void run_case(const Case& c, int columns, std::ostream& jsonl) {
 
     bool bf16_checked = false;
     bool exact_bf16 = false;
-    if (!off_plan.fixup) {
+    if (!off_plan.fixup && !on_plan.fixup) {
         initialize(off_bf16.p, off_bf16.bytes);
         initialize(on_bf16.p, on_bf16.bytes);
         call_variant(false, off_plan, weight_data, c.rows, c.k, activation_data, columns,
@@ -301,6 +302,8 @@ void run_case(const Case& c, int columns, std::ostream& jsonl) {
           << ",\"activation_layout\":\"Q8_1_D4\",\"activation_slack_bytes\":"
           << 128 * sizeof(block_q8_1_mmq)
           << ",\"J\":" << off_plan.J << ",\"I\":" << off_plan.I
+          << ",\"on_J\":" << on_plan.J << ",\"on_I\":" << on_plan.I
+          << ",\"on_fixup\":" << (on_plan.fixup ? "true" : "false")
           << ",\"stream_k\":" << (off_plan.stream_k ? "true" : "false")
           << ",\"fixup\":" << (off_plan.fixup ? "true" : "false")
           << ",\"fp32_off_on_bitwise_equal\":" << (exact_f32 ? "true" : "false")
@@ -361,7 +364,7 @@ int main(int argc, char** argv) {
         jsonl << "{\"kind\":\"environment\",\"device\":\"" << json_string(properties.name)
               << "\",\"compute_capability\":\"8.6\",\"sm_count\":" << properties.multiProcessorCount
               << ",\"free_bytes_before\":" << free_bytes << ",\"total_bytes\":" << total_bytes
-              << ",\"feature\":\"Q6_MMQ_PACKED_SCALES\",\"store_fusion\":true}\n";
+              << ",\"feature\":\"Q6_MMQ_J64_ALIGNED\",\"store_fusion\":true}\n";
         const std::array<Case, 2> cases{{
             {"q6-full-k17408", "/extra/q6-full-k17408.bin", 5120, 17408},
             {"q6-head-k5120", "/fixtures/q6-head-full-k5120.bin", 1024, 5120}

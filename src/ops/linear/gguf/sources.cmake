@@ -1,4 +1,3 @@
-option(NINFER_GGUF_Q6_MMQ_PACKED_SCALES "Keep Q6_K MMQ scales packed until each SM86 integer product" OFF)
 # ggml's block-quant kernels (third_party/ggml-quants) behind a plain bridge. They build as their own
 # archive: the ggml headers define CUDA_CHECK and friends, so no NInfer translation unit may see them.
 set(NINFER_GGML_QUANTS_ROOT "${PROJECT_SOURCE_DIR}/third_party/ggml-quants")
@@ -388,10 +387,14 @@ target_link_libraries(ninfer_ggml_quants PRIVATE CUDA::cudart CUDA::cublas)
 target_link_libraries(ninfer_ops PRIVATE ninfer_ggml_quants)
 target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/gguf_linear.cpp")
 
-if(NINFER_GGUF_Q6_MMQ_PACKED_SCALES)
+option(NINFER_GGUF_Q6_MMQ_J64_ALIGNED "Use Q6 MMQ J64 for aligned SM86 column batches" OFF)
+if(NINFER_GGUF_Q6_MMQ_J64_ALIGNED)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
-    message(FATAL_ERROR "Packed Q6_K MMQ scale registers require sm_86")
+    message(FATAL_ERROR "Q6 aligned MMQ schedule requires sm_86")
   endif()
-  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu" APPEND
-    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_PACKED_SCALES=1)
+  if(NINFER_GGUF_SM86_MMQ_TILE_CAP)
+    message(FATAL_ERROR "Q6 aligned MMQ schedule requires the uncapped control")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q6_k.cu"
+    APPEND PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_J64_ALIGNED=1)
 endif()

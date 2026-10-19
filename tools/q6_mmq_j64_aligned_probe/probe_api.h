@@ -18,13 +18,13 @@ struct Q6MmqProbePlan {
     bool fixup;
 };
 
-bool q6_mmq_packed_scales_off_plan(int rows, int columns, Q6MmqProbePlan* plan);
-bool q6_mmq_packed_scales_on_plan(int rows, int columns, Q6MmqProbePlan* plan);
-void q6_mmq_packed_scales_off_run(const Q6MmqProbePlan* plan, const char* weight,
+bool q6_mmq_j64_aligned_off_plan(int rows, int columns, Q6MmqProbePlan* plan);
+bool q6_mmq_j64_aligned_on_plan(int rows, int columns, Q6MmqProbePlan* plan);
+void q6_mmq_j64_aligned_off_run(const Q6MmqProbePlan* plan, const char* weight,
                             int stride_row_blocks, int rows, int k, const int* activation,
                             int columns, float* out, __nv_bfloat16* out_bf16,
                             std::int64_t output_column_stride, float* fixup, cudaStream_t stream);
-void q6_mmq_packed_scales_on_run(const Q6MmqProbePlan* plan, const char* weight,
+void q6_mmq_j64_aligned_on_run(const Q6MmqProbePlan* plan, const char* weight,
                            int stride_row_blocks, int rows, int k, const int* activation,
                            int columns, float* out, __nv_bfloat16* out_bf16,
                            std::int64_t output_column_stride, float* fixup, cudaStream_t stream);
