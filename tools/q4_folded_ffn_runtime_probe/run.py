@@ -25,6 +25,8 @@ PROTOCOL = OUT / "protocol-r2.json"
 PROTOCOL_SHA = "1ff33e339731bfe6a7ac22f8364ce8e21fbb05e93c243ea0e29f721c5e2a5574"
 BUILD = OUT / "build-r2.json"
 BUILD_SHA = "6f7426bc1e6dcad9a4cdf347f1d97e23bd0fae6ed88ed5f6859cbb485d8d6e89"
+CONFIRM_PROTOCOL = OUT / "confirmation-protocol-r1.json"
+CONFIRM_PROTOCOL_SHA = "3ad4c1536aff6d24bce8be3eb8c941f61599763fa1fdf2c9f1aa943a864aaf33"
 EXPORT = ROOT / "artifacts/experimental/folded16-runtime-serve"
 EXE = "/usr/local/bin/ninfer-serve"
 LABEL = "io.codex.ninfer-owner"
@@ -67,13 +69,16 @@ def remove_owned(ident, token, exe_sha=None):
 
 
 def main():
+    global PROTOCOL, PROTOCOL_SHA
     parser = argparse.ArgumentParser(description="One serialized lab-only folded16 request/profile launch.")
     parser.add_argument("arm", choices=("off", "on"))
-    parser.add_argument("mode", choices=("screen", "profile"))
+    parser.add_argument("mode", choices=("screen", "profile", "confirm"))
     parser.add_argument("tag")
     parser.add_argument("control_tag")
     parser.add_argument("--route", type=pathlib.Path)
     args = parser.parse_args()
+    if args.mode == "confirm":
+        PROTOCOL, PROTOCOL_SHA = CONFIRM_PROTOCOL, CONFIRM_PROTOCOL_SHA
     assert not sys.flags.optimize, "Run without Python -O"
     assert all(re.fullmatch(r"[a-z0-9-]+", value) for value in (args.tag, args.control_tag))
     receipt = OUT / (args.tag + "-runtime.json")
@@ -112,6 +117,7 @@ def main():
         assert lab.sha(PROTOCOL) == PROTOCOL_SHA and lab.sha(BUILD) == BUILD_SHA
         protocol, build = load(PROTOCOL), load(BUILD)
         assert protocol["created_before_inference"] and protocol["image"] == lab.IMAGE
+        assert (protocol.get("stage") == "independent_confirmation") == (args.mode == "confirm")
         assert build["status"] == "LAB_ONLY_OFF_ON_WRAPPERS_LINKED_NOT_GPU_QUALIFIED"
         assert build["build"]["status"] == "LAB_WRAPPERS_LINKED_NOT_RUNTIME_QUALIFIED"
         assert all(lab.sha(HERE / name) == digest for name, digest in build["source_sha256"].items())
@@ -131,24 +137,24 @@ def main():
         control = load(control_path) if control_path.exists() else None
         if control:
             assert control["status"] == "SCREENED" and control["arm"] == "off"
-            assert control["mode"] == "screen" and control["sequence_index"] == 0
+            assert control["mode"] == ("confirm" if args.mode == "confirm" else "screen") and control["sequence_index"] == 0
             assert control["tag"] == control["control_tag"] == args.control_tag
             assert all(control[key] == record[key] for key in
                        ("protocol_sha256", "build_receipt_sha256", "model_sha256", "bench_sha256", "runner_sha256"))
             assert control["executable_sha256"] == build["build"]["outputs"]["off"]["sha256"]
             record["reference_receipt_sha256"] = lab.sha(control_path)
         else:
-            assert args.arm == "off" and args.mode == "screen" and args.tag == args.control_tag
-        if args.mode == "screen":
+            assert args.arm == "off" and args.mode != "profile" and args.tag == args.control_tag
+        if args.mode != "profile":
             previous = [load(p) for p in OUT.glob("*-runtime.json")]
-            previous = sorted((r for r in previous if r.get("mode") == "screen"
+            previous = sorted((r for r in previous if r.get("mode") == args.mode
                                and r.get("control_tag") == args.control_tag
                                and r.get("protocol_sha256") == PROTOCOL_SHA), key=lambda r: r["started_at"])
             assert all(r["status"] == "SCREENED" for r in previous), "Prior screen failed; do not extend"
             assert [r["arm"] for r in previous] == protocol["order"][:len(previous)]
             assert len(previous) < len(protocol["order"]) and args.arm == protocol["order"][len(previous)]
             record["sequence_index"] = len(previous)
-        if args.arm == "on" and args.mode == "screen":
+        if args.arm == "on" and args.mode != "profile":
             assert args.route is not None, "ON timing requires the independent current CUDA route PASS"
             route_path = args.route if args.route.is_absolute() else ROOT / args.route
             route = load(route_path)

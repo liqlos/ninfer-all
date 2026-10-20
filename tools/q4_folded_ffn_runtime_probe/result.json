@@ -1,5 +1,5 @@
 {
-  "status": "R2_NATIVE_STREAM_K_GUARD_FIXED_RUNTIME_QUALIFICATION_PENDING",
+  "status": "R2_REQUEST_SCREEN_SELECTED_INDEPENDENT_CONFIRMATION_PENDING",
   "default_off_flag": "NINFER_LAB_FOLDED16_RUNTIME",
   "scope": "Temporary link-time lab gate; not product integration or CMake option. Core archives/source and production unchanged.",
   "closed_route": "SM86, merged gate/up Q4_K N34816/K5120/T1280; down Q4_K or Q6_K N5120/K17408; BF16 contiguous operands, no gather, GgufBlocks, J128/I128 native stream_k=true with zero fixup.",
@@ -19,17 +19,35 @@
     "off": "fd51ca66912acbbf9d47e2831ab4192c05efe1f7b4f7f3b05113984b719fb0d8",
     "on": "6ead722e9d4b23f4dbb4da967c60437fba562bb85cc66294d28ede599e2f5344"
   },
-  "runtime_route_qualified": false,
-  "numerical_runtime_pass": false,
-  "full_request_measured": false,
+  "runtime_route_qualified": true,
+  "numerical_runtime_pass": "Both frozen RU4K/JSON32K output+usage+finish+full MTP dict exact across W/C/C/W; full state snapshot not asserted.",
+  "full_request_measured": true,
   "performance_claim": false,
   "host_diagnostic": "NINFER_LAB_FOLDED16_HOST_ADMISSIONS=1 counts host admissions/capture, not CUDA graph replays; OFF during timing.",
-  "next_gate": "First OFF request reference; untimed ON profile must prove both D4/DS4 real launches and exact output/speculative workload, then W/C/C/W for RU4K+JSON32K.",
+  "next_gate": "Fixed independent8freshprocesspairs/4AB4BA; same workloads. Paired-logt95CI; no selection data or optional extension. Main/production unchanged.",
   "receipts": {
     "build": "results/q4-folded-ffn-runtime/build-r2.json",
     "static": "results/q4-folded-ffn-runtime/static-link-r2.json",
-    "protocol": "results/q4-folded-ffn-runtime/protocol-r2.json"
+    "protocol": "results/q4-folded-ffn-runtime/protocol-r2.json",
+    "route": "results/q4-folded-ffn-runtime/r2-on-profile-route.json",
+    "screen": "results/q4-folded-ffn-runtime/screen-r2-decision.json",
+    "confirmation_protocol": "results/q4-folded-ffn-runtime/confirmation-protocol-r1.json"
   },
   "prior_route_failure": "R1 untimed profile exact-output but zero folded kernel calls: wrapper incorrectly rejected native stream_k=true, conflating stream-k scheduling with fixup. Corrected before candidate timing; R1 excluded from fresh R2 screen.",
-  "static_checks_reuse": "R1 actual linked-call/cubin proof reused under identical original link/native input hashes/build recipe and whole OFF executable; R2 modifies only ON C++ guard and untimed metadata."
+  "static_checks_reuse": "R1 actual linked-call/cubin proof reused under identical original link/native input hashes/build recipe and whole OFF executable; R2 modifies only ON C++ guard and untimed metadata.",
+  "actual_measured_prefill_calls": {
+    "Q6_D4": 96,
+    "Q4_DS4": 96
+  },
+  "screen": {
+    "independent_pairs": 2,
+    "JSON32K_time_reduction_percent": 0.5863241495091361,
+    "JSON_pair_reductions_percent": [
+      0.8851428072342158,
+      0.2866578572487859
+    ],
+    "RU4K_time_reduction_percent": -0.11271106792405966,
+    "selected": true,
+    "statistical_confirmation": false
+  }
 }
