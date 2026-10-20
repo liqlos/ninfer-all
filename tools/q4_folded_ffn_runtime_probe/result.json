@@ -1,0 +1,33 @@
+{
+  "status": "LAB_ONLY_CLOSED_RUNTIME_WRAPPERS_LINKED_STATIC_PASS_NOT_GPU_QUALIFIED",
+  "default_off_flag": "NINFER_LAB_FOLDED16_RUNTIME",
+  "scope": "Temporary link-time lab gate; not product integration or CMake option. Core archives/source and production unchanged.",
+  "closed_route": "SM86, merged gate/up Q4_K N34816/K5120/T1280; down Q4_K or Q6_K N5120/K17408; BF16 contiguous operands, no gather, GgufBlocks, J128/I128 no fixup.",
+  "fallback": "All other routes forward exact original symbol before launches; no fallback after starting candidate sequence.",
+  "workspace_bytes": 32477184,
+  "workspace_capacity_unchanged": true,
+  "native_input_pack_and_down_accumulate": true,
+  "producer_object_identical_in_both_arms": true,
+  "compile_link_seconds": 27.734000000025844,
+  "static_checks": [
+    "Actual FFN call reaches __wrap in both binaries.",
+    "OFF and rejected ON cases forward __real.",
+    "No unresolved __wrap/__real; exact original archive order.",
+    "Producer cubin equals qualified whole-FFN producer; native bridge/Q4/Q6 cubins identical across arms."
+  ],
+  "binaries": {
+    "off": "fd51ca66912acbbf9d47e2831ab4192c05efe1f7b4f7f3b05113984b719fb0d8",
+    "on": "eef3664502f01ad0b631345b8badc428c2482acf1c304b93beee85b41a63ddf1"
+  },
+  "runtime_route_qualified": false,
+  "numerical_runtime_pass": false,
+  "full_request_measured": false,
+  "performance_claim": false,
+  "host_diagnostic": "NINFER_LAB_FOLDED16_HOST_ADMISSIONS=1 counts host admissions/capture, not CUDA graph replays; OFF during timing.",
+  "next_gate": "First OFF request reference; untimed ON profile must prove both D4/DS4 real launches and exact output/speculative workload, then W/C/C/W for RU4K+JSON32K.",
+  "receipts": {
+    "build": "results/q4-folded-ffn-runtime/build-r1.json",
+    "static": "results/q4-folded-ffn-runtime/static-link-r1.json",
+    "protocol": "results/q4-folded-ffn-runtime/protocol-r1.json"
+  }
+}
