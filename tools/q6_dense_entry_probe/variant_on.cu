@@ -1,0 +1,15 @@
+#define NINFER_GGUF_MMQ_STORE_FUSION 1
+#define NINFER_GGUF_Q6_MMQ_DENSE_ENTRY 1
+#define mul_mat_q q6_dense_entry_on_mul_mat_q
+#define mul_mat_q_stream_k_fixup q6_dense_entry_on_mul_mat_q_stream_k_fixup
+#define launch_matrix q6_dense_entry_on_launch_matrix
+#define matrix_product_impl q6_dense_entry_on_matrix_product_impl
+#define matrix_fixup_bytes_impl q6_dense_entry_on_matrix_fixup_bytes_impl
+#define select_matrix_launch q6_dense_entry_on_select_matrix_launch
+#define matrix_bf16_store_plan_impl q6_dense_entry_on_matrix_bf16_store_plan_impl
+#define matrix_product_bf16_store_impl q6_dense_entry_on_matrix_product_bf16_store_impl
+#define PROBE_PLAN q6_dense_entry_on_plan
+#define PROBE_RUN q6_dense_entry_on_run
+#define PROBE_USES_DENSE q6_dense_entry_on_uses_dense
+
+#include "variant_impl.cuh"
