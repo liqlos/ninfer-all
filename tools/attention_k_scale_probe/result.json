@@ -1,5 +1,5 @@
 {
-  "status": "SOURCE_ONLY_CPU_PROOF_PASS_COMPILE_NOT_RUN",
+  "status": "CLOSED_RESOURCE_GATE_FAILED",
   "default_off_flag": "NINFER_PROMPT_K_SCALE_FP32",
   "scope": "Isolated SM86, D256/H24/KV4, Warps8, INT8 K8/V8, PageMajor, PagedKVBatchMetadata<false>; core/CMake/runtime unchanged.",
   "mechanism": "64 producer threads synchronously load one uint2 of four original half scales, expand with the same half-to-float conversion and store float4 in shared before the existing wait/CTA publication. QK consumes FP32 scales; arithmetic and two-stage/barrier order unchanged.",
@@ -117,19 +117,57 @@
       "variant.cu": "fb709e15ed807a8487cf96d2dc8a70ad2f8cb0a71769882db4b1e96bd27dc4d5",
       "probe_api.h": "b35047d2b35f571fb58022553c288c6fbacbfa28fa6f198feadcd97e75582e78",
       "build.sh": "8fed5294a6713376fa8f7d722db2e734a5207c03bf0fbca18c6b6c0daec445cb",
-      "analyze.py": "38d92585b50b9e479482979ac022c397d107a35bdd04ed53da15fc85d1550717"
+      "analyze.py": "994a0a2a49b3f66b1f02bcd17863d656a9f7652c603d733d294fd8e481ec402b"
     },
     "inverse_and_OFF_byte_exact": true
   },
   "host_guard_revision": "Before compilation, root added contiguous PageMajor plane/shape/page-count, singleton-aware local stride, and vector alignment rejects. All table rows remain supported through the selected table_rows entry; no extra tensor.cpp link dependency.",
   "caller_preconditions": "Valid device positions/page-table contents and disjoint sufficiently sized allocations remain caller-owned; this private probe is not a product API validator.",
-  "pending": [
-    "Actual compile/resource gate: <=255 registers, zero stack/local/spills, total shared<=101376.",
-    "Selected conversion movement and original math counts, then manual PTX/SASS wait/publication/read/reuse order review.",
-    "Only after resource/mechanism pass: exported-binary exact BF16 and independent FP64/tails/fragmentation/guards, then one fixed exploratory operator screen."
-  ],
-  "compile_run": false,
+  "pending": [],
+  "compile_run": true,
   "export_run": false,
   "gpu_run": false,
-  "performance_claim": false
+  "performance_claim": false,
+  "actual_compile": {
+    "seconds": 16.531,
+    "receipt": "results/attention-k-scale/compile-r2.json",
+    "diagnostic": "results/attention-k-scale/resource-diagnostic-r1.json",
+    "diagnostic_sha256": "e654b4e22e1ba4c45e1a9f2f7f242e091a7a9b346782f825b8f8cb4018d10580",
+    "parser_provenance": {
+      "mode": "read_only_diagnostic_of_existing_objects",
+      "original_compile_analyzer_sha256": "38d92585b50b9e479482979ac022c397d107a35bdd04ed53da15fc85d1550717",
+      "current_analyzer_sha256": "994a0a2a49b3f66b1f02bcd17863d656a9f7652c603d733d294fd8e481ec402b",
+      "analyzer_matches_compile_manifest": false,
+      "compiled_probe_source_pins": {
+        "generate.py": "177ef82d3cda1ce3c44259ff29fe33e6d285f3e2f53c57bbeef779210ea62104",
+        "variant.cu": "fb709e15ed807a8487cf96d2dc8a70ad2f8cb0a71769882db4b1e96bd27dc4d5",
+        "probe_api.h": "b35047d2b35f571fb58022553c288c6fbacbfa28fa6f198feadcd97e75582e78",
+        "build.sh": "8fed5294a6713376fa8f7d722db2e734a5207c03bf0fbca18c6b6c0daec445cb",
+        "analyze.py": "38d92585b50b9e479482979ac022c397d107a35bdd04ed53da15fc85d1550717"
+      }
+    },
+    "off": {
+      "object_sha256": "3fd328e78c54239e4e371dc658143705ec6e836080bb2c77a9bbeec8bf8dab27",
+      "registers": 255,
+      "stack_bytes": 8,
+      "spill_store_bytes": 4,
+      "spill_load_bytes": 4,
+      "total_shared_bytes": 100352
+    },
+    "on": {
+      "object_sha256": "3ad7552f31ac3a692fa778d193bec38b2bdc9ab730286a76d5447bce0639931e",
+      "registers": 255,
+      "stack_bytes": 64,
+      "spill_store_bytes": 112,
+      "spill_load_bytes": 112,
+      "total_shared_bytes": 101376
+    },
+    "native_IMMA64_HMMA128": true,
+    "same_single_CTA_barrier": true,
+    "same_selected_SASS_math_counts": false,
+    "selected_PTX_conversion_moved": false,
+    "independent_review": "Astra7 source author and root reviewed actual resources; hard gate failed before GPU."
+  },
+  "decision": "Retain source default-OFF. Resource gate failed: do not build host, export, run GPU, deepen manual order review, or repeat unchanged. New lifetime mechanism required.",
+  "dependency_parser_fix": "NVCC emitted target.o : prerequisites; corrected split validates exact target and one logical rule. Existing objects/manifests unchanged; diagnostic records revised analyzer and original compiled parser separately."
 }

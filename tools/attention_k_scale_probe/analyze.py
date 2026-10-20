@@ -9,6 +9,18 @@ import sys
 from generate import GENERATED, PINS, prepare, require, sha256
 
 
+def parse_dependencies(source, expected_target):
+    require(not source.rstrip().endswith("\\"), "dangling dependency continuation")
+    rule = re.sub(r"\\\r?\n", " ", source).strip()
+    require("\n" not in rule and "\r" not in rule, "expected one logical dependency rule")
+    require(rule.count(":") == 1, "expected one POSIX dependency target separator")
+    target, prerequisites = rule.split(":", 1)
+    require(shlex.split(target) == [str(expected_target)], "unexpected dependency target")
+    paths = shlex.split(prerequisites)
+    require(paths, "empty dependency prerequisites")
+    return paths
+
+
 def sass_counts(source):
     return collections.Counter(re.findall(
         r"/\*[0-9a-fA-F]+\*/\s+(?:@!?P\w+\s+)?([A-Z][A-Z0-9_.]*)(?:\s|;)", source))
@@ -59,7 +71,7 @@ def variant(build_root, source_root, name, generation):
     require(ptx_stack == int(stack), "ptxas/cubin stack mismatch")
     counts = sass_counts(files["sass"])
     require(any(op.startswith("IMMA") for op in counts), "SASS instruction parse incomplete")
-    dependency_paths = shlex.split(files["dependencies"].replace("\\\n", " "))[1:]
+    dependency_paths = parse_dependencies(files["dependencies"], build_root / (name + ".o"))
     require(any(path.endswith("/" + GENERATED) for path in dependency_paths), "generated include dependency missing")
     require(not any(path.endswith("/prompt_i8_fast.cuh") for path in dependency_paths), "native sibling include trap")
     local_dependencies = {}
@@ -93,16 +105,31 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", type=pathlib.Path, default=pathlib.Path("/src"))
     parser.add_argument("--build-root", type=pathlib.Path, required=True)
+    parser.add_argument("--diagnostic-original-analyzer-sha256")
+    parser.add_argument("--diagnostic-generation-sha256")
     args = parser.parse_args()
     root = args.build_root.resolve()
     source_root = args.source_root.resolve()
     generated, prepared = prepare(source_root)
-    generation = json.loads((root / "generation.json").read_text(encoding="utf-8"))
+    generation_bytes = (root / "generation.json").read_bytes()
+    generation = json.loads(generation_bytes)
+    generation_sha256 = sha256(generation_bytes)
+    analyzer_sha256 = sha256(pathlib.Path(__file__).read_bytes())
+    diagnostic = args.diagnostic_original_analyzer_sha256 is not None
+    require(diagnostic == (args.diagnostic_generation_sha256 is not None),
+            "diagnostic mode requires both original analyzer and generation SHA256")
+    if diagnostic:
+        require(generation_sha256 == args.diagnostic_generation_sha256,
+                "diagnostic original generation SHA256 mismatch")
+        require(generation["probe_source_pins"]["analyze.py"] == args.diagnostic_original_analyzer_sha256,
+                "diagnostic original analyzer SHA256 mismatch")
     require(generation["source_pins"] == PINS, "generation source pins differ")
     require(generation["generated_sha256"] == sha256(generated), "generation digest differs")
     require((root / "generated" / GENERATED).read_bytes() == generated, "generated build bytes differ")
     require(generation["generated_line_ranges"] == prepared["generated_line_ranges"], "source location ranges differ")
     for name, digest in generation["probe_source_pins"].items():
+        if diagnostic and name == "analyze.py":
+            continue
         require(sha256((pathlib.Path(__file__).parent / name).read_bytes()) == digest, "probe changed after generation: " + name)
     require("V13.1.115" in (root / "toolchain.txt").read_text(), "unexpected compiler version")
     off = variant(root, source_root, "off", generation)
@@ -129,7 +156,14 @@ def main():
               "native_IMMA64_HMMA128": qk_pv, "selected_PTX_conversion_moved": conversion_moved,
               "native_baseline_stack_spill_store_spill_load_expected": [8, 4, 4],
               "native_baseline_observed": [off[key] for key in ("stack_bytes", "spill_store_bytes", "spill_load_bytes")],
-              "source_generation_sha256": sha256((root / "generation.json").read_bytes()),
+              "source_generation_sha256": generation_sha256,
+              "parser_provenance": {
+                  "mode": "read_only_diagnostic_of_existing_objects" if diagnostic else "compile_manifest_analyzer",
+                  "original_compile_analyzer_sha256": generation["probe_source_pins"]["analyze.py"],
+                  "current_analyzer_sha256": analyzer_sha256,
+                  "analyzer_matches_compile_manifest": analyzer_sha256 == generation["probe_source_pins"]["analyze.py"],
+                  "compiled_probe_source_pins": generation["probe_source_pins"],
+              },
               "off": off, "on": on,
               "manual_PTX_SASS_order_review_required": ["producer global vector loads and FP32 shared stores",
                                                         "no new CTA barrier or staged-half reads",
