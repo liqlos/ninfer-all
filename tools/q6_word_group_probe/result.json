@@ -220,5 +220,59 @@
     },
     "selected": false,
     "statistical_confirmation": false
+  },
+  "postmortem": {
+    "scope": "Static SASS and CPU address model; not measured traffic or proven causality.",
+    "cooperative_native_already_reads_each_code_byte_once": true,
+    "warp_four_blocks_one_row": {
+      "unique_bytes_both": 840,
+      "unique_32B_sectors_both": 27,
+      "sum_sectors_over_weight_load_instructions": [
+        185.5,
+        53
+      ],
+      "weight_load_instructions_per_row": [
+        15,
+        7
+      ]
+    },
+    "full_row_unique_32B_sectors_both": {
+      "head_B20": 132,
+      "down_B68": 447
+    },
+    "128B_line_footprint_model_per_step": [
+      7.5,
+      9.5
+    ],
+    "address_arithmetic": {
+      "IMAD_WIDE_U32": [
+        2,
+        8
+      ],
+      "integer_add_carry_delta_per_K_iteration_two_rows": 10
+    },
+    "T4_activation_schedule": {
+      "native": "Eight activation LDG128 grouped before dot.",
+      "candidate": "Later columns interleaved with dot.",
+      "max_live_activation_words": [
+        32,
+        17
+      ],
+      "late_column_load_to_first_dot_instruction_distance": {
+        "native": [
+          121,
+          148
+        ],
+        "candidate": [
+          30,
+          45
+        ]
+      }
+    },
+    "cost_filters": [
+      "Compare to the cooperative control, not an old redundant-load decoder.",
+      "Any new backing must repay address arithmetic/metadata footprint with fewer compulsory bytes or useful reuse.",
+      "Preserve activation prefetch/latency overlap; fewer registers alone is not a performance objective."
+    ]
   }
 }
