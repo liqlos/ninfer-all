@@ -1,26 +1,27 @@
 {
-  "status": "CPU_COMPILED_STATIC_REVIEW_PARTIAL_NO_GPU",
+  "status": "REJECTED_UNIFIED_LAYOUT_EXPLORATORY_SCREEN_EXACT_OPERATOR_PASS",
   "default_off_flag": "NINFER_Q6_WORD_GROUP_PROBE",
   "mechanism": "Single Q6 word-group slab16 backing, original codes/scales/d; vector removes decode shuffles, MMQ producer writes STS128 into unchanged native shared layout.",
   "runtime_integrated": false,
   "performance_claim": false,
-  "gpu_correctness_qualified": false,
-  "full_fixture_roundtrip": false,
+  "gpu_correctness_qualified": true,
+  "full_fixture_roundtrip": true,
   "cpu_checks": {
     "basis_cases": 1680,
     "group_cases": 1024,
     "views": 53,
     "invalid_descriptors_rejected": 44,
     "real_fixture_sample_bytes": 369600,
-    "full_fixture_hash_checked": false
+    "full_fixture_hash_checked": true,
+    "full_real_fixture_bytes_roundtripped": 1116057600
   },
   "compile": {
     "toolchain": "CUDA13.1.115 SM86",
     "seconds": 23.5,
     "units": 2,
     "native_cache": "/build/q6-word-group",
-    "host_main": false,
-    "linked": false,
+    "host_main": true,
+    "linked": true,
     "spills_stack_local": 0,
     "vector_registers": {
       "native": [
@@ -48,7 +49,8 @@
         247,
         250
       ]
-    }
+    },
+    "host_compile_link_seconds": 8.453
   },
   "review": {
     "status": "PARTIAL_STATIC_REVIEW_ORIGINAL_MECHANISM_GATE_BLOCKED",
@@ -86,17 +88,137 @@
     ]
   },
   "next_gate": [
-    "Root reviewed resource/mechanism decision, preserving failed original gate status.",
-    "Use existing two objects; prepare isolated actual real-fixture correctness harness before any timing.",
-    "Full literal roundtrip of both pinned real fixtures; exact outputs and independent Q6 oracle for vector T1/T4 and all MMQ epilogues.",
-    "One joint head/down screen; converter/runtime only after both hot consumers justify integration."
+    "Current backing is closed; do not build converter/runtime or repeat unchanged screen.",
+    "Read-only address/codegen postmortem may inform a distinct ownership design; do not present fewer registers as a speedup.",
+    "Continue the selected packed folded16 full-request gate."
   ],
   "receipts": {
     "build": "results/q6-word-group/build-r2.json",
-    "review": "results/q6-word-group/review-r1.json"
+    "review": "results/q6-word-group/review-r1.json",
+    "host_build": "results/q6-word-group/host-build-r1.json",
+    "export": "results/q6-word-group/host-export-r1.json",
+    "static_admission": "results/q6-word-group/static-admission-r1.json",
+    "protocol": "results/q6-word-group/screen-protocol-r1.json",
+    "correctness_and_samples": "results/q6-word-group/screen-r1.jsonl",
+    "screen": "results/q6-word-group/screen-r1-receipt.json",
+    "decision": "results/q6-word-group/screen-r1-decision.json"
   },
   "receipt_sha256": {
     "build": "5af55ce76953394456b2ce6408103034e9b25e203b5db608d51d065309708295",
-    "review": "a1749e3ec49345539b765a0a8ae5202ba7952e223f45c4683fe1dd321b9749a2"
+    "review": "a1749e3ec49345539b765a0a8ae5202ba7952e223f45c4683fe1dd321b9749a2",
+    "decision": "8b1081436b03fa2d735a4713f07b103ae6539ac01c2d49f4514cb2aa0dac0227"
+  },
+  "operator_qualification": {
+    "cases": 10,
+    "output_modes_per_case": 3,
+    "full_real_parents": [
+      "head248320x5120",
+      "down5120x17408"
+    ],
+    "vector_tokens": [
+      1,
+      4
+    ],
+    "MMQ_tokens": 1280,
+    "odd_origin_views": 5,
+    "all_FP32_BF16_outputs_bit_exact": true,
+    "FP64_samples_per_case_per_arm": 64,
+    "nonzero_carry_and_32_call_evolution": true,
+    "API_canaries_and_route_proof": true,
+    "positive_fixup_qualified": false,
+    "generic_consumers_qualified": false,
+    "vision_qualified": false,
+    "output_stride": "rows+19; shared native/candidate",
+    "timing_scope": "Common native activation pack and carry reset before events; prepacked activation to output."
+  },
+  "exploratory_screen": {
+    "independent_launches": 1,
+    "orders": [
+      "ABBA",
+      "BAAB",
+      "ABBA"
+    ],
+    "repetitions_per_sample": 32,
+    "endpoints": {
+      "FULL_head_vector_T1/StoreBF16": {
+        "time_reduction_percent": -3.8979419716015373,
+        "positive_blocks": 0,
+        "block_time_reduction_percent": [
+          -5.600246338807668,
+          -3.106843859145192,
+          -3.0278295641123387
+        ],
+        "baseline_ms": 1.2234664956733334,
+        "candidate_ms": 1.2711565097166666
+      },
+      "FULL_head_vector_T4/StoreBF16": {
+        "time_reduction_percent": -14.422841896839845,
+        "positive_blocks": 0,
+        "block_time_reduction_percent": [
+          -13.526599379689896,
+          -16.2372303042156,
+          -13.500484403111512
+        ],
+        "baseline_ms": 1.2350399891533335,
+        "candidate_ms": 1.4131678541516666
+      },
+      "FULL_down_vector_T1/AccumulateBF16": {
+        "time_reduction_percent": 4.3459521851103915,
+        "positive_blocks": 3,
+        "block_time_reduction_percent": [
+          3.4626506542738245,
+          5.1049823928164155,
+          4.467294712765401
+        ],
+        "baseline_ms": 0.0952533322076,
+        "candidate_ms": 0.09111366793513336
+      },
+      "FULL_down_vector_T4/AccumulateBF16": {
+        "time_reduction_percent": -12.15928491292033,
+        "positive_blocks": 1,
+        "block_time_reduction_percent": [
+          -23.16338409763288,
+          5.06820119448379,
+          -23.363157742454987
+        ],
+        "baseline_ms": 0.10175900037086666,
+        "candidate_ms": 0.1141321671505
+      },
+      "FULL_down_MMQ_T1280/PlainFP32": {
+        "time_reduction_percent": 2.165802984057341,
+        "positive_blocks": 3,
+        "block_time_reduction_percent": [
+          2.5449459193601753,
+          3.7440521634552915,
+          0.15547348200535271
+        ],
+        "baseline_ms": 2.631941318513333,
+        "candidate_ms": 2.5749386548983333
+      },
+      "FULL_down_MMQ_T1280/StoreBF16": {
+        "time_reduction_percent": 0.2752273977708941,
+        "positive_blocks": 2,
+        "block_time_reduction_percent": [
+          -1.5858091608642155,
+          1.6684877743836202,
+          0.6989396818730564
+        ],
+        "baseline_ms": 2.6373440424616663,
+        "candidate_ms": 2.6300853490833336
+      },
+      "FULL_down_MMQ_T1280/AccumulateBF16": {
+        "time_reduction_percent": -0.5432199005952043,
+        "positive_blocks": 1,
+        "block_time_reduction_percent": [
+          -1.8516794931550784,
+          -0.5842217976945507,
+          0.8023482265081983
+        ],
+        "baseline_ms": 2.7480479876216664,
+        "candidate_ms": 2.762975931168333
+      }
+    },
+    "selected": false,
+    "statistical_confirmation": false
   }
 }
