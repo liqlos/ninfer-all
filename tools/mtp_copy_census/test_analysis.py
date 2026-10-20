@@ -50,8 +50,32 @@ class CopyTests(unittest.TestCase):
         b = analysis.local_comparison(ledger, [7, 8, 9, 5], [9, 9, 9], 2)
         self.assertEqual(a["copy"], b["copy"])
         self.assertEqual(a["copy"]["candidate_ids"], [7, 8, 9])
-        self.assertEqual(a["local_licensed_difference"], -3)
-        self.assertEqual(b["local_licensed_difference"], 3)
+        self.assertEqual(a["checkpoint_licensed_difference_lower"], -3)
+        self.assertEqual(a["checkpoint_licensed_difference_upper"], -3)
+        self.assertEqual(b["finalized_output_match_difference"], 3)
+        self.assertEqual(b["checkpoint_licensed_difference_lower"], 1)
+        self.assertEqual(b["checkpoint_licensed_difference_upper"], 3)
+
+    def test_repair_does_not_observe_acceptance_after_new_prefix(self):
+        ledger = [50, 51, 7, 8, 9, 0, 50, 51]
+        for native, lower, upper, changed in (([0, 0, 0], 1, 3, 0),
+                                             ([7, 0, 0], 2, 3, 1),
+                                             ([7, 8, 0], 3, 3, 2),
+                                             ([7, 8, 9], 3, 3, None)):
+            result = analysis.local_comparison(ledger, [7, 8, 9, 6], native, 2)
+            self.assertEqual(result["finalized_output_prefix_matches"], 3)
+            self.assertEqual((result["checkpoint_accepted_lower"], result["checkpoint_accepted_upper"]),
+                             (lower, upper))
+            self.assertEqual(result["first_new_prefix_position"], changed)
+            self.assertFalse(result["acceptance_after_new_prefix_observed"])
+
+    def test_harm_before_native_rejection_is_exact(self):
+        ledger = [50, 51, 7, 0, 9, 0, 50, 51]
+        result = analysis.local_comparison(ledger, [7, 8, 9, 6], [7, 8, 0], 2)
+        self.assertEqual(result["checkpoint_accepted_lower"], 1)
+        self.assertEqual(result["checkpoint_accepted_upper"], 1)
+        self.assertEqual(result["checkpoint_licensed_difference_lower"], -1)
+        self.assertIsNone(result["first_new_prefix_position"])
 
     def test_partial_continuation_and_overlapping_known_history(self):
         self.assertIsNone(analysis.copy_candidate([1] * 4, 2))

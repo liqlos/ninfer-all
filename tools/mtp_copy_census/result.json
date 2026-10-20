@@ -1,30 +1,132 @@
 {
-  "status": "CPU_ANALYSIS_READY_NATIVE_CAPTURE_PENDING",
+  "status": "NATIVE_CAPTURE_QUALIFIED_COPY_POLICIES_NOT_SELECTED",
   "lab_only": true,
   "default_off_flag": "NINFER_LAB_MTP_COPY_CENSUS=0",
   "purpose": "Capture exact native ledger/output IDs and full MTP boundaries, then measure causal history-only K3 admission before changing graphs or proposer policy.",
   "model_or_KV_or_sampling_changed": false,
   "core_source_modified": false,
   "CPU_analysis": {
-    "tests": 8,
-    "seconds": 0.055,
+    "tests": 10,
+    "seconds": 0.057,
     "selector": "longest suffix then most recent legal source; min8/16/32,max256,history65536,full3alreadyknown continuation",
     "independent_reference": "Exhaustive binary histories plus randomized bounded-history brute-force checks; native frontier/result/counter mutation cases.",
     "ready_first_round_excluded": true,
     "terminal_drain_saving_included": false,
     "new_trajectory_or_speed_claim": false,
     "files_sha256": {
-      "analysis.py": "5053ac51f94e5bee0092273225e2b8b1da981af251cd251dd6ff66ae25de05d0",
-      "test_analysis.py": "e83ff41160d7f055bc6245cb865eea9819426133c8b4bc2b5890978a392463ef"
-    }
+      "analysis.py": "f6e677867d9fc7c4a09bc12279755461caaa6f73592713817367c501e3e542d9",
+      "test_analysis.py": "0d2acd40e5f9a22c7f257256dd279ce6b6d4fd2e5476759fa130e80536363617"
+    },
+    "changed_prefix_acceptance": "bounds only; finalized-output agreement is a separate diagnostic"
   },
   "native_capture": {
-    "status": "SOURCE_PREPARATION",
+    "status": "DIAGNOSTIC_QUALIFIED",
     "GPU_copies_or_synchronizations_added": false,
     "exact_inputs": "First native SequenceState ledger plus incremental committed deltas; actual GenerationHandle::wait generated_token_ids and prompt summary,not retokenized text.",
-    "output_equality_and_native_counter_gate": "pending",
-    "build_run": false,
-    "GPU_run": false
+    "output_equality_and_native_counter_gate": "PASS",
+    "build_run": true,
+    "GPU_run": true,
+    "runtime_receipts": [
+      "results/mtp-copy-census/copy-r1-off-runtime.json",
+      "results/mtp-copy-census/copy-r1-on-runtime.json"
+    ],
+    "qualified_epochs": [
+      3,
+      4
+    ],
+    "startup_epoch": 1,
+    "warmup_epoch": 2,
+    "physical_calls": {
+      "RU4K": 182,
+      "JSON32K": 131
+    },
+    "cleanup": "Owned containers removed,reservations released,production/model unchanged",
+    "source_audit": "Independent review caught and fixed pre-install code_warm interception; null executable skipped before touching collector."
   },
-  "next_gate": "Native ABI/noLTO/freshness preflight,host-only OFF/ON wrapper compile/link; then own-reservation fresh diagnostic OFF/ON RU/JSON with exact outputs/counters. No timing claim."
+  "next_gate": "Bounded native two-input MMQ compile/resource probe; then only if exact/resource gates pass,a whole paired FFN screen against folded16.",
+  "capture_analysis_source_binding": {
+    "runtime_analyzer_sha256": "5053ac51f94e5bee0092273225e2b8b1da981af251cd251dd6ff66ae25de05d0",
+    "derived_analyzer_sha256": "f6e677867d9fc7c4a09bc12279755461caaa6f73592713817367c501e3e542d9",
+    "scope": "Same immutable native captures; corrected interpretation and tested bounds after GPU,not a rerun or performance claim."
+  },
+  "policies": {
+    "ru4k": {
+      "analysis": "results/mtp-copy-census/copy-r1-ru4k-analysis.json",
+      "sha256": "cd8b10444dfafdfc15c25b8564760a07bee895c9de65b485afbd92fe5ef6f10a",
+      "summary": [
+        {
+          "minimum_suffix": 8,
+          "eligible_baseline_checkpoints": 180,
+          "causal_copy_admissions": 4,
+          "checkpoint_licensed_increase_proven": 0,
+          "checkpoint_licensed_decrease_proven": 1,
+          "checkpoint_licensed_equal_proven": 3,
+          "checkpoint_licensed_difference_lower_sum": -1,
+          "checkpoint_licensed_difference_upper_sum": -1
+        },
+        {
+          "minimum_suffix": 16,
+          "eligible_baseline_checkpoints": 180,
+          "causal_copy_admissions": 0,
+          "checkpoint_licensed_increase_proven": 0,
+          "checkpoint_licensed_decrease_proven": 0,
+          "checkpoint_licensed_equal_proven": 0,
+          "checkpoint_licensed_difference_lower_sum": 0,
+          "checkpoint_licensed_difference_upper_sum": 0
+        },
+        {
+          "minimum_suffix": 32,
+          "eligible_baseline_checkpoints": 180,
+          "causal_copy_admissions": 0,
+          "checkpoint_licensed_increase_proven": 0,
+          "checkpoint_licensed_decrease_proven": 0,
+          "checkpoint_licensed_equal_proven": 0,
+          "checkpoint_licensed_difference_lower_sum": 0,
+          "checkpoint_licensed_difference_upper_sum": 0
+        }
+      ]
+    },
+    "json32k": {
+      "analysis": "results/mtp-copy-census/copy-r1-json32k-analysis.json",
+      "sha256": "2f3d2f8749bbcfee5e96a7e3abe15ce49955b4c3158a8600aa5e089ab0bf11ad",
+      "summary": [
+        {
+          "minimum_suffix": 8,
+          "eligible_baseline_checkpoints": 129,
+          "causal_copy_admissions": 8,
+          "checkpoint_licensed_increase_proven": 0,
+          "checkpoint_licensed_decrease_proven": 8,
+          "checkpoint_licensed_equal_proven": 0,
+          "checkpoint_licensed_difference_lower_sum": -22,
+          "checkpoint_licensed_difference_upper_sum": -22
+        },
+        {
+          "minimum_suffix": 16,
+          "eligible_baseline_checkpoints": 129,
+          "causal_copy_admissions": 0,
+          "checkpoint_licensed_increase_proven": 0,
+          "checkpoint_licensed_decrease_proven": 0,
+          "checkpoint_licensed_equal_proven": 0,
+          "checkpoint_licensed_difference_lower_sum": 0,
+          "checkpoint_licensed_difference_upper_sum": 0
+        },
+        {
+          "minimum_suffix": 32,
+          "eligible_baseline_checkpoints": 129,
+          "causal_copy_admissions": 0,
+          "checkpoint_licensed_increase_proven": 0,
+          "checkpoint_licensed_decrease_proven": 0,
+          "checkpoint_licensed_equal_proven": 0,
+          "checkpoint_licensed_difference_lower_sum": 0,
+          "checkpoint_licensed_difference_upper_sum": 0
+        }
+      ]
+    }
+  },
+  "decision": "Do not implement these longest-suffix copy-first policies for these fixed workloads: min16/32 never admit; min8 admits4/180 RU and8/129 JSON,with1 and8 proven local regressions and no proven repairs. Not a general rejection of other causal policies/workloads.",
+  "independent_audit": {
+    "status": "PASS",
+    "method": "Independent reverse search over every eligible native ledger and separate acceptance bounds calculation.",
+    "findings": "All12 admitted candidates have collapsed exact checkpoint bounds;no repaired prefix. Runtime output/native counters/source hashes/cleanup match. Not a speed or new-trajectory result."
+  }
 }

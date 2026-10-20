@@ -89,8 +89,24 @@ def local_comparison(ledger, generated_future, native_drafts, minimum=8):
     result = {"copy": selected,
               "native_prefix_matches": common_prefix(native_drafts, generated_future[:3])}
     if selected is not None:
-        result["copy_prefix_matches"] = common_prefix(selected["candidate_ids"], generated_future[:3])
-        result["local_licensed_difference"] = result["copy_prefix_matches"] - result["native_prefix_matches"]
+        candidate = selected["candidate_ids"]
+        result["finalized_output_prefix_matches"] = common_prefix(candidate, generated_future[:3])
+        result["finalized_output_match_difference"] = (
+            result["finalized_output_prefix_matches"] - result["native_prefix_matches"])
+        lower = upper = 3
+        changed = None
+        for index, (proposed, original, target) in enumerate(zip(candidate, native_drafts, generated_future)):
+            if proposed != target:
+                lower = upper = index
+                break
+            if proposed != original:
+                lower, upper, changed = index + 1, 3, index
+                break
+        result.update(checkpoint_accepted_lower=lower, checkpoint_accepted_upper=upper,
+                      checkpoint_licensed_difference_lower=lower - result["native_prefix_matches"],
+                      checkpoint_licensed_difference_upper=upper - result["native_prefix_matches"],
+                      first_new_prefix_position=changed,
+                      acceptance_after_new_prefix_observed=False)
     return result
 
 
@@ -195,10 +211,19 @@ def analyze_capture(record, minimum=8):
             "full_three_known_tokens_only": True, "longest_then_most_recent": True,
             "eligible_baseline_checkpoints": len(eligible), "causal_copy_admissions": len(samples),
             "admission_fraction": len(samples) / len(eligible) if eligible else 0,
-            "all_three_match_at_original_prefix": sum(row["copy_prefix_matches"] == 3 for row in samples),
-            "local_licensed_increase": sum(row["local_licensed_difference"] > 0 for row in samples),
-            "local_licensed_decrease": sum(row["local_licensed_difference"] < 0 for row in samples),
-            "local_licensed_equal": sum(row["local_licensed_difference"] == 0 for row in samples),
+            "all_three_equal_finalized_output_continuation": sum(
+                row["finalized_output_prefix_matches"] == 3 for row in samples),
+            "checkpoint_licensed_increase_proven": sum(
+                row["checkpoint_licensed_difference_lower"] > 0 for row in samples),
+            "checkpoint_licensed_decrease_proven": sum(
+                row["checkpoint_licensed_difference_upper"] < 0 for row in samples),
+            "checkpoint_licensed_equal_proven": sum(
+                row["checkpoint_licensed_difference_lower"] == row["checkpoint_licensed_difference_upper"] == 0
+                for row in samples),
+            "checkpoint_licensed_difference_lower_sum": sum(
+                row["checkpoint_licensed_difference_lower"] for row in samples),
+            "checkpoint_licensed_difference_upper_sum": sum(
+                row["checkpoint_licensed_difference_upper"] for row in samples),
             "optimistic_avoided_head_calls_on_original_checkpoints": 3 * len(samples),
             "optimistic_avoided_AR_calls_on_original_checkpoints": 2 * len(samples),
             "new_trajectory_or_throughput_claim": False, "terminal_drain_saving_included": False,
@@ -217,7 +242,7 @@ def main():
               "analyzer_sha256": sha(pathlib.Path(__file__)), "diagnostic_only": True,
               "capture_summary": {k: v for k, v in validated.items() if k not in ("rows", "generated")},
               "policies": [analyze_capture(record, minimum) for minimum in POLICIES],
-              "interpretation": "Each candidate is selected only from its original committed ledger; comparison stops at first new prefix. Original checkpoints are not stitched into a new rollout. Counts are not a speed estimate."}
+              "interpretation": "Each candidate is selected only from its original committed ledger. Finalized-output agreement is not counterfactual acceptance. Checkpoint acceptance bounds stop at the first new draft prefix; later acceptance is unobserved. Original checkpoints are not stitched into a new rollout. Counts are not a speed estimate."}
     with args.output.open("x", encoding="utf-8") as stream:
         json.dump(result, stream, indent=2)
         stream.write("\n")
