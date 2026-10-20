@@ -1,0 +1,93 @@
+{
+  "status": "CLOSED_NEGATIVE_EXPLORATORY_OPERATOR_SCREEN",
+  "switch": "NINFER_GGUF_Q4_MMQ_OUTPUT_CS",
+  "default": 0,
+  "runtime_integrated": false,
+  "whole_request_gain_claim": false,
+  "scope": "Q4 K5120/N17408/T1280 two FP32 MMQ products plus GateProduct; common Q8 DS4 pack outside events",
+  "binary_sha256": "ca13c866836a1cf3a4b3bb59fd2b562f6cf14002d4ee9d0db84bc74abba84fa4",
+  "probe_sources": {
+    "build.sh": "6169c8a3009ea087b7513ed3aecdeddfebc5e7286385a00a367f70dc95d62450",
+    "generate.py": "6186107e65d5e4145226c374f7befee84934e927651acf72932b1fc30dd1f249",
+    "main.cu": "3461a5e64b7802f8e7e868057aba3a151f79a0ffbe046858b5fed951fd210b99",
+    "screen.py": "61c2904a154eaa124057fd259da2955cf912997e5419eb2578c46c620ec46f18"
+  },
+  "generated_header_sha256": "5a0d069cb8ebef994df9f7ddd81a89cd09475bd2dff19975afbb14317018939a",
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 0.0001141365257,
+    "fp64_max_rel_error": 0.1323190691,
+    "input_seed": 776586465,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r1-2b598ae4aa8e4d639c8ef838824f23e8"
+  },
+  "timings": [
+    {
+      "block": 0,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.419456005,
+      "candidate_ms": 4.95810008,
+      "operator_time_increase_percent": 12.188017583851952
+    },
+    {
+      "block": 1,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.65109992,
+      "candidate_ms": 5.114112139,
+      "operator_time_increase_percent": 9.954897270837403
+    },
+    {
+      "block": 2,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.636543989,
+      "candidate_ms": 4.856191874,
+      "operator_time_increase_percent": 4.737319122197614
+    }
+  ],
+  "static_body": {
+    "candidate_registers": 224,
+    "baseline_registers": 221,
+    "stack_local_spills": 0,
+    "shared_bytes": 57856,
+    "baseline_final_store": "32bit STG.E",
+    "candidate_final_store": "32bit STG.E.EF",
+    "final_stores": 64,
+    "unchanged_fixup_stores": 64,
+    "unchanged_ldg_constant_instructions": 119,
+    "unchanged_math_opcodes": {
+      "IMMA.16832.S8.S8": 256,
+      "I2FP.F32.S32": 1024,
+      "FMUL": 1024,
+      "FFMA": 2048
+    }
+  },
+  "bindings": {
+    "build-r1.json": "06cd95f418dc44c8326a7823e948503f1a7a929c3a2e20b35e6be8eb05390481",
+    "body-r1.json": "1ba9a17dec2ae918207f3c68e93f6338015ff3754bd1ce927d8251c1f55ea587",
+    "export-r1.json": "e0619b1b431b57070429f7b041a11ed56a8d49fdb9d3dc9cd8943bf8b06dc76f",
+    "screen-r1-binding.json": "7c8b7228a7dcf5d46588742232eabad8f91e7ad299ca600fb8be6253c22db298",
+    "screen-r1-receipt.json": "6f9a4912608aa07ea483d3dbbbd4f2f13ceaf46098d1659daf44e071ac627f91",
+    "screen-r1.jsonl": "85dd154442d14eb75557d2c9ad891f689b34139c5389f34350447214e47a0e84"
+  },
+  "cleanup": {
+    "owned_container_removed": true,
+    "reservation_released": true,
+    "production_config_unchanged": true
+  },
+  "interpretation": "All three balanced exploratory blocks slower; no statistical regression claim. Evict-first hint reached actual code; current data do not isolate cache eviction from changed register allocation/store scheduling. Do not integrate, confirm statistically, or combine. Keep opt-in source for history."
+}
