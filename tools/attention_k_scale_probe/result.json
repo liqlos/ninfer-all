@@ -1,0 +1,135 @@
+{
+  "status": "SOURCE_ONLY_CPU_PROOF_PASS_COMPILE_NOT_RUN",
+  "default_off_flag": "NINFER_PROMPT_K_SCALE_FP32",
+  "scope": "Isolated SM86, D256/H24/KV4, Warps8, INT8 K8/V8, PageMajor, PagedKVBatchMetadata<false>; core/CMake/runtime unchanged.",
+  "mechanism": "64 producer threads synchronously load one uint2 of four original half scales, expand with the same half-to-float conversion and store float4 in shared before the existing wait/CTA publication. QK consumes FP32 scales; arithmetic and two-stage/barrier order unchanged.",
+  "costs": [
+    "K-scale async copy replaced by synchronous global load.",
+    "Shared K-scale payload doubles.",
+    "No occupancy or performance gain established."
+  ],
+  "planned_layout": {
+    "stage_bytes_off_on": [
+      33792,
+      34304
+    ],
+    "dynamic_shared_bytes_off_on": [
+      100352,
+      101376
+    ],
+    "new_static_shared_bytes": 0,
+    "new_workspace_bytes": 0,
+    "compiled_resources": "NOT_RUN"
+  },
+  "cpu_proofs": {
+    "cpu_address_proof": {
+      "status": "PASS",
+      "valid_keys_exhaustive": [
+        0,
+        64
+      ],
+      "stages": 2,
+      "physical_pages": [
+        0,
+        3,
+        1023
+      ],
+      "heads": 4,
+      "producer_threads": [
+        0,
+        63
+      ],
+      "vector_rows_checked": 99840,
+      "valid_8B_reads": 49920,
+      "zero_filled_16B_rows": 49920,
+      "QK_scalar_reads_checked": 32768,
+      "consumers_per_stored_scale_full_CTA": 64,
+      "query_blocks_checked": 45,
+      "query_widths": [
+        1,
+        33,
+        127,
+        129,
+        1280
+      ],
+      "stage_bytes_off_on": [
+        33792,
+        34304
+      ],
+      "shared_bytes_off_on": [
+        100352,
+        101376
+      ],
+      "partial_key_copy": "none: one whole 8B scale vector per valid key, including odd tails",
+      "new_static_shared_bytes": 0,
+      "global_workspace_bytes": 0
+    },
+    "cpu_lifetime_proof": {
+      "status": "PASS_SOURCE_ORDER_MODEL",
+      "tile_lifetimes_checked": 527,
+      "producer_reads": "immutable global half vectors only; no staged-half reads",
+      "publish": "producer normal shared stores precede the existing all-thread CTA barrier",
+      "reuse": "barrier at tile t+1 follows all reads of t and precedes issue_tile(t+2)",
+      "in_place_half_expansion_overlap_negative_control": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          4
+        ]
+      ],
+      "compiler_order_requires_PTX_SASS_review": true,
+      "async_tradeoff": "K-scale cp.async replaced by synchronous global load/conversion/store; K/V and V-scale async copies unchanged",
+      "shared_payload_tradeoff": "K-scale writes grow from 512B to 1024B per page; each selected QK scale read grows from 2B to 4B"
+    },
+    "cpu_numeric_proof": {
+      "status": "PASS_ALL_FINITE_HALF_BITS",
+      "finite_encodings": 63488,
+      "uint2_half2_float4_boundary_vectors": 13,
+      "includes": [
+        "both signed zeros",
+        "all signed subnormals",
+        "8/16 boundaries",
+        "signed maximum finite 65504"
+      ],
+      "operation": "same __half2float conversion performed earlier, FP32 store/load exact",
+      "scale_recomputation": false,
+      "QK_multiply_FMA_order_changed": false,
+      "NaN_or_infinity_contract_qualified": false,
+      "GPU_math_qualified": false
+    }
+  },
+  "source": {
+    "native_pins": 32,
+    "generated_header_sha256": "3487e9ed0e740b3c9bb7ece070707852b39ce02789bd4f85b22cc2ce48aed447",
+    "probe_sha256": {
+      "generate.py": "177ef82d3cda1ce3c44259ff29fe33e6d285f3e2f53c57bbeef779210ea62104",
+      "variant.cu": "fb709e15ed807a8487cf96d2dc8a70ad2f8cb0a71769882db4b1e96bd27dc4d5",
+      "probe_api.h": "b35047d2b35f571fb58022553c288c6fbacbfa28fa6f198feadcd97e75582e78",
+      "build.sh": "8fed5294a6713376fa8f7d722db2e734a5207c03bf0fbca18c6b6c0daec445cb",
+      "analyze.py": "38d92585b50b9e479482979ac022c397d107a35bdd04ed53da15fc85d1550717"
+    },
+    "inverse_and_OFF_byte_exact": true
+  },
+  "host_guard_revision": "Before compilation, root added contiguous PageMajor plane/shape/page-count, singleton-aware local stride, and vector alignment rejects. All table rows remain supported through the selected table_rows entry; no extra tensor.cpp link dependency.",
+  "caller_preconditions": "Valid device positions/page-table contents and disjoint sufficiently sized allocations remain caller-owned; this private probe is not a product API validator.",
+  "pending": [
+    "Actual compile/resource gate: <=255 registers, zero stack/local/spills, total shared<=101376.",
+    "Selected conversion movement and original math counts, then manual PTX/SASS wait/publication/read/reuse order review.",
+    "Only after resource/mechanism pass: exported-binary exact BF16 and independent FP64/tails/fragmentation/guards, then one fixed exploratory operator screen."
+  ],
+  "compile_run": false,
+  "export_run": false,
+  "gpu_run": false,
+  "performance_claim": false
+}
