@@ -1,0 +1,375 @@
+{
+  "source_pins": {
+    "src/ops/softmax_attention/dense/causal_cache/prompt_i8_fast.cuh": "f7c887c6c0dec7de242822b1ab831eecd8712761510d1bc6e83a27b847955f6b",
+    "src/ops/softmax_attention/dense/causal_cache/prompt_common.cuh": "0749aa221b829b53de02ae7a62ccb0b72ea8e1d4ca767fdf1773b2554b0978ce",
+    "src/ops/common/mma.cuh": "4f3f05cfb7ecce39a650cf53588587997a9e8bee4faf992e23564cf8c696d94d",
+    "src/ops/common/memory.cuh": "68d4ce555d86761aa4c21d49726be2e48d82fcbdc4f6dbe4fc8b7356f945e205",
+    "src/ops/common/warp.cuh": "7555cb64c0bfd8738209fc25ebe5972f4cb032fee03ea4fc769770da4ec2d839",
+    "src/ops/softmax_attention/dense/causal_cache/geometry.cuh": "cccf46c4e0704cfa5893a45f9bb9a0e51b7f300c921b873046671f9e44788368",
+    "src/ops/softmax_attention/common/head_mapping.cuh": "c11948e0e5bf38caceb8b7681e1c73bfb1871bca4761a331d57fe741237bdcdc",
+    "src/ops/kernel/paged_kv_address.cuh": "df4463d9d3c15caeb18fa511abdc982dd9142828d958282299fe1c0e44cae77e",
+    "src/ops/softmax_attention/dense/causal_cache/prompt.cu": "02fa6e5675c9b8097de366027ec43b5acdce37aa86cf5a038cab240f2a09cdaa",
+    "src/ops/softmax_attention/dense/causal_cache/launch.h": "702aacf8e88138acb0ce96ceb171329ccd23854958119ea5fd8dfa50a01a00ee",
+    "src/ops/kv_cache/int8_g64_codec.cuh": "5acb97a519b740905d6ab4e475d086922479c30eb530ac396fadb9a76a60e62a",
+    "src/core/paged_kv_cache.h": "8e7e015ce06c7354d33ae22387b7fa061337046ba49d9c6e219eb1e08d0e1f06",
+    "src/core/paged_kv_storage.h": "a9bb8920c61cc66ac08774e8bb8cda9fb03b0e9ea0e3a9886ea2ad0c31242025",
+    "src/core/tensor.h": "99bdbd15aab32e189165b98ede5efd94e2c900c20ce1313acb41b4173b0f188e",
+    "include/ninfer/ops/attention_geometry.h": "32cc81e045773e2b3119f2971030ad4878a8090a1b6556cb6fb45ad2230249f4",
+    "include/ninfer/ops/kv_cache_append.h": "65e69bfe36ecfecb381de42b017cefb8063aab75bd9f64fffce48d603fd401c9",
+    "include/ninfer/ops/softmax_attention.h": "9ee1fd2636b28274d0f0e12049ec41545702eabd64446df6290889f65765ad94",
+    "include/ninfer/types.h": "b8f831d75158a530d8a9b27195ff91ba3dc1c7e406ff00a66b106b0c37f43975",
+    "src/core/arena.h": "869c06ffe4afe0bc88c8a9dcfdfd8f296ddd3202867a6d021aacc3ee3577e21e",
+    "src/core/cyclic_kv_cache.h": "1048ed7a1395691936bbe20350880dff26555342679244b74fd51be787921ed3",
+    "src/core/device.h": "f4b87ac4b493a58d29970ab233f69d0ddc5a2a6f5a8526893cd16f7315cabbd0",
+    "src/core/dtype.h": "13ab4e833debe24baf9294a9d8eefc3f61a182b914e8a128d1725be3d93574ed",
+    "src/core/layout.h": "2fa3dbde6e507d5940c1ea9cff08606900cb71ab27ca888a8b5b66ea9235e400",
+    "src/ops/common/device_route.h": "3e8f073d5f51a495bfd3eb9686a917182ea2a85541858d54bb900ebf24da9bbe",
+    "src/ops/common/math.cuh": "339939e6189695afdc027f4541f816c014061c4a37965550cbba72f96a2ad2c1",
+    "src/ops/common/math.h": "2f61fe7900d5584e700c824add008fe5c1d21e7d32a31e93ac9089b9f861f330",
+    "src/ops/kv_cache/append/launch.h": "de41fcac3ddc21a2b76a0ef83741c74c8d8fb875cfe0f0a19f06185d4a7ab1d5",
+    "src/ops/kv_cache/d256_profile.h": "e02bf4a088d46bc4b48e5612a79e52289aa1d0b2dc9e9662b1b2e52fb306b64d",
+    "src/ops/kv_cache/e8_root_codec.cuh": "372c6b3dbf7decefe654e1e32d9ca89a89ea269a9710b27ddc73484a21d70090",
+    "src/ops/kv_cache/hadamard_d256.cuh": "3d00813a0a3c112484ef5a12c0011ec7ee8d0848aa17fadccaf9fbdeb0b14fa7",
+    "src/ops/softmax_attention/dense/causal_cache/prompt_bf16.cuh": "ef5583d348b11f749752065d02caf6538905f189f90650c2f9fa46af71a58b52",
+    "src/ops/softmax_attention/dense/causal_cache/prompt_i8.cuh": "7e795dacee7c79bec61d5217b9c9082fbbd72dcf3ba3e823c08a86ea6e05682f"
+  },
+  "probe_source_pins": {
+    "analyze.py": "dd77cbedf72ca16f5f5501f6ac6a6a20f4efb54fb424ae38a7434ffd8a9425dd",
+    "build.sh": "bffb21dca38ba10f422ff72ccc53e4d56b8bef500510ca5905571ea17be2b8fe",
+    "generate.py": "6029a7153f4b9142ada4c1a419980f70501efd291669035417ab57be0913aeeb",
+    "kernel.in.cuh": "0e0c2efca0514e9fbf2dabb216c57001117812d5b2765e9e32ede1356d04ec98",
+    "proof.py": "0c1b2340511cbe49317a2829ea2904d7330defd97574716c11b661b0d43fb16a",
+    "variant.cu": "47a7ebbcbfad11344bd184d2a3b874e08e5ca453ee77a485c62610e59e20dd8b"
+  },
+  "native_source_sha256": "f7c887c6c0dec7de242822b1ab831eecd8712761510d1bc6e83a27b847955f6b",
+  "native_source_pin_count": 32,
+  "OFF_byte_exact": true,
+  "native_generated_sha256": "f7c887c6c0dec7de242822b1ab831eecd8712761510d1bc6e83a27b847955f6b",
+  "paired_generated_sha256": "55ed8c7fbf20aafa6433a66ae21f3780ae95ac6aa93f12b82ec9c8983fdcae6e",
+  "extractions": {
+    "dispatch_and_zero": {
+      "first_line": 180,
+      "last_line": 203,
+      "native_sha256": "05cf0b500412b7d38ec9febdf34f4d819cca24194780df5dde887ff6d2200726"
+    },
+    "q_prepare": {
+      "first_line": 219,
+      "last_line": 240,
+      "native_sha256": "40cc960a0711e739df86dd8806750d4e36e73d8b9c67ff91ad41ee3ec701ab6d"
+    },
+    "qk_group": {
+      "first_line": 401,
+      "last_line": 434,
+      "native_sha256": "d8199143c4b27fa03937d9ce13bacbc86c87f4d553e6b2a630130bf00c33cf7a"
+    },
+    "qk_max": {
+      "first_line": 436,
+      "last_line": 453,
+      "native_sha256": "114d75bbc79795eba4551ce1bd94ef84be764cfe06ed07002ea3c9d23da30ae3"
+    },
+    "online_max": {
+      "first_line": 455,
+      "last_line": 466,
+      "native_sha256": "0a4a4b4028bb89bf665d4ce2f829c4b9424b5272a6118f0723c2b3ebaac94192"
+    },
+    "probabilities": {
+      "first_line": 472,
+      "last_line": 482,
+      "native_sha256": "99e7badb03117e4b8713adb7a410e444fcf40d17888723403bc8fe01fde01190"
+    },
+    "denominator_update": {
+      "first_line": 484,
+      "last_line": 485,
+      "native_sha256": "bbbfbaf222e1f12773cde5f01a86c65f293ac84fd7b13874b4191281078dab10"
+    },
+    "final_denominator": {
+      "first_line": 670,
+      "last_line": 673,
+      "native_sha256": "a41a0883b2cd18eedc29b4a7134674cd5aee95ac2ddbd444818b06d526881797"
+    },
+    "tile_shift": {
+      "first_line": 490,
+      "last_line": 507,
+      "native_sha256": "00ac3531dea4dad45ba15a6834055a385a3a0530a8ac9c79ad3573cd9b13447e"
+    },
+    "pv_body": {
+      "first_line": 580,
+      "last_line": 654,
+      "native_sha256": "16078c7ab4864ea85cd587143d5ca69b230f442587ee737bc54f2614e475736c"
+    },
+    "native_pv_scale_prepare": {
+      "first_line": 583,
+      "last_line": 597,
+      "native_sha256": "2348124b74c71d4a96a512a2f635a90cc64351bf7796d7e31897556d57929de4"
+    },
+    "pv_scale_one_j": {
+      "first_line": 586,
+      "last_line": 596,
+      "native_sha256": "2d85e09bce7766abb97f7311e0ead761e84b9f7c9f3b1fe9f867e397148d0ccb"
+    }
+  },
+  "source_static_checks": "PASS",
+  "new_math_lowering_requires_actual_compile_review": true,
+  "scope": "compile-only SM86, D256 Hq24 Hkv4 K8/V8, PagedKVBatchMetadata<false>",
+  "cpu_proofs": {
+    "status": "PASS",
+    "ownership": {
+      "output_elements": 32768,
+      "scores_per_tile": 8192,
+      "temporary_Q_scales": 512,
+      "unique_writers": true
+    },
+    "P_transport": {
+      "P_arena_bytes": 16384,
+      "carry_bytes_per_pair": 256,
+      "P_half_bit_patterns": 65536,
+      "wrong_side_negative_control": "PASS",
+      "P_vector_model_32_banks_4B_per_bank_unique_per_8_lanes": true
+    },
+    "fragments": {
+      "QK_operand_addresses": 16384,
+      "PV_operand_addresses": 1024,
+      "integer_QK_groups_then_FP32_FMA": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "PV_four_FP16_accumulator_steps_before_promotion": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "memory": {
+      "dynamic_shared_bytes": 101376,
+      "stage_bytes": 33792,
+      "async_16B_destinations_per_K_or_V": 1024,
+      "physical_page_head_tail_cases": 780,
+      "additional_KV_stages": 0,
+      "max_and_final_denominator_scratch_bytes": 1024
+    },
+    "ordering_model": {
+      "happens_before_obligations": 10,
+      "negative_controls": 6,
+      "page_CTA_barriers": 4,
+      "prologue_CTA_barriers": 2,
+      "terminal_CTA_barriers": 1,
+      "model_is_not_compiled_race_proof": true
+    },
+    "tails": {
+      "tail_pair_page_cases": 2516,
+      "all_16_warps_execute_uniform_barriers": true,
+      "all_CTA_zero_return_is_uniform": true,
+      "inactive_rows_publish_BF16_zero": true,
+      "compiled_candidate_metadata": "unmasked only; partial final row-block tails are in scope"
+    },
+    "arithmetic": {
+      "max_associativity_cases": 343,
+      "random_tile_cases": 1024,
+      "wrong_regrouped_sum_differences": 355,
+      "original_running_l_FMA_DAG": "preserved",
+      "final_quad_reduce_and_reciprocal": "native source retained on side 1, bits transported",
+      "domain": "finite computed QK scores and masked -inf, finite quant scales, positive finite attention scale",
+      "MUFU_and_tensor_core_emulation": false,
+      "max_lowering_and_IEEE_signed_zero_require_compile_review": true
+    },
+    "resources": {
+      "source_live_arrays_QK": {
+        "acc": 64,
+        "score": 16,
+        "af": 8,
+        "Q_scales": 2
+      },
+      "source_live_arrays_PV": {
+        "acc": 64,
+        "P": 16,
+        "h": 8,
+        "V_scales": 2
+      },
+      "array_counts_are_not_actual_register_counts": true,
+      "compile_prerequisite_registers_max": 128,
+      "compile_prerequisite_stack_spills_local_bytes": 0,
+      "compile_prerequisite_total_shared_bytes_max": 101376,
+      "actual_compile_pass": false
+    },
+    "cost": {
+      "CTA_IMMA": 512,
+      "CTA_HMMA": 1024,
+      "native_main_shared_read_bytes": 294912,
+      "paired_main_shared_read_write_bytes": 376832,
+      "main_shared_traffic_increase_fraction": 0.2777777777777778,
+      "extra_logical_V_scale_read_bytes": 32768,
+      "extra_logical_max_carry_shift_bytes": 10272,
+      "extra_Q_scale_shuffle_warp_instructions": 128,
+      "extra_CTA_barriers_per_page": 3,
+      "performance_claim": null
+    }
+  },
+  "analyzer_self_test": {
+    "status": "PASS",
+    "resource_rejection_negative_controls": 9,
+    "compiled_artifact_evidence": false
+  },
+  "CPU_python_version": "3.11.9",
+  "source_balanced_delimiters": true,
+  "compile_run": true,
+  "GPU_run": false,
+  "status": "CLOSED_COMPILE_RESOURCE_REJECTED",
+  "default_switch": {
+    "name": "NINFER_PROMPT_PAIRED_WARP",
+    "default": 0,
+    "production_dispatch_changed": false
+  },
+  "main_priority": "One actual paired-warp OFF/ON compile; reject resource failure before any host harness or GPU work.",
+  "ownership_design": {
+    "CTA": "512 threads, 16 warps, eight adjacent pairs; each pair retains the native 16 query rows.",
+    "QK": "side 0 owns keys 0..31 and side 1 keys 32..63 in each 64-key page; score[4][4]. Each score retains grp 0..3 and kk 0..1 native IMMA/FMA order. Group loop is rolled.",
+    "PV": "side 0 owns D0..127 and side 1 D128..255; acc[8][2][4] contains 64 FP32 scalars. Each dimension retains the four original FP16 HMMA steps over keys 0..63 and the native FP32 promotion/FMA.",
+    "Q_scale": "Each warp prepares eight original query rows with unchanged H256/quantization. Temporary scales occupy the dead first K stage. After two CTA barriers, each lane retains only its two row scales for group=lid; each rolled QK group uses two quad shuffles.",
+    "online_softmax": "Each side publishes its two quad-reduced maxima; both obtain the common maximum and identical running_m/alpha. Only max grouping changes; finite/signed-zero lowering must be checked in PTX/SASS.",
+    "denominator": "side 0 computes native serial bl for nt 0..3 and publishes two FP32 carries per lane. side 1 continues nt 4..7 without regrouping and alone executes native running_l FMA. Final native quad sum and reciprocal execute on side 1; lid 0 publishes inv_l for both D128 owners.",
+    "P_alias": "Current K bytes are reused only after all QK consumers pass barrier A. Each pair owns 2048 bytes. Each half owns two [32 lanes][uint4] fragments, j-major; carry temporarily aliases the first 256 bytes of high P. Side 1 completes carry reads before warp sync and high-P writes.",
+    "tile_shift": "side 0 retains the full V-tile maximum and exact power-of-two shift; shift lives in dead current K-scale bytes and side 1 reads the same integer. V scales are streamed per PV j, shrinking the live scale array from eight to two words.",
+    "lifetimes": "Per page: cp_wait and entry barrier, prefetch next stage, QK/max then A, low P/carry/shift then B, high P after warp sync then C, both D128 PV consumers. Next entry precedes reuse of this stage for kb+2. Final denominator has a terminal CTA barrier.",
+    "shared": "Original Q32768 plus two33792-byte KV stages plus1024-byte max/final-denominator scratch =101376. There is no third KV stage.",
+    "tails": "Both paired warps have identical tile_live and all warps reach every CTA barrier. Partial final row-block rows and inactive pairs are preserved. The prepared instance uses PagedKVBatchMetadata<false>; masked batches and other geometry/codec instances are excluded."
+  },
+  "resource_plausibility": {
+    "QK_live_array_scalars_native_to_candidate": {
+      "acc": [
+        128,
+        64
+      ],
+      "score": [
+        32,
+        16
+      ],
+      "Q_scales": [
+        8,
+        2
+      ],
+      "af": [
+        8,
+        8
+      ]
+    },
+    "PV_live_array_scalars_native_to_candidate": {
+      "acc": [
+        128,
+        64
+      ],
+      "P": [
+        16,
+        16
+      ],
+      "h": [
+        8,
+        8
+      ],
+      "V_scales": [
+        8,
+        2
+      ]
+    },
+    "qualification": "These are source arrays, not compiler registers. Pointer/control state, decode temporaries and scheduling still count. Both roles share one static register allocation on SM86. <=128 registers with zero spills is plausible but unproved.",
+    "occupancy": "Both variants are limited to one CTA by shared memory. A successful 512-thread/<=128-register lowering can expose16 rather than8 resident warps, without claiming 2x throughput."
+  },
+  "exact_and_oracle_contract": {
+    "exact_execution_reference": "Pinned native K8/V8 fast prompt instance, same represented inputs, physical block table, positions, launch row order, scale and compiler policy. The candidate must match every observable BF16 output bit; no state/codec/sampling changes.",
+    "preserved_boundaries": [
+      "BF16 query loads and native normalized H256 order",
+      "native transient Q scales and signed INT8 quantization",
+      "stored FP16 K scales to FP32; ordered group INT32 QK and FP32 products/FMA",
+      "native scaled exp2 approximation; FP16 packed P",
+      "stored FP16 V scales, same full-tile power-of-two shift and FP16 V decode",
+      "four native FP16 PV accumulator steps per64-key page; FP32 promotion and running-accumulator FMA",
+      "native FP32 online denominator serial pair-adds/FMA; final quad sum/reciprocal; FP32 normalization and BF16 output"
+    ],
+    "mathematical_oracle": "Independently decode stored K codes/scales and their inverse normalized H256 interpretation; decode V as FP32(code)*FP32(stored FP16 scale). Evaluate naive FP64 dot, stable softmax over keys0..position, and FP64 V reduction using represented BF16 Q. Do not reproduce private Q quantization, FP16 PV accumulation, or output BF16 rounding in this oracle.",
+    "public_criterion_source": "tests/ops/softmax_attention/causal_cache.cpp:kAttentionInt8Criterion",
+    "public_criterion": {
+      "relative_l2": 0.00315,
+      "gross_absolute": 0.0011,
+      "gross_relative_to_max_reference": 0.0078125,
+      "non_finite_count": 0
+    },
+    "state": "q, K/V codes/scales, positions, metadata/table bytes unchanged; output fully overwritten within width; invalid final CTA rows write nothing beyond width. No global workspace or persistent state is added.",
+    "proof_domain": "Finite target-representative inputs, finite computed QK scores, finite scale products, positive finite attention scale; masked scores are -inf. NaN/overflow preservation is not established.",
+    "executed": "Source/DAG, address, half-bit transport and synthetic FP32 model checks only; neither full mathematical oracle nor GPU parity has run."
+  },
+  "actual_compile_gate": {
+    "owner": "root, after currently prioritized MMQ work is serialized",
+    "command_template": "bash /lab/source/tools/attention_paired_warp_probe/build.sh /src /build/attention-paired-warp",
+    "compiler": "CUDA13.1.115, SM86, -O3, default precise arithmetic; no fast math or register-limit workaround",
+    "outputs": "OFF and ON objects plus dependency, ptxas, resource, PTX and SASS evidence; no executable/link/host or device launch",
+    "reject": [
+      "ON registers>128",
+      "any ON stack/local/spill load/spill store bytes or SASS LDL/STL",
+      "total shared>101376",
+      "wrong512-thread launch bound",
+      "unresolved pin/dependency provenance"
+    ],
+    "after_resource_pass": "Manual operand/order and synchronization review remains mandatory, including preparation-scale reads before first async copy, shared aliases and partner reciprocal. Resource PASS is not correctness or permission to skip root review.",
+    "failure_action": "Record failure and stop this candidate; no GPU screen or unchanged syntactic retry."
+  },
+  "future_minimal_GPU_gate_not_implemented": {
+    "prerequisite": "Root actual compile gate and manual PTX/SASS review pass before any host harness is prepared.",
+    "correctness": "One bounded run: native/candidate BF16 bit parity, independent FP64 criterion, input/cache/table/canary checks. Cases cover widths33/127/129/1280, base0 and width1280/base31488, noncontiguous physical pages, low/high key asymmetry, zero/uniform and realistic finite scaled data, and tile_shift0/>0.",
+    "performance": "After correctness, one fixed exploratory screen of the complete page-loop kernel at width1280/base0 and width1280/base31488, with identical data/cache policy, warmup and counterbalanced order. No QK-only timing and no CI claim.",
+    "proposed_cost_filter": "Pre-register before execution: at least10% time reduction in the long-depth primary and at most1% regression at the short-depth guard. Otherwise stop before server integration or statistical confirmation."
+  },
+  "profile_contribution": {
+    "interpretation": "Diagnostic attribution, not measured critical-path fractions or a matched candidate baseline. Conditional saving assumes the removed kernel time lies on the selected serial request spans.",
+    "JSON32K": {
+      "source": "provenance/json32k-profile-analysis.json",
+      "source_sha256": "7ed274aafe30a5466dbac2275848998d63eec7b2054d2ebab36ed677b8a21aba",
+      "prompt_kernel_s": 1.99035865,
+      "prefill_plus_decode_spans_s": 24.094663636,
+      "removable_kernel_time_over_spans_pct": 8.260578691068307,
+      "conditional_spans_saving_for_10pct_kernel_time_cut_pct": 0.8260578691068307
+    },
+    "R10_MTP3_4K512": {
+      "source": "provenance/jonathan-r10-inference-kernel-breakdown-20261019.json",
+      "source_sha256": "359e074b9c7596976c20dfa19d8b777866c78a547ac05d25d2bf9cf311e831d5",
+      "prompt_kernel_s": 0.160275887,
+      "prefill_plus_decode_spans_s": 27.537455137,
+      "removable_kernel_time_over_spans_pct": 0.582028681309223
+    },
+    "conclusion": "Long-context prompt is the only plausible payoff. No foreign GPU headline, 2x warp count or lower register count establishes a speedup."
+  },
+  "primary_hardware_sources": [
+    "https://docs.nvidia.com/cuda/ampere-tuning-guide/index.html#occupancy",
+    "https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#miscellaneous-instructions-setmaxnreg",
+    "https://docs.nvidia.com/cuda/parallel-thread-execution/index.html"
+  ],
+  "limitations": [
+    "Actual CUDA compile failed the prespecified resource gate: ON128 registers,120B stack,200/232B spill stores/loads. No numerical or runtime qualification.",
+    "No host/GPU harness, exports, reservations, service changes or core integration.",
+    "CPU lifetime model is not a compiled race proof; final compiler lowering and runtime qualification remain necessary.",
+    "Masked metadata and other geometry/codec routes are outside this prepared instance."
+  ],
+  "performance_claim": false,
+  "compile_receipt": "results/attention-paired-warp/compile-r1.json",
+  "compile_elapsed_seconds": 14.469939300004626,
+  "actual_compiled_resources": {
+    "off": {
+      "registers": 255,
+      "stack_bytes": 8,
+      "spill_store_bytes": 4,
+      "spill_load_bytes": 4,
+      "total_shared_bytes": 100352,
+      "object_sha256": "2f5393837f84aa8d021fde9d83ed2cad7243b80228100db2421760127c4e1ff4"
+    },
+    "on": {
+      "registers": 128,
+      "stack_bytes": 120,
+      "spill_store_bytes": 200,
+      "spill_load_bytes": 232,
+      "total_shared_bytes": 101376,
+      "object_sha256": "748d61c93b513095f522c6640132f2933411b4c7dacf84f4f4cc2f1c83047628"
+    }
+  },
+  "next_gate": "Do not build a host harness or run GPU unchanged. Reopen only after a concrete lifetime/schedule change that eliminates stack/local/spills at <=128 registers."
+}
