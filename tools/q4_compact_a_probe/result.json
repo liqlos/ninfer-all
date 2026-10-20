@@ -1,5 +1,5 @@
 {
-  "status": "MIXED_EXPLORATORY_OPERATOR_SCREEN_NO_WINNER",
+  "status": "CLOSED_NO_USEFUL_OPERATOR_WIN_AFTER_FIXED_WARMED_DISCRIMINATION",
   "performance_claim": false,
   "full_request_measured": false,
   "flag": "NINFER_GGUF_Q4_MMQ_COMPACT_A",
@@ -81,5 +81,298 @@
     "screen-r1.jsonl": "4a5f06d3b9a95c35d6a1013762f6833d3e379745d7d5067612d911fdb1a1dbbe",
     "screen-r1-receipt.json": "f7e8abb9e8784fe61e80542acaa34b11c89f0c5b0e293029b3dc93104956feee",
     "screen-r1-binding.json": "73deccb732f3c04190f3913a123258c3a6d128ecf3c86992cec10116f246cb5c"
+  },
+  "r2": {
+    "protocol_sha256": "dc34d2cda7d2a51a1adace2dd2a52d6fbb7cf2a7282484a54d7e49dc5c94d5a4",
+    "all_device_text_byte_equal_r1": true,
+    "input_seed": 3243835100,
+    "launches": [
+      {
+        "tag": "screen-r2-a",
+        "baseline_sample_ms_sum": 28.435193062,
+        "candidate_sample_ms_sum": 28.843737125,
+        "time_reduction_percent": -1.4367550173097543,
+        "samples": [
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 0,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.674427032
+          },
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 1,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 5.273691177
+          },
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 2,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.818048
+          },
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 3,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.735839844
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 0,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.713277817
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 1,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.738175869
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 2,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.673694134
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 3,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.678207874
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 0,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.840256214
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 1,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.678880215
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 2,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.681632042
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 3,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.772799969
+          }
+        ],
+        "warmups": [
+          {
+            "kind": "warmup",
+            "sample": 0,
+            "candidate": false,
+            "repetitions": 32,
+            "ms": 4.616002083
+          },
+          {
+            "kind": "warmup",
+            "sample": 1,
+            "candidate": true,
+            "repetitions": 32,
+            "ms": 4.639872074
+          },
+          {
+            "kind": "warmup",
+            "sample": 2,
+            "candidate": false,
+            "repetitions": 32,
+            "ms": 4.797664165
+          },
+          {
+            "kind": "warmup",
+            "sample": 3,
+            "candidate": true,
+            "repetitions": 32,
+            "ms": 4.608158112
+          }
+        ],
+        "binary_sha256": "5f83ffc0baf95c885f88d81a9dec0144ef891e5e4aeef5c4ebc5349101539757",
+        "bindings": {
+          ".jsonl": "720cab3aa835f65a3c99e57474d91ed589039c6526826efd6ce794bcb54a0aed",
+          "-receipt.json": "499805f694fd2b4d38046f414b4f614f8e22dd2c5fcfc98428836fbd6f30bf57",
+          "-binding.json": "11ecab42f64a6f97913bb44d72b3c8b730fca921c46d8e149242bd88f7bf167c"
+        }
+      },
+      {
+        "tag": "screen-r2-b",
+        "baseline_sample_ms_sum": 28.623607158,
+        "candidate_sample_ms_sum": 28.083959579,
+        "time_reduction_percent": 1.8853234535437413,
+        "samples": [
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 0,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.725791931
+          },
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 1,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.72153616
+          },
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 2,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.875710964
+          },
+          {
+            "kind": "sample",
+            "block": 0,
+            "sample": 3,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.665495872
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 0,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.748960018
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 1,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.608160019
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 2,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.663871765
+          },
+          {
+            "kind": "sample",
+            "block": 1,
+            "sample": 3,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.747159958
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 0,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.719295979
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 1,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.788703918
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 2,
+            "arm": 0,
+            "repetitions": 32,
+            "ms": 4.74153614
+          },
+          {
+            "kind": "sample",
+            "block": 2,
+            "sample": 3,
+            "arm": 1,
+            "repetitions": 32,
+            "ms": 4.701344013
+          }
+        ],
+        "warmups": [
+          {
+            "kind": "warmup",
+            "sample": 0,
+            "candidate": true,
+            "repetitions": 32,
+            "ms": 4.491827011
+          },
+          {
+            "kind": "warmup",
+            "sample": 1,
+            "candidate": false,
+            "repetitions": 32,
+            "ms": 4.71880722
+          },
+          {
+            "kind": "warmup",
+            "sample": 2,
+            "candidate": true,
+            "repetitions": 32,
+            "ms": 4.605951786
+          },
+          {
+            "kind": "warmup",
+            "sample": 3,
+            "candidate": false,
+            "repetitions": 32,
+            "ms": 4.673791885
+          }
+        ],
+        "binary_sha256": "5f83ffc0baf95c885f88d81a9dec0144ef891e5e4aeef5c4ebc5349101539757",
+        "bindings": {
+          ".jsonl": "629c731a5b1e9551d8ade0d7d6b13bff52b02b343fa4cf90aad4e58c9f36e1ce",
+          "-receipt.json": "483d09a1510050b116582fa32f7f71f2385aa66ff067850fa712c04a4b779ec0",
+          "-binding.json": "0f12d3bb949e8b1e11141aae15ec375ac58bd55dfa41aefedbe586115abe7651"
+        }
+      }
+    ],
+    "combined_time_reduction_percent": 0.2297691425240389,
+    "selected": false,
+    "ci_computed": false,
+    "full_request_run": false,
+    "rule": "both launch estimands > 0 and ratio-of-sums time reduction over both launches >= 0.01",
+    "interpretation": "Prespecified usefulness gate failed; retain all samples including slow first block. No third screen/confirmation/server integration. Does not prove zero effect or a stable regression. Compact shared can be reused only as a building block of a separately motivated architecture."
   }
 }
