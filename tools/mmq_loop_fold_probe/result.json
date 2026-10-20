@@ -1,0 +1,145 @@
+{
+  "status": "SOURCE_ONLY_READY_FOR_SERIAL_COMPILE_GATE",
+  "date": "2026-10-21",
+  "switch": "NINFER_LAB_MMQ_K128_LOOP_FOLD",
+  "default": 0,
+  "scope": {
+    "type": "Q4_K",
+    "K": 5120,
+    "N": 17408,
+    "T": 1280,
+    "I": 128,
+    "J": 128,
+    "threads": 256,
+    "warps": 8,
+    "fixup": false,
+    "activation_layout": "DS4",
+    "outputs": [
+      "plain",
+      "store",
+      "accumulate"
+    ],
+    "dynamic_shared_bytes": 57856
+  },
+  "transform": {
+    "native_mmq_sha256": "493ce59f8be4ff269fd0a2a8386f9d1e9a80bd2ee9c7478083d36bc2ac9ccf45",
+    "native_loop": {
+      "byte_begin": 57562,
+      "byte_end": 59019,
+      "sha256": "a57cc7e3203a9a790dc500fac0db204180433b4a71333daad4a263372f300eb1"
+    },
+    "ON_header_sha256": "0e5dd83a0a19ac42333a92b24ec00aa1ad49e825b90bc89907919c61f4881bbd",
+    "OFF_byte_exact": true,
+    "native_math_and_load_headers_byte_exact": true,
+    "retained_native_fixup_source": true,
+    "runtime_phase_only_in_X_and_Y_source_offsets": true
+  },
+  "CPU_python_version": "3.11.9",
+  "CPU_proof": {
+    "status": "PASS_CPU_SOURCE_INDEX_ORDER_RANGE",
+    "activation_copy_words_checked": 1843200,
+    "max_activation_word": 1843199,
+    "activation_allocation_words": 1843200,
+    "ldmatrix_source_addresses_checked": 4096,
+    "DM_addresses_checked": 8192,
+    "max_X_code_word": 9715,
+    "output_owners": 16384,
+    "native_weight_blocks_checked": 348160,
+    "full_shape_output_owners": 22282240,
+    "ordered_scalar_updates_per_CTA_K256": 262144,
+    "ordered_trace_sha256": "a7234f33e0480191e316a5b1ebcb469200212b681e18a0da220b0afa0d768692",
+    "dynamic_barriers_per_K256": 4,
+    "candidate_static_barriers_in_phase_body": 2,
+    "dynamic_MMA_per_thread_K256": 128,
+    "candidate_static_MMA_in_phase_body": 64,
+    "phase_uniform_by_construction": true,
+    "arrays_indexed_only_by_unrolled_n_l_k01": true,
+    "all_A_DM_preloaded_before_J_K32_math": true,
+    "limitation": "source symbolic proof; CUDA fragment lowering, FP32 operands and phase trip count still require compiled review"
+  },
+  "analyzer_self_test": {
+    "status": "PASS_CPU_PARSER_RESOURCE_TESTS",
+    "compile_or_GPU_run": false,
+    "synthetic_hot_loop_tests": "fold, unroll, weighted-math mismatch, no shrink, predicated barrier, NOINC exits"
+  },
+  "saved_native_parser": {
+    "source": "results/q4-compact-a/sass-off.txt",
+    "sha256": "b2009ff5108ca3f3183a16f4d513a92343aeececaabc74707c676ed7862ba1b3",
+    "K256_regions": [
+      {
+        "begin": "0xe70",
+        "backedge": "0xc750",
+        "bytes": 47344,
+        "instruction_slots": 2959,
+        "backedge_predicate": "",
+        "backedge_op": "BRA",
+        "backedge_operand_predicate": "",
+        "static_math": {
+          "I2F.F16": 8,
+          "HMUL2": 5,
+          "HADD2.F32": 320,
+          "IMMA.16832.S8.S8": 128,
+          "I2FP.F32.S32": 512,
+          "FMUL": 512,
+          "FFMA": 1024
+        },
+        "static_barriers": 4
+      },
+      {
+        "begin": "0xf0a0",
+        "backedge": "0x1a8c0",
+        "bytes": 47152,
+        "instruction_slots": 2947,
+        "backedge_predicate": "",
+        "backedge_op": "BRA",
+        "backedge_operand_predicate": "",
+        "static_math": {
+          "I2F.F16": 8,
+          "HMUL2": 5,
+          "IMMA.16832.S8.S8": 128,
+          "HADD2.F32": 320,
+          "I2FP.F32.S32": 512,
+          "FMUL": 512,
+          "FFMA": 1024
+        },
+        "static_barriers": 4
+      }
+    ],
+    "qualification": "existing native evidence, no new candidate compile"
+  },
+  "syntax_check": "Python 3.11 AST and in-memory compile PASS; no code comment tokens",
+  "default_gate_check": "explicit enable required before compiler detection or output creation",
+  "compile_gate": {
+    "compiler": "existing CUDA 13.1.115, SM86, -O3, precise default arithmetic",
+    "modes": [
+      "plain",
+      "Store",
+      "Accumulate"
+    ],
+    "maximum_dynamic_shared_bytes": 57856,
+    "maximum_registers": 255,
+    "minimum_resident_CTA_model": 1,
+    "required_stack_local_spill_bytes": 0,
+    "require_actual_inner_phase_backedge": true,
+    "require_hot_K256_bytes_strictly_below_every_native_K256_body": true,
+    "require_dynamic_opcode_histogram_parity_conditional_on_two_phases": true,
+    "whole_ELF_size_is_not_a_gate": true,
+    "manual_review_before_GPU": [
+      "Map the folded parent loop to non-fixup full tiles; the native kernel retains a separate fixup body.",
+      "Trace initialization, compare, increment and backedge operands: exactly two CTA-uniform phases, 0 then 1.",
+      "Trace global Y source and shared X k00 source: native half0 then half1; no register-array dynamic indexing.",
+      "Check full A/DM preload before J-major/K32 math and operand-aware ordered FP32 accumulator DAG.",
+      "Check all four dynamic publish/retire barriers and plain/Store/Accumulate final conversion boundary."
+    ]
+  },
+  "compile_command": "PYTHON=/home/neroued/miniconda3/envs/py311/bin/python bash /lab/source/tools/mmq_loop_fold_probe/compile.sh --source-root /src --output-dir /build/mmq-loop-fold --enable-candidate",
+  "command_environment_note": "Use the already selected Python 3.11 and CUDA 13.1.115 environment; adjust PYTHON to its existing interpreter, do not install or reconfigure.",
+  "next_FFN_comparator": "confirmed folded16",
+  "CUDA_compile_run": false,
+  "GPU_run": false,
+  "host_or_GPU_harness_created": false,
+  "numerics_qualified": false,
+  "performance_claim": false,
+  "manual_review_is_still_required": true,
+  "shell_syntax_check": "bash -n PASS"
+}
