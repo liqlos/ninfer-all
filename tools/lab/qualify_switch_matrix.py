@@ -140,13 +140,14 @@ def main():
     dump_path = OUT / (tag + "-q6-runtime.bin")
     q4_dump_path = OUT / (tag + "-q4-mmq.bin")
     assert not receipt_path.exists() and not dump_path.exists() and not q4_dump_path.exists()
-    record = {"schema": "ninfer-switch-matrix-q6-qualification-v1", "arm": arm,
+    record = {"schema": "ninfer-switch-matrix-q6-qualification-v2", "arm": arm,
               "tag": tag, "started_at": lab.now(), "performance_claim": False}
     reservation, ident, handles = None, None, []
     config_sha = lab.sha(ROOT / "broker/config.json")
     lab.OWNER = OWNER
     kernel = None
-    reference_path = OUT / "q6-runtime-gate-reference-w.json"
+    reference_path = OUT / "q6-runtime-gate-reference-w-v2.json"
+    record["reference_file"] = reference_path.name
     try:
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel.CreateMutexW.restype = ctypes.c_void_p
@@ -238,10 +239,19 @@ def main():
         assert "q6_runtime_gate " + expected_macro in gate.stdout
         q6_cases = [line for line in gate.stdout.splitlines()
                     if line.startswith("q6_runtime_gate case=")]
-        assert len(q6_cases) == 6 and all("route=PASS" in line or "status=PASS" in line
+        assert len(q6_cases) == 11 and all("route=PASS" in line or "status=PASS" in line
                                           for line in q6_cases)
-        assert sum("T1280 epilogue=" in line and "store_route=FUSED" in line for line in q6_cases) == 2
+        assert sum("T1280 epilogue=" in line and "store_route=FUSED" in line for line in q6_cases) == 4
         assert sum("T1281 epilogue=" in line and "store_route=FALLBACK" in line for line in q6_cases) == 2
+        for case, epilogue, route in (
+            ("K17408_N5120_T768", "Accumulate", "FUSED"),
+            ("K5120_N10240_T1280", "Store", "FUSED"),
+            ("K5120_N10240_T768", "Store", "FUSED"),
+            ("K5120_N1024_T1280", "Store", "FUSED"),
+            ("K5120_N1024_T768", "Store", "FALLBACK"),
+        ):
+            assert any(f"case={case} epilogue={epilogue} store_route={route}" in line
+                       for line in q6_cases), (case, epilogue, route)
         record["q6_runtime_cases"] = q6_cases
         assert dump_path.is_file()
         runtime_sha = lab.sha(dump_path)
@@ -288,7 +298,7 @@ def main():
             assert record["q6_outputs_exact_match"] and record["q4_outputs_exact_match"]
             if not reference_path.exists():
                 record["pending_w_reference"] = {
-                    "schema": "ninfer-switch-matrix-q6-output-reference-v1", "status": "PASS",
+                    "schema": "ninfer-switch-matrix-q6-output-reference-v2", "status": "PASS",
                     "arm": "w", "source_manifest_sha256": manifest["source_manifest_sha256"],
                     "fixture_sha256": fixture_hashes, "q6_runtime_dump_sha256": runtime_sha,
                     "q6_runtime_dump_bytes": dump_path.stat().st_size,

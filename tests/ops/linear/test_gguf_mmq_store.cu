@@ -370,7 +370,8 @@ int check_q6_runtime_oracle(const Case& c, const std::vector<std::uint8_t>& host
 }
 
 void run_q6_store_runtime_case(const Case& c, const std::vector<std::uint8_t>& host_weight,
-                               int columns, bool accumulate, std::ofstream& dump) {
+                               int columns, bool accumulate, bool expect_store,
+                               std::ofstream& dump) {
     DeviceBuffer weight(host_weight.size());
     weight.copy_from_host(host_weight.data(), host_weight.size());
     const auto host_input = make_input(c.k, columns, 0xA119u + columns + c.rows);
@@ -409,7 +410,6 @@ void run_q6_store_runtime_case(const Case& c, const std::vector<std::uint8_t>& h
     WorkspaceArena workspace(detail::gguf_project_workspace_bytes({&shape, 1}, columns, columns) +
                              (1U << 20));
     bool store_enqueued = false;
-    const bool expect_store = columns == 1280;
     if (detail::gguf_project(input_tensor, {&product, 1}, workspace, nullptr,
                              &store_enqueued) || store_enqueued != expect_store) {
         throw std::runtime_error("Q6 runtime gate selected an unexpected MMQ BF16 store route");
@@ -516,9 +516,20 @@ void run_q6_runtime_gate(const std::string& operator_fixture_dir,
     std::cout << "q6_runtime_gate NINFER_GGUF_Q6_MMQ_A_X4=OFF\n";
 #endif
     for (const int columns : {1280, 1281}) {
-        run_q6_store_runtime_case(layer, layer_weight, columns, false, dump);
-        run_q6_store_runtime_case(layer, layer_weight, columns, true, dump);
+        run_q6_store_runtime_case(layer, layer_weight, columns, false, columns == 1280, dump);
+        run_q6_store_runtime_case(layer, layer_weight, columns, true, columns == 1280, dump);
         run_q6_plain_runtime_case(head, head_weight, columns, dump);
+    }
+    run_q6_store_runtime_case(layer, layer_weight, 768, true, true, dump);
+    const Case attention{QType::GGUF_Q6_K, gguf::GgmlType::Q6_K, 1024, 5120, 208};
+    const std::size_t attention_bytes = std::size_t(attention.rows) *
+        (attention.k / q6_block.elements) * q6_block.bytes;
+    const std::vector<std::uint8_t> attention_weight(
+        head_weight.begin(), head_weight.begin() + attention_bytes);
+    for (const int columns : {1280, 768}) {
+        run_q6_store_runtime_case(head, head_weight, columns, false, true, dump);
+        run_q6_store_runtime_case(attention, attention_weight, columns, false, columns == 1280,
+                                  dump);
     }
     dump.flush();
     if (!dump) { throw std::runtime_error("failed flushing Q6 runtime output dump"); }
