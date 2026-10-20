@@ -27,8 +27,15 @@ def load(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def serving_admission(reservation):
-    status = lab.api("/v1/status")
+def serving_admission(reservation, attempts=1):
+    started = time.monotonic()
+    for attempt in range(attempts):
+        try:
+            status = lab.api("/v1/status")
+            break
+        except TimeoutError:
+            if attempt + 1 == attempts:
+                raise
     grant = status["admission"]["photo_gpu_reservation"]
     allowed = {"dwm", "explorer", "ChatGPT", "Codex", "chrome", "msedge", "firefox",
                "csrss", "vmmemWSL", "vmmem"}
@@ -45,6 +52,8 @@ def serving_admission(reservation):
                                       "process_memory": status["windows_gpu"]["process_memory"],
                                       "reservation": grant,
                                       "external_growth_pressure": status.get("external_growth_pressure")}))
+    return {"checks": checks, "attempts": attempt + 1,
+            "seconds": time.monotonic() - started}
 
 
 def main():
@@ -169,7 +178,7 @@ def main():
         warm = copy.deepcopy(prompts["categories"][0]["request_body"])
         warm["max_tokens"] = 32
         warm["messages"][-1]["content"] = "Switch matrix warmup\n" + warm["messages"][-1]["content"]
-        serving_admission(reservation)
+        record["serving_admission_before_warmup"] = serving_admission(reservation, attempts=2)
         record["warmup"] = lab.request(warm)
         assert record["warmup"]["usage"]["completion_tokens"] == 32
         print("Lab ready; collecting " + mode + " requests for " + arm, flush=True)
