@@ -58,6 +58,15 @@
     "correctness": "Three real-fixture shapes, all three output modes, 64 FP64 samples per arm/shape, exact full outputs, native Q8 pack, 32-call direct and graph carry, canaries/API and N1024 native-only guard.",
     "screen": "Six Store endpoints: N6144/17408/34816, projection-only and preparation+projection+Store. Primary N34816 prepared requires mean time reduction>=1% and >=2/3 positive blocks; all five other endpoints require no mean regression>1%.",
     "scope": "N6144 is a real-fixture prefix/geometry proxy; N17408 is its gate half; N34816 is the actual merged matrix single-projection Store. No fused GateProduct or runtime qualification.",
-    "build": "Reuse the exact compiled chain.o; compile/link host only after current FFN worker exits."
+    "build": "Reuse the exact compiled chain.o; compile/link host only after current FFN worker exits.",
+    "exported_operator_controller": {
+      "path": "tools/q4_t4_chain_probe/run.py",
+      "sha256": "c3569201715b64dd747771abbb93f62d7492fd351279d2f5f14782b90a8ae8db",
+      "status": "SOURCE_ONLY_NOT_EXECUTED",
+      "checks": "AST, frozen source pins and actual host-build schema checked; parser accepts a pass and a completed negative screen, rejects16 malformed cases.",
+      "admission": "Five mutexes, CPU24GiB/C20, fresh broker budget/reserve30/no foreign work; repeat after own reservation, exact owned container/finally cleanup.",
+      "binding": "One export; fresh read-only binary/real-fixture full hashes before exec in the same GPU container. No profiler or hash inside timing.",
+      "actual_build_receipt": "Must supply the real host_build.json and its SHA after host compilation; no future build hash is assumed."
+    }
   }
 }
