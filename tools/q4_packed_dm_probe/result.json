@@ -1,6 +1,6 @@
 {
   "schema": "q4-packed-dm-decision-v1",
-  "status": "GPU_NOT_RUN_SHARED_GPU",
+  "status": "REJECT_AFTER_EXPLORATORY_SCREEN",
   "candidate": "NINFER_GGUF_Q4_MMQ_PACKED_DM",
   "default": "OFF",
   "scope": "SM86 Q4_K/J128 half2 scale/minimum retained until FP32 consumption; original tile/reuse/K-order/arithmetic",
@@ -161,12 +161,65 @@
     "opcode_histograms_equal": false,
     "interpretation": "No register saving realized (221 both); static counts/encodings are not a timing result."
   },
-  "interpretation": "No register saving realized. Main arithmetic/shared-load counts match; MOV/NOP/CS2R and register allocation differ. Static data establishes neither speed gain nor regression.",
-  "gpu_attempt": "Admission stopped before reservation because ComfyUI held GPU memory. Queue empty at observation; service untouched while approval pending. No candidate correctness/timing execution.",
-  "next_step": "After safe GPU window run screen.py screen-r2 using existing binary. Exact FP32 planes/BF16 outputs/oracle first,3balancedblocks;only clear positive screen advances to6independent launches and CI,screen excluded.",
+  "interpretation": "No useful screen gain: all3 balanced blocks slower, roughly1.9-8.3% greater operator latency. Register reduction was not realized. No independent confirmation or full runtime build justified; do not claim a statistically confirmed regression magnitude.",
+  "gpu_attempt": "Completed after ComfyUI was already absent/stopped; owned reservation/container released.",
+  "next_step": "Keep OFF; continue first-stage Q4/Q6 independent-switch runtime qualification and remaining ordered plan. Do not repeat this metadata schedule without new codegen evidence.",
   "protocol_sha256": "0e5bba9bc8e88dc075c6ec57d768a3f94115b113141a8b99a22e504c87155e30",
   "binary_sha256": "ca5f421870773c779501bf3b7471e46b130154ab961c78032fbaf03fbbc76db3",
   "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
   "reservation_active": false,
-  "model_performance_claim": false
+  "model_performance_claim": false,
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 7.602871469e-05,
+    "fp64_max_rel_error": 0.5452117188,
+    "input_seed": 3493531650,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r2-0a6a0fbdcf164ae7a34301739b3cf3f8"
+  },
+  "timing_blocks": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.550528049,
+      "candidate_ms": 4.63560009,
+      "speedup_percent": -1.869498213
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.714215994,
+      "candidate_ms": 4.827260017,
+      "speedup_percent": -2.397938993
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.648704052,
+      "candidate_ms": 5.033216,
+      "speedup_percent": -8.271379364
+    }
+  ],
+  "geometric_operator_latency_increase_pct": 4.13970682351068,
+  "owned_container_removed": true,
+  "reservation_released": true,
+  "production_config_unchanged": true
 }

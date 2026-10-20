@@ -75,10 +75,10 @@ def admission(reserved=False):
     c = capacities[0]
     assert c['sample_age_seconds'] <= 15 and c['measurement'] == 'measured'
     assert c['external_reserve_satisfied'] and c['available_llm_budget_bytes'] >= 24_000_000_000
-    ps = "$m=Get-CimInstance Win32_PerfRawData_PerfOS_Memory; @{free_commit=([uint64]$m.CommitLimit-[uint64]$m.CommittedBytes);comfy=(Get-Service homelab-comfyui).Status.ToString()}|ConvertTo-Json -Compress"
+    ps = "$m=Get-CimInstance Win32_PerfRawData_PerfOS_Memory; $svc=Get-Service homelab-comfyui -ErrorAction SilentlyContinue; @{free_commit=([uint64]$m.CommitLimit-[uint64]$m.CommittedBytes);comfy=$(if($svc){$svc.Status.ToString()}else{'Absent'});comfy_listening=[bool](Get-NetTCPConnection -State Listen -LocalPort 8188 -ErrorAction SilentlyContinue)}|ConvertTo-Json -Compress"
     host = json.loads(run(['powershell.exe', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps]).stdout)
     assert host['free_commit'] >= 40 * 2**30 and shutil.disk_usage('C:/').free >= 20 * 2**30
-    if host['comfy'] == 'Running':
+    if host['comfy'] == 'Running' or host['comfy_listening']:
         with urllib.request.urlopen('http://127.0.0.1:8188/queue', timeout=5) as response:
             q = json.load(response)
         assert not q['queue_running'] and not q['queue_pending']
