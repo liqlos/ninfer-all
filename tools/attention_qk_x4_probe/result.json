@@ -1,0 +1,73 @@
+{
+  "status": "REJECTED_COMPILE_RESOURCE_GATE_NO_GPU",
+  "default_off_flag": "NINFER_PROMPT_QK_B_X4",
+  "target": "SM86 CausalD256H24Kv4 Warps8 K8/V8 PackedValues=false",
+  "mechanism": "One QK B-fragment LDSM.x4 replaces two adjacent x2, with upper-lane addresses corrected; same source MMA order.",
+  "cpu_symbolic_fragment_proof": {
+    "status": "PASS_CPU_SYMBOLIC_BYTE_ADDRESS_AND_FRAGMENT_PROOF",
+    "ptx_reference": "https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#warp-level-matrix-instructions-ldmatrix",
+    "stages": 2,
+    "groups": 4,
+    "n8_tiles": 8,
+    "lanes": 32,
+    "row_addresses": 2048,
+    "register_fragments": 8192,
+    "symbolic_bytes": 32768,
+    "unique_staged_k_bytes": 32768,
+    "negative_controls_rejected": {
+      "naive_x4_without_upper_lane_address_change": 4096,
+      "swapped_mma_register_pairs": 8192
+    },
+    "quantification": "all byte values; each byte represented by its unique source coordinate",
+    "register_mapping": "x4[0:2] = x2(kk=0); x4[2:4] = x2(kk=1)",
+    "mma_order": "grp then nt then kk=0,1; same A and C registers and exact B bytes",
+    "mma_per_warp_live_page": 64,
+    "qk_b_loads_per_warp_live_page_off": 64,
+    "qk_b_loads_per_warp_live_page_on": 32,
+    "fp32_order": "unchanged donor suffix after both IMMA calls in each group",
+    "proof_limit": "PTX data movement and source order; no CUDA compiler or GPU execution"
+  },
+  "compile": {
+    "cuda": "13.1.115",
+    "off": {
+      "registers": 255,
+      "stack_bytes": 8,
+      "spill_store_bytes": 4,
+      "spill_load_bytes": 4
+    },
+    "on": {
+      "registers": 255,
+      "stack_bytes": 24,
+      "spill_store_bytes": 20,
+      "spill_load_bytes": 20
+    },
+    "dynamic_shared_bytes": 100352,
+    "observed_static_opcodes": {
+      "off": {
+        "HMMA.16816.F16": 128,
+        "IMMA.16832.S8.S8": 64,
+        "LDL": 1,
+        "LDSM.16.M88.2": 64,
+        "LDSM.16.M88.4": 8,
+        "LDSM.16.MT88.4": 32,
+        "STL": 1
+      },
+      "on": {
+        "HMMA.16816.F16": 128,
+        "IMMA.16832.S8.S8": 64,
+        "LDL": 3,
+        "LDL.64": 1,
+        "LDSM.16.M88.4": 40,
+        "LDSM.16.MT88.4": 32,
+        "STL": 3,
+        "STL.64": 1
+      }
+    }
+  },
+  "decision": "Reject before host harness/GPU. Baseline already spills; candidate adds 16B stack and 16B spill stores/loads. Fewer fragment-load instructions do not justify this resource regression. Revisit only with a new ownership/liveness mechanism that removes pressure.",
+  "runtime_integrated": false,
+  "gpu_correctness_qualified": false,
+  "performance_claim": false,
+  "receipt": "results/attention-qk-x4/compile-r3.json",
+  "receipt_sha256": "7c9abdfab0c313e2807013c3ec9a424194abf1019354f7873c056642df3be0bc"
+}
