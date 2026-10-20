@@ -1,0 +1,82 @@
+{
+  "status": "REJECTED_EXPLORATORY_OPERATOR",
+  "variant": "NINFER_GGUF_Q4_MMQ_K_STREAM",
+  "shape": {
+    "N": 17408,
+    "K": 5120,
+    "T": 1280,
+    "I": 128,
+    "J": 128
+  },
+  "device": "RTX 3090 SM86",
+  "binary_sha256": "85f648b2fcb0aab3b79c9b91a9d2c7d228920e17bd636b2d46c89830695b69cd",
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 7.863752213e-05,
+    "fp64_max_rel_error": 0.08211103646,
+    "input_seed": 1857487773,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r1-1497fb6e938e42028ef57a49894cf96e"
+  },
+  "blocks": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.718976021,
+      "candidate_ms": 5.299763918,
+      "speedup_percent": -12.30749838
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.58418417,
+      "candidate_ms": 5.487211943,
+      "speedup_percent": -19.69876732
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.606587887,
+      "candidate_ms": 5.501311779,
+      "speedup_percent": -19.42270319
+    }
+  ],
+  "operator_slowdown_percent": [
+    12.307498372855164,
+    19.69876731632272,
+    19.422703179612654
+  ],
+  "registers": {
+    "baseline": 221,
+    "candidate": 165
+  },
+  "shared_bytes": 57856,
+  "spills_bytes": 0,
+  "decision": "Leave runtime flag OFF. Clear operator regression; no full-model build or confirmation justified. Existing control/candidate keep one CTA per SM; lower registers alone did not improve occupancy. Scheduling/load costs are plausible, not measured causal attribution.",
+  "scope": "Three balanced operator blocks from one launch; no CI or whole-request performance claim. helper speedup_percent is time reduction, not throughput gain.",
+  "receipts": {
+    "screen-r1-receipt.json": "ae738b757c41cc4682fb7f43afc0bc07fa95fe41d3918f90f718e09004ad3c60",
+    "screen-r1-binding.json": "64c28eae6fd5c98a3cdf7af3c6c03d23ac062f04487373f37262b3fd393c2e0a",
+    "body-r1.json": "c9a720f8bc441a34cf76acdd46b22d644b7e758225171a7f92ed49fc7d6c0ca8",
+    "build-r3.json": "8e4d7ca96e11c4d1ecbfc5fcda92382f050c09374711afa0d0a097896fa99fa8",
+    "export-r1.json": "5aac480314ba3744cf8033177a516fdafa3d114a3cd3ecad52ce0d31f197490d"
+  }
+}
