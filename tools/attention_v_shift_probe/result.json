@@ -1,172 +1,106 @@
 {
-  "status": "COMPILED_RESOURCE_AND_MECHANISM_PASS_NO_GPU",
+  "status": "CLOSED_NEGATIVE_EXPLORATORY_SCREEN",
+  "decision": "CLOSED_KEEP_DEFAULT_OFF",
   "default_off_flag": "NINFER_PROMPT_V_SHIFT_CTA",
-  "target": "SM86 CausalD256H24Kv4 Warps8 K8/V8 PackedValues=false PagedKVBatchMetadata<false>",
-  "mechanism": "One producer warp copies paired V-scales with partial zero-fill; exact previous max/shift before the existing publication barrier; two shared stage shifts replace up to eight repeated query-warp reductions.",
+  "default_value": 0,
+  "target": "RTX3090/SM86 CausalD256H24Kv4 Warps8 K8/V8 PackedValues=false PagedKVBatchMetadata<false>",
+  "mechanism": "Warp2 copies paired V-scales, computes the unchanged max/shift after its own cp.async wait, and publishes two shared stage shifts before the existing CTA barrier.",
   "cpu_proof": {
-    "cpu_address_proof": {
-      "status": "PASS_ADDRESS_TAIL_AND_OWN_COPY_PROOF",
-      "valid_keys_exhaustive": [
-        0,
-        64
-      ],
-      "physical_pages": [
-        0,
-        3,
-        31,
-        1023
-      ],
-      "kv_heads": 4,
-      "stages": 2,
-      "paired_copies": 66560,
-      "partial_8byte_pairs": 1024,
-      "symbolic_byte_checks": 1064960,
-      "old_ownership_negative_control_failures": 1048320,
-      "producer_threads": [
-        64,
-        95
-      ],
-      "source_alignment_precondition": "actual FP16 V-scale plane base aligned to 16 bytes"
-    },
-    "cpu_lifetime_proof": {
-      "status": "PASS_PUBLICATION_AND_STAGE_REUSE_PARTIAL_ORDER",
-      "pipeline_pages": 6,
-      "publication_checks": 48,
-      "stage_reuse_checks": 256,
-      "query_rows_exhaustive": [
-        1,
-        128
-      ],
-      "producer_inactive_for_qk_tail_cases": 32,
-      "inactive_query_warps_participate": true,
-      "reason": "producer is outside qk_softmax early returns; q0>=tokens return is CTA-uniform",
-      "own_wait_read": "each producer lane reads only its completed 16-byte cp.async destination",
-      "cross_lane": "unchanged full-mask warp_max after all lane-local reads",
-      "cross_warp": "publish before existing CTA barrier; consume after it",
-      "reuse": "B(k+1) orders all k consumers before issue(k+2) and shift publish(k+2)",
-      "compiler_order": "same ON cp.async.wait_group 0 with explicit memory clobber"
-    },
-    "cpu_numeric_proof": {
-      "status": "PASS_FINITE_FP16_NUMERIC_BOUNDARIES",
-      "finite_half_patterns": 63488,
-      "max_shift": 13,
-      "boundaries": [
-        {
-          "half_bits": "0000",
-          "value": 0.0,
-          "shift": 0
-        },
-        {
-          "half_bits": "0001",
-          "value": 5.960464477539063e-08,
-          "shift": 0
-        },
-        {
-          "half_bits": "03ff",
-          "value": 6.097555160522461e-05,
-          "shift": 0
-        },
-        {
-          "half_bits": "0400",
-          "value": 6.103515625e-05,
-          "shift": 0
-        },
-        {
-          "half_bits": "47ff",
-          "value": 7.99609375,
-          "shift": 0
-        },
-        {
-          "half_bits": "4800",
-          "value": 8.0,
-          "shift": 0
-        },
-        {
-          "half_bits": "4801",
-          "value": 8.0078125,
-          "shift": 1
-        },
-        {
-          "half_bits": "4bff",
-          "value": 15.9921875,
-          "shift": 1
-        },
-        {
-          "half_bits": "4c00",
-          "value": 16.0,
-          "shift": 1
-        },
-        {
-          "half_bits": "4c01",
-          "value": 16.015625,
-          "shift": 2
-        },
-        {
-          "half_bits": "77ff",
-          "value": 32752.0,
-          "shift": 12
-        },
-        {
-          "half_bits": "7800",
-          "value": 32768.0,
-          "shift": 12
-        },
-        {
-          "half_bits": "7801",
-          "value": 32800.0,
-          "shift": 13
-        },
-        {
-          "half_bits": "7bff",
-          "value": 65504.0,
-          "shift": 13
-        },
-        {
-          "half_bits": "8000",
-          "value": 0.0,
-          "shift": 0
-        }
-      ],
-      "reduction_equivalence": "identical per-lane eight half operands and exact donor reduction",
-      "pv_rounding": "unchanged consumer code and identical integer tile_shift",
-      "nonfinite_limit": "no new finite-value repair; NaN/Inf behavior is not GPU-qualified"
-    }
+    "address_status": "PASS_ADDRESS_TAIL_AND_OWN_COPY_PROOF",
+    "valid_keys_exhaustive": [0, 64], "physical_pages": [0, 3, 31, 1023],
+    "kv_heads": 4, "stages": 2, "producer_threads": [64, 95],
+    "paired_copies": 66560, "partial_8byte_pairs": 1024,
+    "symbolic_byte_checks": 1064960, "old_ownership_negative_control_failures": 1048320,
+    "source_alignment_precondition": "Actual FP16 V-scale plane base aligned to 16 bytes",
+    "lifetime_status": "PASS_PUBLICATION_AND_STAGE_REUSE_PARTIAL_ORDER",
+    "pipeline_pages": 6, "publication_checks": 48, "stage_reuse_checks": 256,
+    "query_rows_exhaustive": [1, 128], "producer_inactive_for_qk_tail_cases": 32,
+    "inactive_query_warps_participate": true,
+    "ordering": "Own completed 16B copy -> unchanged full-mask warp_max -> lane0 publish -> existing CTA barrier -> consumers; next barrier orders reuse.",
+    "compiler_order": "Same ON cp.async.wait_group 0 with explicit memory clobber",
+    "numeric_status": "PASS_FINITE_FP16_NUMERIC_BOUNDARIES",
+    "finite_half_patterns": 63488, "max_shift": 13,
+    "boundary_columns": ["half_bits", "value", "shift"],
+    "boundaries": [
+      ["0000", 0.0, 0],
+      ["0001", 5.960464477539063e-8, 0],
+      ["03ff", 6.097555160522461e-5, 0],
+      ["0400", 6.103515625e-5, 0],
+      ["47ff", 7.99609375, 0],
+      ["4800", 8.0, 0],
+      ["4801", 8.0078125, 1],
+      ["4bff", 15.9921875, 1],
+      ["4c00", 16.0, 1],
+      ["4c01", 16.015625, 2],
+      ["77ff", 32752.0, 12],
+      ["7800", 32768.0, 12],
+      ["7801", 32800.0, 13],
+      ["7bff", 65504.0, 13],
+      ["8000", 0.0, 0]
+    ],
+    "reduction_and_rounding": "Identical per-lane eight half operands, donor reduction, integer tile_shift and consumer PV rounding",
+    "nonfinite_limit": "NaN/Inf behavior is not GPU-qualified"
   },
   "resources": {
-    "registers": [
-      255,
-      255
-    ],
-    "stack_bytes": [
-      8,
-      0
-    ],
-    "spill_store_bytes": [
-      4,
-      0
-    ],
-    "spill_load_bytes": [
-      4,
-      0
-    ],
-    "dynamic_shared_bytes": 100352,
-    "static_shared_bytes": [
-      0,
-      16
-    ],
-    "candidate_total_shared_bytes": 100368,
-    "existing_CTA_barriers": 1
+    "arm_order": ["off", "on"],
+    "registers": [255, 255], "stack_bytes": [8, 0],
+    "spill_store_bytes": [4, 0], "spill_load_bytes": [4, 0],
+    "dynamic_shared_bytes": 100352, "static_shared_bytes": [0, 16],
+    "candidate_total_shared_bytes": 100368, "existing_CTA_barriers_per_page": 1,
+    "static_IMMA_HMMA_SHFL_counts_each_arm": [64, 128, 974],
+    "QK_PV_math_and_LDSM_unchanged": true
   },
   "compile_seconds": 17.0,
-  "runtime_integrated": false,
-  "gpu_correctness_qualified": false,
-  "performance_claim": false,
-  "next_gate": [
-    "Source-only minimal host harness is being prepared; reuse the two frozen objects, do not recompile the kernels.",
-    "Short fragmented-page/tail/reuse/rescale cases and actual T1280/base31488 exact+FP64 qualification before a single long-region screen.",
-    "Run only after the full FFN request series; no concurrent GPU or CPU build/export."
-  ],
-  "receipt": "results/attention-v-shift/compile-r1.json",
-  "mechanism_receipt": "results/attention-v-shift/mechanism-r1.json",
-  "mechanism_receipt_sha256": "c3729d2d2faac2c12ea4c1acafc571c8c931f8748eb76be6d5877e5ff967640d"
+  "gpu_qualification": {
+    "status": "PASS_ALL_FIVE_CASES_BEFORE_TIMING",
+    "synthetic_represented_inputs": true, "model_activation_capture": false,
+    "case_columns": ["case", "tokens", "base", "capacity", "BF16_elements_exact", "FP64_rows"],
+    "cases": [
+      ["tail1-valid1-low-boundary", 1, 192, 256, 6144, 24],
+      ["tail33-valid63-high-boundary", 33, 158, 256, 202752, 792],
+      ["tail127-valid1-maxfinite", 127, 130, 384, 780288, 3048],
+      ["tail129-valid63-stage-reuse", 129, 126, 384, 792576, 3096],
+      ["long-T1280-base31488", 1280, 31488, 65536, 7864320, 4]
+    ],
+    "all_BF16_outputs_bit_exact": true, "finite_canaries_and_guards_passed": true,
+    "cache_and_inputs_byte_immutable": true, "actual_kernel_routes_verified_outside_events": true,
+    "short_cases_full_FP64_oracle": true,
+    "long_visible_keys": 32768, "long_BF16_bytes_per_arm": 15728640,
+    "long_FP64_rows": 4, "long_FP64_elements": 1024, "long_full_FP64_oracle": false,
+    "oracle": "Independent FP64 attention with represented physical-cache decode and FP64 inverse key Hadamard",
+    "relative_l2_limit": 0.00315, "gross_absolute": 0.0011,
+    "gross_relative_to_max_reference": 0.0078125,
+    "post_block_exactness_and_immutability_passed": true
+  },
+  "screen": {
+    "case": "long-T1280-base31488", "selection_data_only": true,
+    "timing_scope": "full_attention_launcher_cuda_event_loop",
+    "includes_possible_host_attribute_gaps": true, "cupti": false,
+    "warmup_order": "ABAB", "warmup_samples": 4, "calls_per_sample": 32,
+    "block_orders": ["ABBA", "BAAB", "ABBA"], "samples_per_block": 4,
+    "same_cache_and_activation_all_arms": true, "repacking_or_uploads_between_arms": false,
+    "diagnostics_or_copies_inside_events": false,
+    "off_mean_ms": 9.455396334329999, "on_mean_ms": 9.879862944288332,
+    "time_reduction_percent": -4.489146672966084,
+    "block_time_reduction_percent": [-5.827505934232057, -2.8272410452986683, -4.8389327318874145],
+    "selection_rule": "At least 1% overall reduction and all three blocks positive to consider independent confirmation",
+    "decision": "close", "CI_computed": false, "statistical_confirmation": false,
+    "full_request_result": false, "unchanged_repeat_planned": false
+  },
+  "gpu_correctness_qualified": true, "runtime_integrated": false, "performance_claim": false,
+  "running_executable_sha256": "5f6fdd1d1875c9593edfdcda2861980fa8fc3b7e218ca4e6aa4c2ef8b0b84b87",
+  "exact_native_fatbins_preserved": true,
+  "owned_cleanup_and_production_preservation_passed": true,
+  "receipts": {
+    "compile": "results/attention-v-shift/compile-r1.json",
+    "mechanism": "results/attention-v-shift/mechanism-r1.json",
+    "host_export": "results/attention-v-shift/host-export-r1.json",
+    "failed_admission_before_reservation_or_GPU": "results/attention-v-shift/screen-r1-receipt.json",
+    "protocol": "results/attention-v-shift/screen-protocol-r2.json",
+    "runtime": "results/attention-v-shift/screen-r2-receipt.json",
+    "raw_output": "results/attention-v-shift/screen-r2.jsonl"
+  },
+  "mechanism_receipt_sha256": "c3729d2d2faac2c12ea4c1acafc571c8c931f8748eb76be6d5877e5ff967640d",
+  "runtime_receipt_sha256": "64ae9cdb257689efd4a411050f98abf999963c9d466d02de741c9e6f00be4d91",
+  "raw_output_sha256": "f6093f43a7495eeeddfe66eb66d8566184c7b365b51ff32a102547e306d49fc1"
 }
