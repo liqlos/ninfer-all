@@ -1,5 +1,5 @@
 {
-  "status": "COMPILE_RESOURCE_PASS_GPU_PENDING",
+  "status": "EXPORTED_GPU_PASS_SCREEN_REJECTED",
   "default_off_flag": "NINFER_LAB_MMQ_TWO_INPUT=0",
   "lab_only": true,
   "native_kernel_edits": false,
@@ -55,8 +55,55 @@
   "CPU_address_proof": "PASS: independent dense/interval coverage, native packed panels, sample/column strides and carry addresses; compiled API calls pending.",
   "ordering": "token tile, then sample, then row tile; paired weight tile reuse distance10CTA instead1360Q4/400Q6. Only L2 locality hypothesis; no guaranteed inter-CTA reuse or lower logical traffic.",
   "compile_receipt": "results/mmq-two-input/compile-r1.json",
-  "GPU_run": false,
-  "numerical_oracle": "PENDING",
+  "GPU_run": true,
+  "numerical_oracle": "PASS:64FP64 points per panel/arm/case,fullFP32/BF16 equality,independent Store/Accumulate rounding,32-call carry and504actual rejected API calls.",
   "performance_claim": false,
-  "next_gate": "Actual exported operator: two different native-packed inputs, exact FP32/BF16/carry, independent real-fixture FP64 oracle, canaries and compiled API guards; short balanced region screen. Whole paired FFN versus folded16 only after a useful primary down gain."
+  "next_gate": "Do not repeat this native sample path unchanged. Continue head-input/shortlist coverage; bounded loader read-ahead and a distinct paired-warp attention resource probe are being prepared separately.",
+  "actual_dispatch": "PASS:2native pack launches per arm,2control projections versus1candidate projection;all3epilogues;proper grids,SM86,readonly real fixtures.",
+  "host_compile_link_seconds": 7.013160049973521,
+  "screen_receipt": "results/mmq-two-input/screen-r1-receipt.json",
+  "screen_scope": "Two native packs plus StoreBF16 projection,not whole FFN or full request.",
+  "endpoints": [
+    {
+      "case": "Q6Down",
+      "control_mean_ms": 5.443840026855,
+      "candidate_mean_ms": 5.408149242401667,
+      "time_reduction_percent": 0.6556178042937844,
+      "block_time_reduction_percent": [
+        0.6863562101212861,
+        0.37292154789038134,
+        0.9021144633741263
+      ]
+    },
+    {
+      "case": "Q4Gate",
+      "control_mean_ms": 4.5370452404016675,
+      "candidate_mean_ms": 4.542656024296668,
+      "time_reduction_percent": -0.12366603367841567,
+      "block_time_reduction_percent": [
+        -1.7938036964556314,
+        0.7083113402102881,
+        0.7151884907819706
+      ]
+    },
+    {
+      "case": "Q4Up",
+      "control_mean_ms": 4.545685291288334,
+      "candidate_mean_ms": 4.54903467496,
+      "time_reduction_percent": -0.07368270034189273,
+      "block_time_reduction_percent": [
+        1.0796350655546516,
+        -1.86778483179737,
+        0.5615092328120075
+      ]
+    }
+  ],
+  "selection": {
+    "primary_minimum_time_reduction_percent": 10,
+    "all_three_primary_blocks_required_positive": true,
+    "passed": false,
+    "reason": "Primary region reduction0.656% is too small for paired-planner cost;Q4 regions effectively neutral.",
+    "CI_or_full_FFN_or_runtime": false
+  },
+  "cleanup": "Owned GPU container removed,reservation released,production unchanged."
 }
