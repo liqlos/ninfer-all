@@ -1,0 +1,85 @@
+{
+  "status": "MIXED_EXPLORATORY_OPERATOR_SCREEN_NO_WINNER",
+  "performance_claim": false,
+  "full_request_measured": false,
+  "flag": "NINFER_GGUF_Q4_MMQ_COMPACT_A",
+  "default": 0,
+  "target": "sm86 Q4_K N17408 K5120 T1280 I128 J128",
+  "mechanism": "raw nibbles stride44 shared, full expanded A register preload outside inner J loop; native resident layout and ordered FP32 math unchanged",
+  "resources": {
+    "off_registers": 221,
+    "on_registers": 222,
+    "stack_local_spills": 0,
+    "off_shared_bytes": 57856,
+    "on_shared_bytes": 41472
+  },
+  "static_body": {
+    "LDSM_x4_before": 32,
+    "LDSM_x4_after": 16,
+    "IMMA_unchanged": 256,
+    "I2FP_unchanged": 1024,
+    "FMUL_unchanged": 1024,
+    "FFMA_unchanged": 2048,
+    "LDG_E_CONSTANT_unchanged": 119,
+    "unpack_cost_increased": true
+  },
+  "binary_sha256": "a21634b90e6613c3879dbcd45638be457f119cfde92abacb322c25156a36530b",
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 7.923445897e-05,
+    "fp64_max_rel_error": 0.05493639741,
+    "input_seed": 3243835100,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r1-8d77734f20484a2491786c72502db379"
+  },
+  "samples": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.51108408,
+      "candidate_ms": 4.358272076,
+      "time_reduction_percent": 3.387478517
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.675840139,
+      "candidate_ms": 4.846711874,
+      "time_reduction_percent": -3.654353646
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.662003994,
+      "candidate_ms": 4.608512163,
+      "time_reduction_percent": 1.147399936
+    }
+  ],
+  "interpretation": "Exact output/oracle/API gates passed; mixed three short four-repetition blocks do not establish useful speedup, regression, or zero effect. No CI or server integration. R1 is selection data only. One independent prospective warmed 32-repetition discrimination screen can distinguish the current candidate before closure; no optional third screen.",
+  "bindings": {
+    "build-r1.json": "b8aa9a8f8244bc62d6227181d6ca0c6ba4fe3c86c5dd3a1ab03aef81758f3e27",
+    "body-r1.json": "c555257dce2446c8428fef1a12dc543866bab5d9489fbbc636f61f65f3fa912c",
+    "export-r1.json": "66189d8db6da71a064425bfaf59a8230e12f9442601a66c016dfb7e35a823a1e",
+    "screen-r1.jsonl": "4a5f06d3b9a95c35d6a1013762f6833d3e379745d7d5067612d911fdb1a1dbbe",
+    "screen-r1-receipt.json": "f7e8abb9e8784fe61e80542acaa34b11c89f0c5b0e293029b3dc93104956feee",
+    "screen-r1-binding.json": "73deccb732f3c04190f3913a123258c3a6d128ecf3c86992cec10116f246cb5c"
+  }
+}
