@@ -1,0 +1,58 @@
+{
+  "status": "PASS_FULL_LOAD_PATH_AND_REQUEST_EQUIVALENCE",
+  "order": [
+    "9p",
+    "ext4",
+    "ext4",
+    "9p"
+  ],
+  "startup_seconds_windows": {
+    "9p": [
+      74.313,
+      72.985
+    ],
+    "ext4": [
+      8.984,
+      8.891
+    ]
+  },
+  "startup_ratio_of_sums_time_reduction_percent": 87.86473679208136,
+  "adjacent_pair_time_reduction_percent": [
+    87.9105943778343,
+    87.81804480372679
+  ],
+  "native_load_seconds_separate_clock": {
+    "9p": [
+      66.226738756,
+      64.847501469
+    ],
+    "ext4": [
+      6.212170571,
+      6.157972329
+    ]
+  },
+  "native_upload_seconds_separate_clock": {
+    "9p": [
+      61.762969885,
+      60.389743797
+    ],
+    "ext4": [
+      2.765818006,
+      2.791479124
+    ]
+  },
+  "statistical_confirmation": false,
+  "warm_request_speedup_claim": false,
+  "host_storage_cache_controlled": false,
+  "new_model_copy": false,
+  "scope": "Fresh server startup to health-ready; OS/host cache state is not controlled.",
+  "workloads": [
+    "RU4089/512",
+    "JSON32756/512"
+  ],
+  "executable": "same production W",
+  "exact_output_usage_finish_cache_and_full_MTP": "PASS all four launches",
+  "owned_cleanup_and_production_unchanged": true,
+  "decision": "Use the existing verified production ext4 model source for future lab arms. This improves lab startup only; production already used ext4.",
+  "evidence": "results/model-storage/storage-r3"
+}
