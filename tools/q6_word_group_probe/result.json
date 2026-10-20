@@ -1,0 +1,102 @@
+{
+  "status": "CPU_COMPILED_STATIC_REVIEW_PARTIAL_NO_GPU",
+  "default_off_flag": "NINFER_Q6_WORD_GROUP_PROBE",
+  "mechanism": "Single Q6 word-group slab16 backing, original codes/scales/d; vector removes decode shuffles, MMQ producer writes STS128 into unchanged native shared layout.",
+  "runtime_integrated": false,
+  "performance_claim": false,
+  "gpu_correctness_qualified": false,
+  "full_fixture_roundtrip": false,
+  "cpu_checks": {
+    "basis_cases": 1680,
+    "group_cases": 1024,
+    "views": 53,
+    "invalid_descriptors_rejected": 44,
+    "real_fixture_sample_bytes": 369600,
+    "full_fixture_hash_checked": false
+  },
+  "compile": {
+    "toolchain": "CUDA13.1.115 SM86",
+    "seconds": 23.5,
+    "units": 2,
+    "native_cache": "/build/q6-word-group",
+    "host_main": false,
+    "linked": false,
+    "spills_stack_local": 0,
+    "vector_registers": {
+      "native": [
+        80,
+        125
+      ],
+      "candidate": [
+        40,
+        72
+      ]
+    },
+    "mmq_registers": {
+      "mode_order": [
+        "plain",
+        "Store",
+        "Accumulate"
+      ],
+      "native": [
+        242,
+        242,
+        248
+      ],
+      "candidate": [
+        246,
+        247,
+        250
+      ]
+    }
+  },
+  "review": {
+    "status": "PARTIAL_STATIC_REVIEW_ORIGINAL_MECHANISM_GATE_BLOCKED",
+    "original_gate_not_passed": true,
+    "vector_actual_K5120_iterations": 5,
+    "vector_decode_SHFL_IDX": {
+      "native": 32,
+      "candidate": 0
+    },
+    "vector_candidate_QL64_loads": 4,
+    "vector_fp_dependency_shapes_and_ordered_reductions_equal": true,
+    "vector_FP_leaves_opaque": true,
+    "mmq_LDG64_and_STS128": {
+      "native": 0,
+      "candidate": 16
+    },
+    "mmq_counts_each_full_computational_region": {
+      "FFMA": 640,
+      "I2FP": 512,
+      "IMMA": 256,
+      "PRMT": 16,
+      "SHF_L": 32,
+      "SHF_R": 49,
+      "LDG": 18,
+      "STS": 18,
+      "LDS": 140,
+      "LDS128": 36,
+      "LDSM": 32
+    },
+    "mmq_operand_aware_equivalence_proved": false,
+    "limitations": [
+      "Original vector parser mistakes helper-rejoin backedges/CALL and counts a shared BFLY helper.",
+      "Original barrier-region signatures differ after compiler scheduling; equal full-region counts do not prove order.",
+      "Original final gate has mmq/matrix key mismatch; do not blindly repeat unchanged build."
+    ]
+  },
+  "next_gate": [
+    "Root reviewed resource/mechanism decision, preserving failed original gate status.",
+    "Use existing two objects; prepare isolated actual real-fixture correctness harness before any timing.",
+    "Full literal roundtrip of both pinned real fixtures; exact outputs and independent Q6 oracle for vector T1/T4 and all MMQ epilogues.",
+    "One joint head/down screen; converter/runtime only after both hot consumers justify integration."
+  ],
+  "receipts": {
+    "build": "results/q6-word-group/build-r2.json",
+    "review": "results/q6-word-group/review-r1.json"
+  },
+  "receipt_sha256": {
+    "build": "5af55ce76953394456b2ce6408103034e9b25e203b5db608d51d065309708295",
+    "review": "a1749e3ec49345539b765a0a8ae5202ba7952e223f45c4683fe1dd321b9749a2"
+  }
+}
