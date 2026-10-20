@@ -18,14 +18,14 @@ assert re.fullmatch(r"[a-z0-9-]+", TAG)
 binding_path = OUT / (TAG + "-binding.json")
 assert not binding_path.exists()
 load = lambda path: json.loads(path.read_text(encoding="utf-8"))
-build = load(OUT / "build-r1.json")
-body = load(OUT / "body-r1.json")
-export = load(OUT / "export-r1.json")
+build = load(OUT / "build-r2.json")
+body = load(OUT / "body-r2.json")
+export = load(OUT / "export-r2.json")
 assert build["status"] == "CPU_BUILT_NOT_GPU_QUALIFIED"
 assert body["status"] == "PASS_STATIC_CUBIN_BODY_QUALIFICATION"
 assert export["status"] == "EXPORTED_NOT_GPU_QUALIFIED"
-assert export["build_receipt_sha256"] == run.lab.sha(OUT / "build-r1.json")
-assert export["body_receipt_sha256"] == run.lab.sha(OUT / "body-r1.json")
+assert export["build_receipt_sha256"] == run.lab.sha(OUT / "build-r2.json")
+assert export["body_receipt_sha256"] == run.lab.sha(OUT / "body-r2.json")
 for name, digest in build["probe_sources"].items():
     assert pathlib.Path(name).name == name
     assert run.lab.sha(pathlib.Path(__file__).parent / name) == digest
@@ -44,7 +44,7 @@ record = {
     "runner_sha256": run.lab.sha(pathlib.Path(__file__)),
     "shared_runner_sha256": run.lab.sha(ROOT / "source/tools/ffn_pair_probe/run.py"),
     "compiled_source_receipt_sha256": run.lab.sha(source_receipt),
-    "export_receipt_sha256": run.lab.sha(OUT / "export-r1.json"),
+    "export_receipt_sha256": run.lab.sha(OUT / "export-r2.json"),
 }
 expected = {(17408, 5120, 1280, "accumulate"), (5120, 10240, 1280, "store"),
             (5120, 1024, 1280, "store")}

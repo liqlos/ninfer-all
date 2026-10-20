@@ -1,5 +1,5 @@
 {
-  "status": "CLOSED_NAIVE_CODEGEN_SPILLS_NO_GPU",
+  "status": "CLOSED_TWO_LOWERINGS_CODEGEN_SPILLS_NO_GPU",
   "variant": "NINFER_GGUF_Q6_MMQ_ALIGNED_RAW32",
   "implementation": "C++ conditional actual-address aligned4 word load, original halfword fallback",
   "device": "RTX3090 SM86",
@@ -60,11 +60,73 @@
   },
   "gpu_executed": false,
   "performance_claim": false,
-  "decision": "Do not run full model or timing this codegen. All three selected plain/Store/Accumulate paths gain spills: 24B stack, 36B spill stores, 40B spill loads, 255 registers versus baseline 242/248 without spills. This rejects this lowering, not aligned-word loads generally. Inspect a bounded predicated read-only PTX lowering before changing resident layout.",
+  "decision": "Both bounded native-layout aligned-word lowerings fail the no-spill compile gate. C++ conditional: 24B stack/36B spill stores/40B spill loads; explicit predicated read-only PTX: 104-112B stack/124-164B stores/132-180B loads. No GPU correctness/timing and no speed claim. Keep default OFF; do not iterate address-condition syntax without a new lifetime/ownership premise. Raw32 is not a required integration prerequisite for a separate compact resident layout, which needs its own vector+MMQ economic gate.",
   "receipts": {
     "build-r1.json": "72b5fa1f428dd56c31f4e6fdeaca5f1a0e87c6572684f58871c20b775e64dfa8",
     "resource-r1.json": "946783e975da063d5bf5eb75f63e56c7d13534214f8af1e8d4521eb577a476b6",
     "compile-off-r1.log": "4abbfab67c478b6764a6a3858ea77872e10bd8e9db05c34ca2bbdf5ee938458f",
-    "compile-on-r1.log": "149a8be290f5eae7d80064c4ab1cc420c107c0f00a17fbe660a675da4af61c64"
+    "compile-on-r1.log": "149a8be290f5eae7d80064c4ab1cc420c107c0f00a17fbe660a675da4af61c64",
+    "build-r2.json": "c6a56a7f8376cd5fc81d0cdd4b0749a85a909de6b0242f7fd24b8898ca1ce140",
+    "resource-r2.json": "4a3a6595fa46bd8361e258bae5379c4b4ca3b033c97d97d0e2f6c8cc08e8392f",
+    "compile-off-r2.log": "d3c8abff306b53cb1f3dad9116f12a3d12587e32069193b879b992a40a26ed15",
+    "compile-on-r2.log": "a523e9716017d42fb4998c35773c88495416d36d9ac8ae7b97689e1c8b3ab458"
+  },
+  "predicated_readonly_ptx_r2": {
+    "resources": {
+      "off": [
+        {
+          "symbol": "_Z22q6_raw32_off_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+          "registers": 242,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0
+        },
+        {
+          "symbol": "_Z22q6_raw32_off_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb1ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+          "registers": 248,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0
+        },
+        {
+          "symbol": "_Z22q6_raw32_off_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb0ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+          "registers": 242,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0
+        }
+      ],
+      "on": [
+        {
+          "symbol": "_Z21q6_raw32_on_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+          "registers": 255,
+          "stack_bytes": 104,
+          "spill_store_bytes": 124,
+          "spill_load_bytes": 132
+        },
+        {
+          "symbol": "_Z21q6_raw32_on_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb1ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+          "registers": 255,
+          "stack_bytes": 112,
+          "spill_store_bytes": 164,
+          "spill_load_bytes": 180
+        },
+        {
+          "symbol": "_Z21q6_raw32_on_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb0ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+          "registers": 255,
+          "stack_bytes": 104,
+          "spill_store_bytes": 128,
+          "spill_load_bytes": 136
+        }
+      ]
+    },
+    "cpu_address_check": {
+      "addresses": 664560,
+      "aligned4": 326560,
+      "fallback2": 338000,
+      "odd_starts": 44,
+      "status": "PASS_CPU_ADDRESS_EQUIVALENCE"
+    },
+    "binary_sha256": "5b546d2834f2f953a000fab784ad6c7d0a32e1c4957a77fad69961f7e4962f77"
   }
 }

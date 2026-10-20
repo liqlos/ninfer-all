@@ -25,9 +25,18 @@ INSERT = """#ifndef NINFER_GGUF_Q6_MMQ_ALIGNED_RAW32
 #if NINFER_GGUF_Q6_MMQ_ALIGNED_RAW32 && defined(__CUDA_ARCH__) && (__CUDA_ARCH__ == 860)
         if constexpr (type == GGML_TYPE_Q6_K && J == 128) {
             const auto * address = static_cast<const uint8_t *>(p) + 4*i32;
-            if ((reinterpret_cast<uintptr_t>(address) & 3u) == 0) {
-                return get_int_b4(p, i32);
-            }
+            int result;
+            asm volatile (
+                "{ .reg .pred aligned; .reg .u32 bits, low, high; "
+                "cvt.u32.u64 bits, %1; and.b32 bits, bits, 3; "
+                "setp.eq.u32 aligned, bits, 0; "
+                "@aligned ld.global.nc.u32 low, [%1]; "
+                "@!aligned ld.global.nc.u16 low, [%1]; "
+                "@!aligned ld.global.nc.u16 high, [%1+2]; "
+                "@!aligned mad.lo.u32 low, high, 65536, low; "
+                "mov.b32 %0, low; }"
+                : "=r"(result) : "l"(address) : "memory");
+            return result;
         }
 #endif
         return get_int_b2(p, i32);
