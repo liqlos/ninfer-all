@@ -101,9 +101,11 @@ def main():
             route = load(route_path)
             assert route["status"] == "PASS" and route["executable_sha256"] == exe_sha
             record["route_receipt"] = {"file": route_path.name, "sha256": lab.sha(route_path)}
-        gate = load(OUT / (operator_tag + "-qualification.json"))
+        gate_path = OUT / (operator_tag + "-qualification.json")
+        gate = load(gate_path)
         assert gate["status"] == "PASS" and gate["arm"] == arm
         assert gate["export"]["files"] == export["files"]
+        record["qualification_receipt"] = {"file": gate_path.name, "sha256": lab.sha(gate_path)}
         assert lab.sha(MODEL) == MODEL_SHA and lab.sha(BENCH) == BENCH_SHA
         protocol = load(OUT / "protocol.json")
         assert protocol["model_sha256"] == MODEL_SHA

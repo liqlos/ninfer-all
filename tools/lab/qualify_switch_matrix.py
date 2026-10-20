@@ -25,7 +25,7 @@ OWNER = "ninfer-switch-matrix"
 LAB_CONTROLLERS = {
     "tools/lab/build_switch_matrix.py", "tools/lab/profile_long_context.py",
     "tools/lab/qualify_switch_matrix.py", "tools/lab/run_switch_matrix.py",
-    "tools/lab/switch_matrix_route.py",
+    "tools/lab/switch_matrix_route.py", "tools/lab/analyze_switch_matrix.py",
 }
 
 

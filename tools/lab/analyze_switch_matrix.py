@@ -6,12 +6,13 @@ import pathlib
 import statistics
 
 import profile_long_context as lab
+import qualify_switch_matrix as qualification
 
 
 OUT = lab.ROOT / "results/switch-matrix"
 
 
-def analyze(records, protocol, protocol_sha):
+def analyze(records, protocol, protocol_sha, control_tag, control_sha):
     assert len(records) == len(protocol["screen_schedule"]) == 8
     assert [r["arm"] for r in records] == protocol["screen_schedule"]
     categories = ["ru", "en", "code", "json"]
@@ -19,12 +20,26 @@ def analyze(records, protocol, protocol_sha):
     previous_finish = None
     binaries = {}
     warmup = None
+    command = None
     for record in records:
         assert record["status"] == "SCREENED" and record["mode"] == "screen"
         assert record["exploratory"] and not record["performance_claim"]
         assert record["owned_container_removed"] and record["reservation_released"]
         assert record["production_config_unchanged"] and not record.get("cleanup_failure")
         assert record["protocol_sha256"] == protocol_sha
+        assert record["control_tag"] == control_tag
+        if record is not baseline:
+            assert record["control_receipt_sha256"] == control_sha
+        argv = record["command"]
+        log_index = argv.index("--request-log-jsonl") + 1
+        normalized = argv[:log_index] + ["<request-log>"] + argv[log_index + 1:]
+        if command is None:
+            command = normalized
+        assert normalized == command
+        for key, value in {"--max-context": "65536", "--kv-capacity": "65536",
+                           "--max-concurrency": "1", "--kv-dtype": "int8", "--spec": "mtp",
+                           "--draft-tokens": "3", "--prefill-chunk": "1024"}.items():
+            assert argv.count(key) == 1 and argv[argv.index(key) + 1] == value
         for key in ("model_sha256", "bench_sha256", "prompts_sha256"):
             assert record[key] == protocol[key]
         started = datetime.datetime.fromisoformat(record["started_at"])
@@ -49,6 +64,7 @@ def analyze(records, protocol, protocol_sha):
         assert [row["category"] for row in record["samples"]] == categories
         for row, control in zip(record["samples"], baseline["samples"]):
             assert math.isfinite(row["elapsed_seconds"]) and row["elapsed_seconds"] > 0
+            assert row["usage"]["completion_tokens"] == 512
             for key in ("output_sha256", "usage", "finish_reason", "request_body_sha256"):
                 assert row[key] == control[key]
             assert row["request_done"]["speculative"] == control["request_done"]["speculative"]
@@ -78,6 +94,39 @@ def analyze(records, protocol, protocol_sha):
             "interpretation": "Descriptive screening only; candidate selection is not confirmation"}
 
 
+def validate_evidence(records):
+    builds = [json.loads(path.read_text(encoding="utf-8")) for path in OUT.glob("*-build.json")]
+    inputs = set()
+    for record in records:
+        related = {}
+        for key in ("qualification_receipt", "route_receipt"):
+            binding = record[key]
+            assert pathlib.Path(binding["file"]).name == binding["file"]
+            path = OUT / binding["file"]
+            assert lab.sha(path) == binding["sha256"]
+            related[key] = json.loads(path.read_text(encoding="utf-8"))
+            assert related[key]["status"] == "PASS"
+        gate, route = related["qualification_receipt"], related["route_receipt"]
+        assert gate["schema"] == "ninfer-switch-matrix-q6-qualification-v2"
+        assert gate["arm"] == record["arm"] and gate["outputs_exact_match"]
+        assert gate["export"]["files"] == record["export"]["files"]
+        assert route["executable_sha256"] == record["running_executable_sha256"]
+        matches = [build for build in builds
+                   if build.get("status") == "BUILT_EXPORTED_NOT_GPU_QUALIFIED"
+                   and build.get("arm") == record["arm"]
+                   and build.get("export_sha256") == record["export"]["files"]
+                   and build.get("source_manifest_sha256") == record["export"]["source_manifest_sha256"]]
+        assert matches
+        for build in matches:
+            assert build["cuda_symbol_seeds"] == ["ninfer-ggml_vec_q4_k", "ninfer-ggml_mmq_q6_k"]
+            assert build["options"] == record["build_options"]
+            compiled = qualification.build_inputs_sha(build)
+            assert compiled == gate["compiled_inputs_sha256"]
+            inputs.add(compiled)
+    assert len(inputs) == 1
+    return inputs.pop()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("tags", nargs=8)
@@ -87,8 +136,10 @@ def main():
     paths = [OUT / (tag + "-runtime.json") for tag in args.tags]
     protocol_path = OUT / "protocol.json"
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
-    result = analyze([json.loads(path.read_text(encoding="utf-8")) for path in paths],
-                     protocol, lab.sha(protocol_path))
+    records = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    compiled = validate_evidence(records)
+    result = analyze(records, protocol, lab.sha(protocol_path), args.tags[0], lab.sha(paths[0]))
+    result["compiled_inputs_sha256"] = compiled
     result["inputs"] = {path.name: lab.sha(path) for path in paths}
     output = OUT / args.output
     assert output.parent == OUT and output.suffix == ".json"
