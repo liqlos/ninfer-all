@@ -189,6 +189,7 @@ def main():
             serving_admission(reservation)
             offset = bench.request_log_offset(events)
             observed, request_sha = bench.stream_request(18042, item["request_body"])
+            serving_admission(reservation)
             assert request_sha == item["request_body_sha256"]
             done = bench.correlate_request_done(events, offset, observed, "mtp3", prior,
                                                observed["usage"], observed["timings"], used)
