@@ -1,0 +1,230 @@
+{
+  "status": "STAGE1_GPU_EQUALITY_PASS_PAIR_REGION_MIXED",
+  "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_MMQ",
+  "full_ffn_qualified": false,
+  "full_request_measured": false,
+  "performance_claim": false,
+  "target": "SM86 Q4_K N17408/K5120/T1280 I128/J128,2720CTA",
+  "mechanism": "Four [gate16,up16] groups per I128; native 64 accumulators/thread, same K/preload/math/scales and one same-thread SwiGLU BF16. Two independent gate/up pointers.",
+  "resources": {
+    "registers_baseline": 221,
+    "registers_candidate": 241,
+    "shared_bytes": 57856,
+    "stack_local_spills": 0,
+    "timed_stores": "32 STG.E.U16, no diagnostic FP32 pointer uses",
+    "diagnostic_stores": "64 STG.E plus32 STG.E.U16"
+  },
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 80,
+    "fp64_max_abs_error": 0.0002832690156,
+    "fp64_max_rel_error": 0.295149757,
+    "input_seed": 3243835100,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r1-71a65763ae0b4828804fe741b36d1931"
+  },
+  "samples": [
+    {
+      "kind": "sample",
+      "block": 0,
+      "sample": 0,
+      "arm": 0,
+      "repetitions": 32,
+      "ms": 4.66435194
+    },
+    {
+      "kind": "sample",
+      "block": 0,
+      "sample": 1,
+      "arm": 1,
+      "repetitions": 32,
+      "ms": 4.71843195
+    },
+    {
+      "kind": "sample",
+      "block": 0,
+      "sample": 2,
+      "arm": 1,
+      "repetitions": 32,
+      "ms": 4.741312027
+    },
+    {
+      "kind": "sample",
+      "block": 0,
+      "sample": 3,
+      "arm": 0,
+      "repetitions": 32,
+      "ms": 4.700863838
+    },
+    {
+      "kind": "sample",
+      "block": 1,
+      "sample": 0,
+      "arm": 1,
+      "repetitions": 32,
+      "ms": 4.725791931
+    },
+    {
+      "kind": "sample",
+      "block": 1,
+      "sample": 1,
+      "arm": 0,
+      "repetitions": 32,
+      "ms": 4.719520092
+    },
+    {
+      "kind": "sample",
+      "block": 1,
+      "sample": 2,
+      "arm": 0,
+      "repetitions": 32,
+      "ms": 4.672128201
+    },
+    {
+      "kind": "sample",
+      "block": 1,
+      "sample": 3,
+      "arm": 1,
+      "repetitions": 32,
+      "ms": 4.672224045
+    },
+    {
+      "kind": "sample",
+      "block": 2,
+      "sample": 0,
+      "arm": 0,
+      "repetitions": 32,
+      "ms": 4.820127964
+    },
+    {
+      "kind": "sample",
+      "block": 2,
+      "sample": 1,
+      "arm": 1,
+      "repetitions": 32,
+      "ms": 4.69091177
+    },
+    {
+      "kind": "sample",
+      "block": 2,
+      "sample": 2,
+      "arm": 1,
+      "repetitions": 32,
+      "ms": 4.641056061
+    },
+    {
+      "kind": "sample",
+      "block": 2,
+      "sample": 3,
+      "arm": 0,
+      "repetitions": 32,
+      "ms": 4.757535934
+    }
+  ],
+  "warmups": [
+    {
+      "kind": "warmup",
+      "sample": 0,
+      "candidate": false,
+      "repetitions": 32,
+      "ms": 4.583818913
+    },
+    {
+      "kind": "warmup",
+      "sample": 1,
+      "candidate": true,
+      "repetitions": 32,
+      "ms": 4.639865875
+    },
+    {
+      "kind": "warmup",
+      "sample": 2,
+      "candidate": false,
+      "repetitions": 32,
+      "ms": 4.776063919
+    },
+    {
+      "kind": "warmup",
+      "sample": 3,
+      "candidate": true,
+      "repetitions": 32,
+      "ms": 4.636571884
+    }
+  ],
+  "blocks": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "ABBA",
+      "repetitions_per_sample": 32,
+      "baseline_ms": 4.682607889,
+      "candidate_ms": 4.729871988,
+      "time_reduction_percent": -1.009354194
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "BAAB",
+      "repetitions_per_sample": 32,
+      "baseline_ms": 4.695824146,
+      "candidate_ms": 4.699007988,
+      "time_reduction_percent": -0.06780155317
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "ABBA",
+      "repetitions_per_sample": 32,
+      "baseline_ms": 4.788831949,
+      "candidate_ms": 4.665983915,
+      "time_reduction_percent": 2.565302671
+    }
+  ],
+  "ratio_of_sums_time_reduction_percent": 0.5110379292657452,
+  "interpretation": "Single warmed 32-repeat exploratory screen is mixed, not a confirmed gain or zero effect. This stage omits down pack/down projection; planned D4/DS4 packed whole-FFN remains necessary before architecture selection. Do not build server/CI or repeat unchanged pair-only screen.",
+  "remaining": [
+    "BF16-round then exact D4 andDS4 activation packs",
+    "real Q4/Q6 down with nonzero residual Accumulate and whole-region screen",
+    "only after useful whole-region result: runtime routes/request screen; confirmation excludes selectiondata"
+  ],
+  "binary_sha256": "ae706c8d464bfee82f7def68832dd1a565e15028d22da6aca76aed48efb97f8b",
+  "independent_review": "Frozen generator/variant/API/build source reviewed read-only; six loader line changes, native dot/K schedule and all ownership checked independently. Not GPU proof by itself.",
+  "bindings": {
+    "protocol-r1.json": "add83d533e47267609ed981471267821eed028eec9ca9243c09f7b278e06338a",
+    "build-r1.json": "efc2429464015c900ef3ff5ee0a350034a1f80a33179922c04a3364ae88e805f",
+    "body-r1.json": "3c8835b8ad4ebb88c162ae0edd19894966e338875cefdbb3ebccecb203c63680",
+    "link-export-r1.json": "5df84915b2031cffc9ecdc051dbbfa4fa6f2bedc29513f4a100d452990209286",
+    "screen-r1.jsonl": "dd41e682a8f747b06d67446d840664c8c8e66fe33e13d7a3eb26bdd73302b266",
+    "screen-r1-receipt.json": "9addc9348c5ff0dbe7f1f2f1c0a77b24eded00d874e05cb234eccf8f2ff964ac",
+    "screen-r1-binding.json": "2e5079813a02f9ac1c12ad4882888dcf42e074c09412f1baae5bc5c03cefc272"
+  },
+  "q4_down_fixture": {
+    "file": "fixtures/operators/q4-full-k17408.bin",
+    "bytes": 50135040,
+    "sha256": "8a5bbd71b5016c0382895b156c554ff9909e7b7f1dccf1158a7de191b94ef3ce",
+    "object": {
+      "id": "weight/000224",
+      "shape": [
+        5120,
+        17408
+      ],
+      "format": "gguf_q4_k",
+      "layout": "gguf_blocks_v1",
+      "offset": 11878387968,
+      "bytes": 50135040,
+      "kind": "tensor"
+    },
+    "model_sha256": "781fcd7da81eb72a123091054ec9b2bd163798a374a127b0f90f68dae3edbf27"
+  }
+}
