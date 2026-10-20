@@ -1,0 +1,76 @@
+{
+  "status": "CPU_CLOCK_DOMAIN_MISMATCH_CONFIRMED",
+  "ninfer_benchmark": false,
+  "performance_claim": false,
+  "samples_windows_r2": [
+    {
+      "pair": 0,
+      "client_qpc_seconds": 1.4372475,
+      "client_utc_seconds": 1.437248,
+      "client_tick_seconds": 1.437,
+      "server_monotonic_seconds": 1.315376333,
+      "server_utc_seconds": 1.315376581,
+      "server_raw_seconds": 1.434959019,
+      "server_raw_over_monotonic": 1.0909113863461917,
+      "client_minus_server_raw_seconds": 0.00228848100000012
+    },
+    {
+      "pair": 1,
+      "client_qpc_seconds": 1.4371513,
+      "client_utc_seconds": 1.4371512,
+      "client_tick_seconds": 1.438,
+      "server_monotonic_seconds": 1.315344324,
+      "server_utc_seconds": 1.315344433,
+      "server_raw_seconds": 1.43492373,
+      "server_raw_over_monotonic": 1.0909111050377711,
+      "client_minus_server_raw_seconds": 0.0022275700000000676
+    },
+    {
+      "pair": 2,
+      "client_qpc_seconds": 1.4373432,
+      "client_utc_seconds": 1.4373434,
+      "client_tick_seconds": 1.437,
+      "server_monotonic_seconds": 1.315351677,
+      "server_utc_seconds": 1.315351925,
+      "server_raw_seconds": 1.43493291,
+      "server_raw_over_monotonic": 1.0909119858141176,
+      "client_minus_server_raw_seconds": 0.002410290000000037
+    },
+    {
+      "pair": 3,
+      "client_qpc_seconds": 1.4368898,
+      "client_utc_seconds": 1.4368903,
+      "client_tick_seconds": 1.438,
+      "server_monotonic_seconds": 1.315319726,
+      "server_utc_seconds": 1.315320019,
+      "server_raw_seconds": 1.434899098,
+      "server_raw_over_monotonic": 1.0909127793313427,
+      "client_minus_server_raw_seconds": 0.0019907020000000664
+    }
+  ],
+  "median_server_raw_over_monotonic": 1.0909116860801547,
+  "client_minus_server_raw_seconds_range": [
+    0.0019907020000000664,
+    0.002410290000000037
+  ],
+  "os_readonly_query": {
+    "adjtimex_modes": 0,
+    "frequency_ppm": -33.45196533203125,
+    "tick_microseconds": 9167,
+    "clocksource": "tsc"
+  },
+  "conclusion": "The synthetic client/server duration difference is dominated by different local clock rates. Linux MONOTONIC/UTC advance slower than RAW; Windows QPC/UTC/tick agree. This is not an inference or network speedup. The remainder against server RAW is about 2ms including ingress and terminal work, not a measured pure network latency. Do not subtract or retrospectively rescale historical cross-domain durations without calibration. No basis here to invalidate historical W paired Windows-client gain.",
+  "limits": [
+    "Synthetic Python HTTP server, not actual NInfer/httplib/logger/engine.",
+    "R2 clocks are measured per request; R1 and historical cohorts have no retroactive calibration.",
+    "The process responsible for Linux tick/rate configuration is not established; no clock or service settings changed.",
+    "Existing phase/program_submit values do not identify removable CPU time; use consistent clocks and actual overlap for future attribution."
+  ],
+  "receipts": {
+    "replay-r1.json": "e6ee2f53d099c6c14d266a5f289f1d575336edbcf79ada1fa42e9ccff8bcff9c",
+    "replay-r2.json": "d5fb97fc1c9cd49d182403e405048e13fd03cef2668d7655e54ec56fca95db84",
+    "clock-os-r1.json": "d65f51eacf7c537f6dd30b54c1eca311c64099b6abb16bd3ced2821b27505bbf"
+  },
+  "source_sha256": "804ce1340e6a50904c7ac0e711957944bf567d4e94dc16819f208b7f0ce5f203",
+  "cleanup_and_config_pass": true
+}
