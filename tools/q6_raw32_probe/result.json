@@ -1,0 +1,70 @@
+{
+  "status": "CLOSED_NAIVE_CODEGEN_SPILLS_NO_GPU",
+  "variant": "NINFER_GGUF_Q6_MMQ_ALIGNED_RAW32",
+  "implementation": "C++ conditional actual-address aligned4 word load, original halfword fallback",
+  "device": "RTX3090 SM86",
+  "resource_rows": {
+    "off": [
+      {
+        "symbol": "_Z22q6_raw32_off_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+        "registers": 242,
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0
+      },
+      {
+        "symbol": "_Z22q6_raw32_off_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb1ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+        "registers": 248,
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0
+      },
+      {
+        "symbol": "_Z22q6_raw32_off_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb0ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+        "registers": 242,
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0
+      }
+    ],
+    "on": [
+      {
+        "symbol": "_Z21q6_raw32_on_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+        "registers": 255,
+        "stack_bytes": 24,
+        "spill_store_bytes": 36,
+        "spill_load_bytes": 40
+      },
+      {
+        "symbol": "_Z21q6_raw32_on_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb1ELb1ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+        "registers": 255,
+        "stack_bytes": 24,
+        "spill_store_bytes": 36,
+        "spill_load_bytes": 40
+      },
+      {
+        "symbol": "_Z21q6_raw32_on_mul_mat_qIL9ggml_type14ELi128ELb0EL9ggml_prec30ELb0ELb0ELb0ELb0EEvPKcPKiS5_S5_PfP13__nv_bfloat16S6_PKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_",
+        "registers": 255,
+        "stack_bytes": 24,
+        "spill_store_bytes": 36,
+        "spill_load_bytes": 40
+      }
+    ]
+  },
+  "cpu_address_check": {
+    "addresses": 664560,
+    "aligned4": 326560,
+    "fallback2": 338000,
+    "odd_starts": 44,
+    "status": "PASS_CPU_ADDRESS_EQUIVALENCE"
+  },
+  "gpu_executed": false,
+  "performance_claim": false,
+  "decision": "Do not run full model or timing this codegen. All three selected plain/Store/Accumulate paths gain spills: 24B stack, 36B spill stores, 40B spill loads, 255 registers versus baseline 242/248 without spills. This rejects this lowering, not aligned-word loads generally. Inspect a bounded predicated read-only PTX lowering before changing resident layout.",
+  "receipts": {
+    "build-r1.json": "72b5fa1f428dd56c31f4e6fdeaca5f1a0e87c6572684f58871c20b775e64dfa8",
+    "resource-r1.json": "946783e975da063d5bf5eb75f63e56c7d13534214f8af1e8d4521eb577a476b6",
+    "compile-off-r1.log": "4abbfab67c478b6764a6a3858ea77872e10bd8e9db05c34ca2bbdf5ee938458f",
+    "compile-on-r1.log": "149a8be290f5eae7d80064c4ab1cc420c107c0f00a17fbe660a675da4af61c64"
+  }
+}
