@@ -86,6 +86,9 @@ def admission(reserved=False):
     for ident in ids:
         item = json.loads(docker('inspect', ident).stdout)[0]
         assert not item['HostConfig'].get('DeviceRequests'), item['Name']
+        if item['Name'] == '/ninfer-builder':
+            processes = docker('top', ident, '-eo', 'pid,args').stdout.splitlines()[1:]
+            assert [p.split(None, 1)[1] for p in processes if p.strip()] == ['sleep infinity'], processes
     return {'at': now(), 'budget': c, 'host': host, 'process_memory': w['process_memory']}
 
 

@@ -123,6 +123,10 @@ if(NINFER_GGUF_MMQ_STORE_FUSION)
   ninfer_add_op_test(ninfer_linear_gguf_mmq_store_test
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu"
     LIBRARIES ninfer_ops)
+  if(NINFER_GGUF_Q6_MMQ_A_X4)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/test_gguf_mmq_store.cu" APPEND
+      PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q6_MMQ_A_X4_TEST=1)
+  endif()
 endif()
 if(NINFER_GGUF_MMQ_GATE_EPILOGUE_FUSION)
   ninfer_add_op_test(ninfer_linear_gguf_mmq_gate_epilogue_test
