@@ -25,8 +25,8 @@ PROTOCOL = OUT / "protocol-r2.json"
 PROTOCOL_SHA = "1ff33e339731bfe6a7ac22f8364ce8e21fbb05e93c243ea0e29f721c5e2a5574"
 BUILD = OUT / "build-r2.json"
 BUILD_SHA = "6f7426bc1e6dcad9a4cdf347f1d97e23bd0fae6ed88ed5f6859cbb485d8d6e89"
-CONFIRM_PROTOCOL = OUT / "confirmation-protocol-r1.json"
-CONFIRM_PROTOCOL_SHA = "3ad4c1536aff6d24bce8be3eb8c941f61599763fa1fdf2c9f1aa943a864aaf33"
+CONFIRM_PROTOCOL = OUT / "confirmation-protocol-r2.json"
+CONFIRM_PROTOCOL_SHA = "529472b6d838b9abd1a78cac1f857417722f21121d69de8b85d319620b1eb710"
 EXPORT = ROOT / "artifacts/experimental/folded16-runtime-serve"
 EXE = "/usr/local/bin/ninfer-serve"
 LABEL = "io.codex.ninfer-owner"
@@ -42,6 +42,29 @@ def file_identity(path):
     stat = resolved.stat()
     return {"path": str(resolved), **{key: getattr(stat, key) for key in
             ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")}}
+
+
+def unreserved_admission(confirmation):
+    if not confirmation:
+        return lab.admission()
+    assert lab.sha(CONFIRM_PROTOCOL) == CONFIRM_PROTOCOL_SHA
+    policy = load(CONFIRM_PROTOCOL)["pre_admission_wait"]
+    started, attempts, announced = time.monotonic(), 0, False
+    while True:
+        attempts += 1
+        try:
+            result = lab.admission()
+            assert result["host"]["free_commit"] >= policy["start_free_commit_GiB"] * 2**30
+            result["pre_admission_wait_seconds"] = time.monotonic() - started
+            result["pre_admission_attempts"] = attempts
+            return result
+        except AssertionError:
+            if time.monotonic() - started >= policy["maximum_seconds_per_gate"]:
+                raise
+            if not announced:
+                print("Waiting for full-model admission; no GPU reservation held.", flush=True)
+                announced = True
+            time.sleep(policy["poll_seconds"])
 
 
 def owned(ident, token):
@@ -107,7 +130,7 @@ def main():
         assert not receipt.exists() and not list(OUT.glob(args.tag + "-*"))
         claimed = True
         config = lab.sha(ROOT / "broker/config.json")
-        record["admission"] = lab.admission()
+        record["admission"] = unreserved_admission(args.mode == "confirm")
         initial = lab.api("/v1/status")
         assert initial["model_state"] == "idle" and not initial["instances"]
         assert all(not m["replicas"] and not m["ready_replicas"] for m in initial["models"])
@@ -224,7 +247,7 @@ def main():
         record["export"] = {"path": str(EXPORT), "native_path": output["path"], "sha256": exe_sha,
                             "elf_magic": True, "fresh_readonly_bind_sha256": exe_sha}
         record["phases_seconds"]["export_and_bind"] = time.monotonic() - started
-        record["admission_after_export"] = lab.admission()
+        record["admission_after_export"] = unreserved_admission(args.mode == "confirm")
         reservation = token
         grant = lab.api("/v1/photo-gpu-reservations", {"owner": lab.OWNER,
                        "reservation_id": reservation, "ttl_seconds": 1800}, "POST", 90)

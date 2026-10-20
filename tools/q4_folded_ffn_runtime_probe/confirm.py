@@ -10,10 +10,10 @@ import run as controller
 
 
 OUT = controller.OUT
-TAGS = [f"confirm-r1-{i:02d}" for i in range(1, 17)]
+TAGS = [f"confirm-r2-{i:02d}" for i in range(1, 17)]
 PATHS = [OUT / (tag + "-runtime.json") for tag in TAGS]
-ROUTE = OUT / "confirm-r1-route.json"
-DECISION = OUT / "confirmation-r1-decision.json"
+ROUTE = OUT / "confirm-r2-route.json"
+DECISION = OUT / "confirmation-r2-decision.json"
 
 
 def reduction(log_ratio):
@@ -105,7 +105,7 @@ def route_binding(protocol):
 
 def main():
     assert sys.platform == "win32" and len(sys.argv) == 1 and not sys.flags.optimize
-    driver_receipt = OUT / "confirmation-r1-driver.json"
+    driver_receipt = OUT / "confirmation-r2-driver.json"
     assert not driver_receipt.exists() and not ROUTE.exists() and not DECISION.exists()
     assert not any(PATHS[i].exists() or list(OUT.glob(TAGS[i] + "-*")) for i in range(16))
     assert controller.lab.sha(controller.CONFIRM_PROTOCOL) == controller.CONFIRM_PROTOCOL_SHA
@@ -125,7 +125,7 @@ def main():
             command = [sys.executable, "-B", str(pathlib.Path(controller.__file__)), arm, "confirm", tag, TAGS[0]]
             if arm == "on":
                 command += ["--route", str(ROUTE)]
-            with (OUT / (f"confirmation-controller-{index + 1:02d}.log")).open("x", encoding="utf-8") as log:
+            with (OUT / (f"confirmation-r2-controller-{index + 1:02d}.log")).open("x", encoding="utf-8") as log:
                 child = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
                                        creationflags=subprocess.CREATE_NO_WINDOW)
             launch = controller.load(PATHS[index])
