@@ -1,8 +1,10 @@
 import argparse
 import datetime
+import hashlib
 import json
 import math
 import pathlib
+import re
 import statistics
 
 import profile_long_context as lab
@@ -96,8 +98,15 @@ def analyze(records, protocol, protocol_sha, control_tag, control_sha):
 
 def validate_evidence(records):
     builds = [json.loads(path.read_text(encoding="utf-8")) for path in OUT.glob("*-build.json")]
+    cache = (lab.ROOT / "artifacts/experimental/CMakeCache.txt").read_bytes()
     inputs = set()
     for record in records:
+        def option(match):
+            name = match[1].decode()
+            assert name in record["build_options"]
+            return match[1] + b":BOOL=" + (b"ON" if record["build_options"][name] else b"OFF")
+        expected_cache = re.sub(rb"^(NINFER_\w+):BOOL=(?:ON|OFF)$", option, cache, flags=re.M)
+        assert hashlib.sha256(expected_cache).hexdigest() == record["export"]["files"]["CMakeCache.txt"]
         related = {}
         for key in ("qualification_receipt", "route_receipt"):
             binding = record[key]
