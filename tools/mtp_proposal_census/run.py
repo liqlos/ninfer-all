@@ -81,30 +81,69 @@ def serving_gate(reservation):
 
 
 def qualify(log, arm, warmup, samples, checker):
-    reports = []
-    for line in log.splitlines():
-        if "ninfer_lab_mtp_census" not in line:
-            continue
-        report = json.loads(line)
-        assert report["kind"] == "ninfer_lab_mtp_census", "Declined or unknown observer record"
-        reports.append(report)
+    lines = log.splitlines()
+    observations = [(i, json.loads(line)) for i, line in enumerate(lines)
+                    if "ninfer_lab_mtp_census" in line]
     if arm == "off":
-        assert not reports, "OFF unexpectedly emitted observer records"
+        assert not observations, "OFF unexpectedly emitted observer records"
         return []
-    assert [r["epoch"] for r in reports] == [1, 2, 3], "Missing, extra, duplicate or unordered epochs"
-    assert len(samples) == 2
-    for report, sample, budget in zip(reports, [warmup, *samples], (31, 511, 511)):
-        assert report["schema"] == 1 and report["diagnostic_only"] and report["bootstrap_omitted"]
+    assert arm == "on" and len(observations) == 5, "Need one startup decline and exactly four epochs"
+    declined_line, declined = observations[0]
+    assert declined == {"kind": "ninfer_lab_mtp_census_declined", "reason": "unsupported_request"}
+    positions, reports = zip(*observations[1:])
+    common = {"kind": "ninfer_lab_mtp_census", "schema": 1, "diagnostic_only": True,
+              "bootstrap_omitted": True, "physical_rows": 248320, "valid_rows": 248077,
+              "native_q_policy": "raw_argmax", "q_adjusted_is_counterfactual": True,
+              "target_policy": "processed_greedy"}
+    assert reports[0] == {**common, "epoch": 1, "active": 0, "error": 0,
+                          "reason": "request_boundary_partial", "device_observed_rounds": 0,
+                          "completed_linked_records": 0, "records": [], "first_frontier": 0,
+                          "first_anchor": 0, "first_budget": 0, "sampling": {
+                              "temperature": 0.0, "top_k": 0, "presence_penalty": 0.0,
+                              "frequency_penalty": 0.0}}, "Startup epoch is not an empty inactive reset"
+    assert [r["epoch"] for r in reports] == [1, 2, 3, 4], "Missing, extra, duplicate or unordered epochs"
+    assert [s["name"] for s in samples] == ["RU4K", "JSON32K"]
+    assert [s["request_done"]["request_id"] for s in samples] == [2, 3]
+    request_lines = []
+    for i, line in enumerate(lines):
+        if "req#" in line:
+            match = re.search(r"\bINFO\s+req#([0-9]+) (started|done) \|", line)
+            assert match, "Unexpected request lifecycle line"
+            request_lines.append((int(match[1]), match[2], i))
+    assert [(i, phase) for i, phase, _ in request_lines] == [
+        (1, "started"), (1, "done"), (2, "started"), (2, "done"), (3, "started"), (3, "done")]
+    s1, d1, s2, d2, s3, d3 = [i for _, _, i in request_lines]
+
+    def unique(pattern):
+        matches = [i for i, line in enumerate(lines) if re.search(pattern, line)]
+        assert len(matches) == 1, "Missing or duplicate startup/stop boundary"
+        return matches[0]
+
+    engine = unique(r"\bINFO\s+engine ready \|")
+    startup_done = unique(r"\bINFO\s+warmup complete \|")
+    listening = unique(r"\bINFO\s+listening on http://0\.0\.0\.0:8080 \| model qwen3\.8-27b \|")
+    stopped = unique(r"\bINFO\s+server stopped$")
+    assert engine < declined_line < startup_done < listening < s1 < positions[0] < d1
+    assert d1 < s2 < positions[1] < positions[2] < d2 < s3 < positions[3] < d3 < stopped, "Census outside its native request phase"
+    for report, sample, budget, start, done in zip(reports[1:], [warmup, *samples], (31, 511, 511), (s1, s2, s3), (d1, d2, d3)):
+        assert all(report[key] == value for key, value in common.items())
         assert report["active"] == 1 and report["error"] == 0
+        assert sample["usage"]["completion_tokens"] == budget + 1
         assert report["first_frontier"] == sample["usage"]["prompt_tokens"] and report["first_budget"] == budget
-    assert reports[0]["reason"] in ("complete", "request_boundary_partial")
+        assert f"| max output {budget + 1} | thinking off" in lines[start]
+        assert f"| prompt {sample['usage']['prompt_tokens']:,} | output {budget + 1} | cache 0 (" in lines[done]
+    warm = reports[1]
+    assert warm["reason"] == "request_boundary_partial" and 0 < warm["completed_linked_records"] == len(warm["records"]) < 16
+    assert warm["device_observed_rounds"] == warm["completed_linked_records"] + 1
     result = []
-    for report, sample in zip(reports[1:], samples):
+    for report, sample, position, start, done in zip(reports[2:], samples, positions[2:], (s2, s3), (d2, d3)):
         assert report["reason"] == "complete"
         summary = checker.check_request(report)
         summary.update(name=sample["name"], request_id=sample["request_done"]["request_id"],
                        request_body_sha256=sample["request_body_sha256"],
-                       first_frontier=report["first_frontier"], first_budget=report["first_budget"])
+                       first_frontier=report["first_frontier"], first_budget=report["first_budget"],
+                       server_log_line=position + 1, request_start_line=start + 1, request_done_line=done + 1,
+                       startup_declined_line=declined_line + 1, startup_inactive_line=positions[0] + 1)
         result.append(summary)
     return result
 
@@ -124,11 +163,12 @@ def main():
     receipt = OUT / (args.tag + "-runtime.json")
     token = uuid.uuid4().hex
     lab.OWNER = "ninfer-mtp-census-" + token
-    record = {"schema": "mtp-census-runtime-r1", "started_at": lab.now(), "status": "INCOMPLETE",
+    record = {"schema": "mtp-census-runtime-r2", "started_at": lab.now(), "status": "INCOMPLETE",
               "arm": args.arm, "tag": args.tag, "control_tag": args.control_tag, "diagnostic_only": True,
               "performance_claim": False, "controller_pid": os.getpid(), "owner": lab.OWNER,
               "runner_sha256": lab.sha(pathlib.Path(__file__)), "samples": [],
-              "expected_epochs": {"warmup": 1, "RU4K": 2, "JSON32K": 3}, "warmup_census_qualified": False}
+              "expected_epochs": {"native_startup": 1, "warmup": 2, "RU4K": 3, "JSON32K": 4},
+              "warmup_census_qualified": False, "native_startup_census_qualified": False}
     handles, reservation, ident, probe, claimed, executable_sha, config_sha = [], None, None, None, False, None, None
     k = ctypes.WinDLL("kernel32")
     k.CreateMutexW.restype = ctypes.c_void_p
@@ -152,6 +192,8 @@ def main():
         assert protocol["created_before_inference"] and protocol["diagnostic_only"]
         assert lab.datetime.datetime.fromisoformat(protocol["created_at"]) <= lab.datetime.datetime.fromisoformat(record["started_at"])
         assert protocol["order"] == ["off", "on"] and protocol["linked_checkpoints_per_request"] == 16
+        assert protocol["acceptance"]["epochs"] == [1, 2, 3, 4]
+        assert protocol["acceptance"]["qualified_request_epochs"] == [3, 4]
         assert protocol["build_receipt_sha256"] == args.build_sha256 and lab.sha(INPUT_PROTOCOL) == INPUT_SHA
         frozen = load(INPUT_PROTOCOL)
         assert all(protocol[key] == frozen[key] for key in ("model", "bench", "image", "requests", "runtime", "sampling"))

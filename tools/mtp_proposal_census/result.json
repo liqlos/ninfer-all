@@ -1,5 +1,5 @@
 {
-  "status": "SOURCE_ONLY_FROZEN_NOT_COMPILED",
+  "status": "QUALIFIED_DIAGNOSTIC_CAPTURE_LAB_ONLY",
   "lab_only": true,
   "default_macro": "NINFER_LAB_MTP_CENSUS=0",
   "scope": {
@@ -44,7 +44,8 @@
       "negative": 10,
       "source_author_checked": true,
       "GPU": false
-    }
+    },
+    "startup_phase_binding_tests": "4 unittest cases including missing/duplicate/late startup,wrong request/epoch/frontier/budget and out-of-phase census negative mutations; root PASS."
   },
   "source_freeze_sha256": {
     "observer.h": "d8753dfbd9fb34588d1713844db12edf06186988b478d5c8731587d01046dfc5",
@@ -52,18 +53,13 @@
     "wrapper.cpp": "af96092b8ddc0a0b501113b9715d7a9b1a33eff6b326bf8fb8fe51d4df1f1e0f",
     "build.py": "4ee26bd2a592e66639721fb49e5c20ee275c10f984304b12e663710b0a2e5ac0",
     "check.py": "2612b22b2b004b60b571caca1fe0ab3a3a4bec86979a8c7aa1b4b70d73c23d29",
-    "run.py": "146c516d07e815b47d0bdec7714c5bc4a5a84cc76d6f7ff842e19160e3045f5b"
+    "run.py": "f321a6d60bde5a09c0e9b139fd8cc0984c5ed606d80e6855f9d6c708da375f06",
+    "test_run.py": "0891d3f4d9e3225b2af868508969a399f36f2d0defe9289e1586713e1edc948f"
   },
-  "pending_gates": [
-    "Native read-only preflight of the six exact U/PLT32/T seams, no LTO, source pins, freshness and original 29-input link",
-    "Compile only the observer CUDA object and OFF/ON host wrappers, then link temporary lab outputs",
-    "Static OFF forwarding and linked real/wrap symbols",
-    "Untimed actual CUDA route, graph replays, finite scores, joins, counts, native acceptance and 16 records for each 512-token request",
-    "Current-model full output SHA, usage, finish, cache and complete MTP stats equality against OFF"
-  ],
-  "build_run": false,
-  "export_run": false,
-  "gpu_run": false,
+  "pending_gates": [],
+  "build_run": true,
+  "export_run": true,
+  "gpu_run": true,
   "core_or_api_edits": false,
   "source_reviews": {
     "graphs_lifetime": "No actionable source defect found; unsupported requests retain inactive graph nodes and D2H and may emit an empty inactive record. Actual replay remains unqualified.",
@@ -71,5 +67,67 @@
     "checker_fixes": "Observed-union top2 dominance checked with three direct negative cases. CLI requires positive unique target epochs; runner must bind all expected full requests to epochs and explicitly exclude warmup.",
     "limitations": "Source reviews and compact checks do not establish global top2, GPU interception or output equivalence."
   },
-  "runtime_controller": "Source-only fresh OFF/ON diagnostic runner prepared. Explicit immutable protocol/build hashes required; epochs 1 warmup, 2 RU4K, 3 JSON32K; every full request needs16 linked records and exact output/full MTP-work equality. Not executed."
+  "runtime_controller": "Source-only fresh OFF/ON diagnostic runner prepared. Explicit immutable protocol/build hashes required; epochs 1 warmup, 2 RU4K, 3 JSON32K; every full request needs16 linked records and exact output/full MTP-work equality. Not executed.",
+  "build_receipt": "results/mtp-proposal-census/build-r1.json",
+  "build_seconds": 29.53100000001723,
+  "current_diagnostic": {
+    "status": "PASS_DERIVED_STARTUP_PHASE_BINDING",
+    "derived_qualification": "results/mtp-proposal-census/derived-phase-qualification-r1.json",
+    "derived_qualification_sha256": "e4763cd1bb990f68a4520ad628a89f872392cea1cfee9edf4a0c880bd67ae47c",
+    "protocol": "results/mtp-proposal-census/protocol-r1.json",
+    "original_runtime_status": "R1 ON remains INCOMPLETE on incorrect startup omission; original protocol/raw/receipt unchanged. Separate post-capture CPU diagnostic correction,not a timing pass.",
+    "epoch_mapping": {
+      "native_startup": 1,
+      "warmup": 2,
+      "RU4K": 3,
+      "JSON32K": 4
+    },
+    "census": [
+      {
+        "epoch": 3,
+        "linked_rounds": 16,
+        "first_rejections": 10,
+        "raw_q_equals_raw_p_but_penalty_changes_p": 0,
+        "adjusted_q_matches_first_rejection": 0,
+        "raw_q_second_matches_first_rejection": 0,
+        "adjusted_q_changes_already_accepted_prefix": 0,
+        "name": "RU4K",
+        "request_id": 2,
+        "request_body_sha256": "c8f569b72ab992878b289a5e966bb85e4c2ae7e9d1bc974e2613485548311aed",
+        "first_frontier": 4089,
+        "first_budget": 511,
+        "server_log_line": 26,
+        "request_start_line": 24,
+        "request_done_line": 28,
+        "startup_declined_line": 16,
+        "startup_inactive_line": 21
+      },
+      {
+        "epoch": 4,
+        "linked_rounds": 16,
+        "first_rejections": 0,
+        "raw_q_equals_raw_p_but_penalty_changes_p": 0,
+        "adjusted_q_matches_first_rejection": 0,
+        "raw_q_second_matches_first_rejection": 0,
+        "adjusted_q_changes_already_accepted_prefix": 0,
+        "name": "JSON32K",
+        "request_id": 3,
+        "request_body_sha256": "c4c938dd6f19afb452df5e6eee7b6c94f8e21f91fe8d60c5dc3d4c33b1a8c993",
+        "first_frontier": 32756,
+        "first_budget": 511,
+        "server_log_line": 35,
+        "request_start_line": 30,
+        "request_done_line": 37,
+        "startup_declined_line": 16,
+        "startup_inactive_line": 21
+      }
+    ],
+    "full_outputs_usage_finish_cache_native_MTP_equal": true,
+    "whole_state_snapshot_oracle": false,
+    "owned_containers_removed": true,
+    "reservations_released": true,
+    "timing_evidence": false,
+    "coverage": "Only16earlylinkedrounds/request; no whole-trajectory,latepenalty,shortlist,headQ8,copyledger or speed claim."
+  },
+  "next_gate": "Early RU rejects were not repaired by adjusted-Q/top2; do not prioritize penalty-only integration on these data. Next quantify causal copy/shortlist coverage and full cost; any late-window check must be selected beforehand. Do not infer a new trajectory or speed from current capture."
 }
