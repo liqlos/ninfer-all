@@ -168,8 +168,12 @@ print(json.dumps({'changed':changed,'nonbuild_extras':extras}))
             target = ROOT / "artifacts/experimental" / name
             temporary = target.with_suffix(target.suffix + ".new")
             assert not temporary.exists()
-            lab.docker("cp", BUILDER + ":" + path,
-                       lab.WSL_ROOT + "/artifacts/experimental/" + temporary.name, timeout=120)
+            with temporary.open("wb") as output:
+                p = subprocess.run(
+                    ["wsl.exe", "-d", "Ubuntu-24.04", "--exec", "/usr/bin/docker",
+                     "exec", BUILDER, "cat", path], stdout=output, stderr=subprocess.PIPE,
+                    creationflags=subprocess.CREATE_NO_WINDOW, timeout=120)
+            assert p.returncode == 0, p.stderr.decode(errors="replace")[-2000:]
             assert lab.sha(temporary) == expected
             temporary.replace(target)
             exported[name] = expected
