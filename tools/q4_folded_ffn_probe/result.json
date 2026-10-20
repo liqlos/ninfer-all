@@ -1,494 +1,89 @@
 {
   "status": "STAGE2_EXPORTED_WHOLE_FFN_EQUALITY_PASS_EXPLORATORY_SELECTED",
-  "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_MMQ",
-  "full_ffn_qualified": true,
+  "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_PACK",
+  "target": "SM86 Q4_K N17408/K5120/T1280 I128/J128,2720CTA",
+  "mechanism": "Fold four gate16/up16 groups into one MMQ accumulator, apply native SwiGLU and BF16 rounding, then write native D4/DS4 Q8 down operands. Native down Accumulate is unchanged.",
+  "runtime_integrated": false,
   "full_request_measured": false,
   "performance_claim": false,
-  "target": "SM86 Q4_K N17408/K5120/T1280 I128/J128,2720CTA",
-  "mechanism": "Four [gate16,up16] groups per I128; native 64 accumulators/thread, same K/preload/math/scales and one same-thread SwiGLU BF16. Two independent gate/up pointers.",
+  "qualification_scope": "Fixed N17408/K5120/T1280 gate-up and N5120/K17408 down, two pinned real Q4/Q6 fixtures; no full-runtime qualification",
+  "timing_scope": "prequantized_gate_input_to_accumulated_residual; common input pack and carry reset outside events",
   "resources": {
-    "registers_baseline": 221,
-    "registers_candidate": 241,
+    "timed_registers": {
+      "D4": 241,
+      "DS4": 244
+    },
     "shared_bytes": 57856,
-    "stack_local_spills": 0,
-    "timed_stores": "32 STG.E.U16, no diagnostic FP32 pointer uses",
-    "diagnostic_stores": "64 STG.E plus32 STG.E.U16"
+    "stack_local_spills": 0
   },
   "correctness": {
-    "kind": "correctness",
-    "status": "PASS",
-    "fixture": "q4-full-k5120.bin",
-    "fixture_bytes": 100270080,
-    "rows": 17408,
-    "k": 5120,
-    "columns": 1280,
-    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
-    "common_activation_pack": "Q8_1 DS4 outside timing",
-    "exact_bf16_all_outputs": true,
-    "exact_fp32_planes": true,
-    "output_canaries": true,
-    "independent_fp64_samples": 80,
-    "fp64_max_abs_error": 0.0002832690156,
-    "fp64_max_rel_error": 0.295149757,
-    "input_seed": 3243835100,
-    "invalid_api_guards": "PASS",
-    "fresh_launch_id": "screen-r1-71a65763ae0b4828804fe741b36d1931"
-  },
-  "samples": [
-    {
-      "kind": "sample",
-      "block": 0,
-      "sample": 0,
-      "arm": 0,
-      "repetitions": 32,
-      "ms": 4.66435194
-    },
-    {
-      "kind": "sample",
-      "block": 0,
-      "sample": 1,
-      "arm": 1,
-      "repetitions": 32,
-      "ms": 4.71843195
-    },
-    {
-      "kind": "sample",
-      "block": 0,
-      "sample": 2,
-      "arm": 1,
-      "repetitions": 32,
-      "ms": 4.741312027
-    },
-    {
-      "kind": "sample",
-      "block": 0,
-      "sample": 3,
-      "arm": 0,
-      "repetitions": 32,
-      "ms": 4.700863838
-    },
-    {
-      "kind": "sample",
-      "block": 1,
-      "sample": 0,
-      "arm": 1,
-      "repetitions": 32,
-      "ms": 4.725791931
-    },
-    {
-      "kind": "sample",
-      "block": 1,
-      "sample": 1,
-      "arm": 0,
-      "repetitions": 32,
-      "ms": 4.719520092
-    },
-    {
-      "kind": "sample",
-      "block": 1,
-      "sample": 2,
-      "arm": 0,
-      "repetitions": 32,
-      "ms": 4.672128201
-    },
-    {
-      "kind": "sample",
-      "block": 1,
-      "sample": 3,
-      "arm": 1,
-      "repetitions": 32,
-      "ms": 4.672224045
-    },
-    {
-      "kind": "sample",
-      "block": 2,
-      "sample": 0,
-      "arm": 0,
-      "repetitions": 32,
-      "ms": 4.820127964
-    },
-    {
-      "kind": "sample",
-      "block": 2,
-      "sample": 1,
-      "arm": 1,
-      "repetitions": 32,
-      "ms": 4.69091177
-    },
-    {
-      "kind": "sample",
-      "block": 2,
-      "sample": 2,
-      "arm": 1,
-      "repetitions": 32,
-      "ms": 4.641056061
-    },
-    {
-      "kind": "sample",
-      "block": 2,
-      "sample": 3,
-      "arm": 0,
-      "repetitions": 32,
-      "ms": 4.757535934
-    }
-  ],
-  "warmups": [
-    {
-      "kind": "warmup",
-      "sample": 0,
-      "candidate": false,
-      "repetitions": 32,
-      "ms": 4.583818913
-    },
-    {
-      "kind": "warmup",
-      "sample": 1,
-      "candidate": true,
-      "repetitions": 32,
-      "ms": 4.639865875
-    },
-    {
-      "kind": "warmup",
-      "sample": 2,
-      "candidate": false,
-      "repetitions": 32,
-      "ms": 4.776063919
-    },
-    {
-      "kind": "warmup",
-      "sample": 3,
-      "candidate": true,
-      "repetitions": 32,
-      "ms": 4.636571884
-    }
-  ],
-  "blocks": [
-    {
-      "kind": "timing",
-      "block": 0,
-      "order": "ABBA",
-      "repetitions_per_sample": 32,
-      "baseline_ms": 4.682607889,
-      "candidate_ms": 4.729871988,
-      "time_reduction_percent": -1.009354194
-    },
-    {
-      "kind": "timing",
-      "block": 1,
-      "order": "BAAB",
-      "repetitions_per_sample": 32,
-      "baseline_ms": 4.695824146,
-      "candidate_ms": 4.699007988,
-      "time_reduction_percent": -0.06780155317
-    },
-    {
-      "kind": "timing",
-      "block": 2,
-      "order": "ABBA",
-      "repetitions_per_sample": 32,
-      "baseline_ms": 4.788831949,
-      "candidate_ms": 4.665983915,
-      "time_reduction_percent": 2.565302671
-    }
-  ],
-  "ratio_of_sums_time_reduction_percent": 0.5110379292657452,
-  "interpretation": "Single warmed 32-repeat exploratory screen is mixed, not a confirmed gain or zero effect. This stage omits down pack/down projection; planned D4/DS4 packed whole-FFN remains necessary before architecture selection. Do not build server/CI or repeat unchanged pair-only screen.",
-  "remaining": [
-    "whole-request potential and scoped lab integration decision",
-    "actual runtime route/API/output gate and short full-request screen before independent statistical confirmation"
-  ],
-  "binary_sha256": "ae706c8d464bfee82f7def68832dd1a565e15028d22da6aca76aed48efb97f8b",
-  "independent_review": "Frozen generator/variant/API/build source reviewed read-only; six loader line changes, native dot/K schedule and all ownership checked independently. Not GPU proof by itself.",
-  "bindings": {
-    "protocol-r1.json": "add83d533e47267609ed981471267821eed028eec9ca9243c09f7b278e06338a",
-    "build-r1.json": "efc2429464015c900ef3ff5ee0a350034a1f80a33179922c04a3364ae88e805f",
-    "body-r1.json": "3c8835b8ad4ebb88c162ae0edd19894966e338875cefdbb3ebccecb203c63680",
-    "link-export-r1.json": "5df84915b2031cffc9ecdc051dbbfa4fa6f2bedc29513f4a100d452990209286",
-    "screen-r1.jsonl": "dd41e682a8f747b06d67446d840664c8c8e66fe33e13d7a3eb26bdd73302b266",
-    "screen-r1-receipt.json": "9addc9348c5ff0dbe7f1f2f1c0a77b24eded00d874e05cb234eccf8f2ff964ac",
-    "screen-r1-binding.json": "2e5079813a02f9ac1c12ad4882888dcf42e074c09412f1baae5bc5c03cefc272"
-  },
-  "q4_down_fixture": {
-    "file": "fixtures/operators/q4-full-k17408.bin",
-    "bytes": 50135040,
-    "sha256": "8a5bbd71b5016c0382895b156c554ff9909e7b7f1dccf1158a7de191b94ef3ce",
-    "object": {
-      "id": "weight/000224",
-      "shape": [
-        5120,
-        17408
-      ],
-      "format": "gguf_q4_k",
-      "layout": "gguf_blocks_v1",
-      "offset": 11878387968,
-      "bytes": 50135040,
-      "kind": "tensor"
-    },
-    "model_sha256": "781fcd7da81eb72a123091054ec9b2bd163798a374a127b0f90f68dae3edbf27"
-  },
-  "phase2": {
-    "status": "EXPORTED_GPU_EQUALITY_PASS_WHOLE_FFN_EXPLORATORY_SELECTED",
-    "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_PACK",
-    "layouts": [
-      "D4",
-      "DS4"
+    "both_real_down_layouts": true,
+    "all_packed_output_bytes": 25067520,
+    "exact_gate_up_down_fp32": true,
+    "exact_intermediate_and_residual_bf16": true,
+    "independent_gate_down_fp64_samples": [
+      80,
+      64
     ],
-    "native_k_body_and_pack_arithmetic_source_preserved": true,
-    "shared_bytes": 57856,
-    "packed_output_bytes": 25067520,
-    "registers": {
-      "1/1": 241,
-      "0/1": 241,
-      "1/0": 244,
-      "0/0": 241
-    },
-    "stack_local_spills": 0,
-    "compile_seconds": 11.375,
-    "cpu_finite_pack_byte_comparisons": 110592,
-    "gpu_correctness_qualified": true,
-    "whole_ffn_measured": true,
-    "performance_claim": false,
-    "body_receipt": "results/q4-folded-ffn/pack-body-r2.json",
-    "next_gate": "evaluate whole-request potential and scoped default-OFF lab integration; no operator confirmation before request screen; selection data excluded from confirmation",
-    "binary_sha256": "5c6e3edc4742789ac051182a9a4bad5055cbcd9f4b8d93d5ce744e02992a38c9",
+    "producer_oracle_groups": 4352,
+    "api_canaries_slack": true,
+    "evolving_carry_calls": 32
+  },
+  "exploratory_screen": {
+    "independent_launches": 1,
+    "blocks_per_case": 3,
+    "samples_per_block": 4,
+    "repetitions": 32,
+    "orders": [
+      "ABBA",
+      "BAAB",
+      "ABBA"
+    ],
     "cases": {
       "Q6_D4": {
         "ratio_of_sums_time_reduction_percent": 1.4546843953593231,
         "positive_blocks": 3,
-        "blocks": [
-          {
-            "kind": "timing",
-            "case": "Q6_D4",
-            "block": 0,
-            "order": "ABBA",
-            "repetitions_per_sample": 32,
-            "warmup_samples": 4,
-            "baseline_ms": 7.623231888,
-            "candidate_ms": 7.411776066,
-            "samples_ms": [
-              7.637023926,
-              7.464064121,
-              7.35948801,
-              7.60943985
-            ],
-            "operator_time_decrease_percent": 2.773834315,
-            "scope": "prequantized_gate_input_to_accumulated_residual",
-            "common_input_pack_outside_events": true,
-            "carry_reset_outside_events": true,
-            "evolving_carry_calls": 32,
-            "evolving_carry_exact": true,
-            "exploratory_only": true,
-            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-          },
-          {
-            "kind": "timing",
-            "case": "Q6_D4",
-            "block": 1,
-            "order": "BAAB",
-            "repetitions_per_sample": 32,
-            "warmup_samples": 4,
-            "baseline_ms": 7.548207998,
-            "candidate_ms": 7.502272129,
-            "samples_ms": [
-              7.483808041,
-              7.597824097,
-              7.4985919,
-              7.520736217
-            ],
-            "operator_time_decrease_percent": 0.6085665528,
-            "scope": "prequantized_gate_input_to_accumulated_residual",
-            "common_input_pack_outside_events": true,
-            "carry_reset_outside_events": true,
-            "evolving_carry_calls": 32,
-            "evolving_carry_exact": true,
-            "exploratory_only": true,
-            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-          },
-          {
-            "kind": "timing",
-            "case": "Q6_D4",
-            "block": 2,
-            "order": "ABBA",
-            "repetitions_per_sample": 32,
-            "warmup_samples": 4,
-            "baseline_ms": 7.546864033,
-            "candidate_ms": 7.473776102,
-            "samples_ms": [
-              7.562880039,
-              7.467904091,
-              7.479648113,
-              7.530848026
-            ],
-            "operator_time_decrease_percent": 0.9684543191,
-            "scope": "prequantized_gate_input_to_accumulated_residual",
-            "common_input_pack_outside_events": true,
-            "carry_reset_outside_events": true,
-            "evolving_carry_calls": 32,
-            "evolving_carry_exact": true,
-            "exploratory_only": true,
-            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-          }
-        ],
         "selected": true
       },
       "Q4_DS4": {
         "ratio_of_sums_time_reduction_percent": 1.5229176419515826,
         "positive_blocks": 3,
-        "blocks": [
-          {
-            "kind": "timing",
-            "case": "Q4_DS4",
-            "block": 0,
-            "order": "ABBA",
-            "repetitions_per_sample": 32,
-            "warmup_samples": 4,
-            "baseline_ms": 7.159999847,
-            "candidate_ms": 7.049135923,
-            "samples_ms": [
-              7.220895767,
-              6.988351822,
-              7.109920025,
-              7.099103928
-            ],
-            "operator_time_decrease_percent": 1.54837886,
-            "scope": "prequantized_gate_input_to_accumulated_residual",
-            "common_input_pack_outside_events": true,
-            "carry_reset_outside_events": true,
-            "evolving_carry_calls": 32,
-            "evolving_carry_exact": true,
-            "exploratory_only": true,
-            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-          },
-          {
-            "kind": "timing",
-            "case": "Q4_DS4",
-            "block": 1,
-            "order": "BAAB",
-            "repetitions_per_sample": 32,
-            "warmup_samples": 4,
-            "baseline_ms": 7.15377593,
-            "candidate_ms": 7.040431976,
-            "samples_ms": [
-              6.977952003,
-              7.171967983,
-              7.135583878,
-              7.102911949
-            ],
-            "operator_time_decrease_percent": 1.584393406,
-            "scope": "prequantized_gate_input_to_accumulated_residual",
-            "common_input_pack_outside_events": true,
-            "carry_reset_outside_events": true,
-            "evolving_carry_calls": 32,
-            "evolving_carry_exact": true,
-            "exploratory_only": true,
-            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-          },
-          {
-            "kind": "timing",
-            "case": "Q4_DS4",
-            "block": 2,
-            "order": "ABBA",
-            "repetitions_per_sample": 32,
-            "warmup_samples": 4,
-            "baseline_ms": 7.105104208,
-            "candidate_ms": 7.003120184,
-            "samples_ms": [
-              7.048960209,
-              7.075136185,
-              6.931104183,
-              7.161248207
-            ],
-            "operator_time_decrease_percent": 1.435362819,
-            "scope": "prequantized_gate_input_to_accumulated_residual",
-            "common_input_pack_outside_events": true,
-            "carry_reset_outside_events": true,
-            "evolving_carry_calls": 32,
-            "evolving_carry_exact": true,
-            "exploratory_only": true,
-            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-          }
-        ],
         "selected": true
       }
-    },
-    "correctness": [
-      {
-        "kind": "correctness",
-        "status": "PASS",
-        "case": "Q6_D4",
-        "gate_k": 5120,
-        "intermediate_rows": 17408,
-        "down_rows": 5120,
-        "columns": 1280,
-        "fixture_gate_sha256": "be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790",
-        "fixture_down_sha256": "a381c6be36f572170ccc9c7e4a3f8b25e5061e4eb633649399f3ec9759cb43e2",
-        "exact_packed_bytes": 25067520,
-        "exact_gate_up_fp32": true,
-        "exact_intermediate_bf16": true,
-        "exact_down_fp32": true,
-        "exact_down_bf16": true,
-        "diagnostic_matches_timed_pack": true,
-        "nonzero_carry_expected": true,
-        "carry_sensitive_outputs": 6553586,
-        "gate_fp64_samples": 80,
-        "gate_fp64_max_abs": 0.0002832690156,
-        "producer_oracle_groups": 4352,
-        "down_fp64_samples": 64,
-        "down_fp64_max_abs": 6.473223982e-08,
-        "down_fp64_max_bound_ratio": 3.23156038e-06,
-        "down_oracle_bound": "0.02+2e-4*abs(reference)",
-        "down_J": 128,
-        "down_I": 128,
-        "down_blocks": 400,
-        "down_shared_bytes": 57856,
-        "down_fixup": false,
-        "down_store_fusion": true,
-        "canaries": true,
-        "activation_slack_untouched": true,
-        "invalid_pack_api_guards": true,
-        "input_seed": 3243835100,
-        "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-      },
-      {
-        "kind": "correctness",
-        "status": "PASS",
-        "case": "Q4_DS4",
-        "gate_k": 5120,
-        "intermediate_rows": 17408,
-        "down_rows": 5120,
-        "columns": 1280,
-        "fixture_gate_sha256": "be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790",
-        "fixture_down_sha256": "8a5bbd71b5016c0382895b156c554ff9909e7b7f1dccf1158a7de191b94ef3ce",
-        "exact_packed_bytes": 25067520,
-        "exact_gate_up_fp32": true,
-        "exact_intermediate_bf16": true,
-        "exact_down_fp32": true,
-        "exact_down_bf16": true,
-        "diagnostic_matches_timed_pack": true,
-        "nonzero_carry_expected": true,
-        "carry_sensitive_outputs": 6553600,
-        "gate_fp64_samples": 80,
-        "gate_fp64_max_abs": 0.0002832690156,
-        "producer_oracle_groups": 4352,
-        "down_fp64_samples": 64,
-        "down_fp64_max_abs": 4.429539165e-05,
-        "down_fp64_max_bound_ratio": 0.03467072047,
-        "down_oracle_bound": "half_coefficient_bound+gamma1632*L1",
-        "down_J": 128,
-        "down_I": 128,
-        "down_blocks": 400,
-        "down_shared_bytes": 57856,
-        "down_fixup": false,
-        "down_store_fusion": true,
-        "canaries": true,
-        "activation_slack_untouched": true,
-        "invalid_pack_api_guards": true,
-        "input_seed": 3243835100,
-        "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
-      }
-    ],
-    "decision_receipt": "results/q4-folded-ffn/screen-whole-r1-decision.json"
+    }
   },
-  "runtime_integrated": false,
-  "qualification_scope": "Fixed N17408/K5120/T1280 gate-up and N5120/K17408 down, two pinned real Q4/Q6 fixtures; no full-runtime qualification"
+  "request_economic_gate": {
+    "conditional_RU4K_spans_reduction_percent": 0.2686,
+    "conditional_JSON32K_spans_range_percent": [
+      0.6782,
+      0.7268
+    ],
+    "different_cohorts_not_client_gain": true,
+    "request_order": [
+      "W",
+      "C",
+      "C",
+      "W"
+    ],
+    "JSON_client_time_reduction_min_percent": 0.5,
+    "both_JSON_adjacent_pairs_positive": true,
+    "RU_client_regression_max_percent": 0.3
+  },
+  "next_gate": "evaluate whole-request potential and scoped default-OFF lab integration; no operator confirmation before request screen; selection data excluded from confirmation",
+  "binary_sha256": "5c6e3edc4742789ac051182a9a4bad5055cbcd9f4b8d93d5ce744e02992a38c9",
+  "receipts": {
+    "protocol": "results/q4-folded-ffn/whole-protocol-r1.json",
+    "export": "results/q4-folded-ffn/whole-link-export-r1.json",
+    "static": "results/q4-folded-ffn/pack-body-r2.json",
+    "correctness_and_samples": "results/q4-folded-ffn/screen-whole-r1.jsonl",
+    "runtime_binding": "results/q4-folded-ffn/screen-whole-r1-binding.json",
+    "selection": "results/q4-folded-ffn/screen-whole-r1-decision.json"
+  },
+  "historical_pair_only_stage1": {
+    "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_MMQ",
+    "exact_operator_pass": true,
+    "mixed_screen_time_reduction_percent": 0.5110379292657452,
+    "interpretation": "Mixed pair-only screen, not whole FFN; do not repeat or combine as extra gain.",
+    "samples": "results/q4-folded-ffn/screen-r1.jsonl"
+  }
 }
