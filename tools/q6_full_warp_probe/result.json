@@ -1,0 +1,34 @@
+{
+  "status": "COMPILE_ONLY_PARTIAL_MECHANISM_NOT_GPU_QUALIFIED",
+  "default_off_flag": "NINFER_Q6_FULL_WARP_SLICES",
+  "scope": "SM86 cooperative Q6 T1/T4 KS0 positive K%1024",
+  "numerical_validation_run": false,
+  "gpu_run": false,
+  "performance_claim": false,
+  "compile_seconds": 9.687999999994645,
+  "routes": {
+    "1": {
+      "off_registers": 80,
+      "on_registers": 80,
+      "stack_local_spills": 0,
+      "runtime_arithmetic_counts_equal": true,
+      "removed_mask_materialization": true,
+      "sync_guards_remain": true
+    },
+    "4": {
+      "off_registers": 125,
+      "on_registers": 126,
+      "stack_local_spills": 0,
+      "runtime_arithmetic_counts_equal": true,
+      "removed_mask_materialization": true,
+      "sync_guards_remain": true
+    }
+  },
+  "mechanism": "Both dynamic VOTE.ANY -> R2UR -> BRA.DIV UR4 chains removed. Two PT-guarded BRA.DIV ~URZ sync-helper branches remain in each runtime K-loop, with WARPSYNC/SHFL.IDX/RET targets. No proof they are dead or free.",
+  "decision": "Stop this lowering at the full compile-mechanism gate. No GPU harness or speed claim. Another emitter must demonstrably remove the remaining sync-guard cost before reopening.",
+  "bindings": {
+    "build-r1.json": "287deb3ab4eddb66dd4bba0ce666541cdb3dd0ab4c3d1197474b8e440436057a",
+    "gate-r1.json": "73d08c24e3d934853fe1f9f4b0a585294e7bb2c8257ac0137a3db318f197ccab",
+    "gate-reviewed-r1.json": "c37078f62e2bbc646fb8b42c77e931421e34f527e58d95e576d0b5fcf1631d8f"
+  }
+}
