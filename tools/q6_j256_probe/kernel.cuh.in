@@ -1,0 +1,50 @@
+template <bool bf16_store, bool bf16_accumulate>
+static __global__ __launch_bounds__(512, 1) void q6_j256_kernel(
+        const char * __restrict__ x, const int * __restrict__ y,
+        float * __restrict__ dst, __nv_bfloat16 * __restrict__ dst_bf16,
+        const int output_column_stride) {
+    static_assert(!bf16_accumulate || bf16_store, "accumulate requires BF16 output");
+    static_assert(sizeof(block_q6_K) == 210 && sizeof(block_q8_1_mmq) == 144, "native widths");
+    static_assert(MMQ_TILE_NE_K == 32 && MMQ_TILE_Y_K == 36 && QI6_K == 32 && QI8_1 == 8 &&
+                  MMQ_ITER_K == 256 && QK_K == 256, "native tiles");
+    constexpr int J = 256;
+    constexpr int nwarps = 16;
+    constexpr int warp_size = 32;
+    constexpr int ncols_y = 1280;
+    constexpr int stride_row_x = 68;
+    constexpr int qk = 256;
+    constexpr int ne_block = 128;
+    constexpr int sz = 36;
+    constexpr int kb0_start = 0;
+    constexpr int kb0_stop = 68;
+    constexpr int blocks_per_iter = 1;
+    constexpr int tile_x_max_i = 127;
+    const int tile_i = blockIdx.x / 5;
+    const int tile_j = blockIdx.x % 5;
+    const int offset_x = tile_i * 128 * stride_row_x;
+    y += tile_j * J * sz;
+    extern __shared__ int q6_j256_shared[];
+    int * ids_dst = q6_j256_shared;
+    int * tile_y = ids_dst + J;
+    int * tile_x = tile_y + J * MMQ_TILE_Y_K;
+    const int tid = threadIdx.y * warp_size + threadIdx.x;
+    if (tid < J) { ids_dst[tid] = tid; }
+    float sum[64] = {0.0f};
+@NATIVE_K_LOOP@
+#pragma unroll
+    for (int j = 0; j < 16; ++j) {
+#pragma unroll
+        for (int l = 0; l < 4; ++l) {
+            const int row = 16 * (threadIdx.y / 2) + 8 * (l / 2) + threadIdx.x / 4;
+            const int column = 16 * j + 8 * (threadIdx.y % 2) + 2 * (threadIdx.x % 4) + l % 2;
+            const int at = (tile_j * J + ids_dst[column]) * output_column_stride + tile_i * 128 + row;
+            float value = sum[j * 4 + l];
+            if constexpr (bf16_store) {
+                if constexpr (bf16_accumulate) { value += __bfloat162float(dst_bf16[at]); }
+                dst_bf16[at] = __float2bfloat16(value);
+            } else {
+                dst[at] = value;
+            }
+        }
+    }
+}
