@@ -1,0 +1,205 @@
+{
+  "status": "EXACT_STATE_GATE_FAILED_FOR_PREFILL_ALIGNMENT_CHANGE",
+  "runtime_changed": false,
+  "performance_claim": false,
+  "numerical_or_quality_branch_only": true,
+  "model_sha256": "781fcd7da81eb72a123091054ec9b2bd163798a374a127b0f90f68dae3edbf27",
+  "binary_sha256": "fcf6a85cf8265828489da184bf37b93e51e660571ce09d6f56c5dc1bc5acfec9",
+  "input_contract": "raw4096 tokens plus 16 forced T1 continuation; not the server/chat benchmark corpus",
+  "input_sha256": "78dcc2bfae64ae4f4f0dc70e20e8a8a0aece3d2bb3bfcc93bdcd17280d076fbb",
+  "protocol_sha256": "777e2de7e349d472f8256428bc15fe0cfe0800e78d3c33923a8bafd5f3038bad",
+  "native_archives_pin_sha256": "60b63e2d0f6b299b2bbce1ed1d7ec68a83bd7332992cb9ba0bfe37992cf3cba8",
+  "arms": [
+    {
+      "tag": "short-r1-a1",
+      "actual_chunks": [
+        1280,
+        1280,
+        1280,
+        256
+      ],
+      "actual_prefill_chunk": 1280,
+      "anchor": 95726,
+      "native_logits_selfcheck": true,
+      "output_sha256": "3464e5414ddd47602fc9df62a9edd47499db926f89f9fbc04fc457e9d60351f4",
+      "snapshots": {
+        "continuation": {
+          "execution_frontier": 4112,
+          "ledger_frontier": 4113,
+          "component_count": 168,
+          "semantic_component_manifest_sha256": "69cd7193a7c0e9e03b0eab90ed4a51445d6ae00cbbd436aef6d947128bd20336",
+          "gdn0_numeric_summary": {
+            "elements": 786432,
+            "max_abs": 30.647979736328125,
+            "maximum": 30.647979736328125,
+            "minimum": -26.88499641418457,
+            "nonfinite": 0,
+            "sum": 2772.6175178046024,
+            "sum_squared": 53821.61592911915
+          }
+        },
+        "prefill": {
+          "execution_frontier": 4096,
+          "ledger_frontier": 4097,
+          "component_count": 168,
+          "semantic_component_manifest_sha256": "bd49cd6c07830defd60c954c26f7d5fdf40bf15328083b9c1307ee7f84905e14",
+          "gdn0_numeric_summary": {
+            "elements": 786432,
+            "max_abs": 30.103437423706055,
+            "maximum": 30.103437423706055,
+            "minimum": -26.116104125976562,
+            "nonfinite": 0,
+            "sum": 2671.9203160950533,
+            "sum_squared": 46101.10252835225
+          }
+        }
+      }
+    },
+    {
+      "tag": "short-r1-b1",
+      "actual_chunks": [
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "actual_prefill_chunk": 1024,
+      "anchor": 95726,
+      "native_logits_selfcheck": true,
+      "output_sha256": "ca040b47bc339833c62b854f9fde5aebdd8797b9494387fa1bd3584fae88f681",
+      "snapshots": {
+        "continuation": {
+          "execution_frontier": 4112,
+          "ledger_frontier": 4113,
+          "component_count": 168,
+          "semantic_component_manifest_sha256": "c27810a17de0c2e4ecd7bd17206edaaa7d1c7a4f6ff9b791a3dba58e3588e1d2",
+          "gdn0_numeric_summary": {
+            "elements": 786432,
+            "max_abs": 30.648056030273438,
+            "maximum": 30.648056030273438,
+            "minimum": -26.884525299072266,
+            "nonfinite": 0,
+            "sum": 2772.621139672853,
+            "sum_squared": 53821.32644180065
+          }
+        },
+        "prefill": {
+          "execution_frontier": 4096,
+          "ledger_frontier": 4097,
+          "component_count": 168,
+          "semantic_component_manifest_sha256": "2f48304f5b43ccadd61b1a1bdeb98a55d3594ddd51edb6a2a2e3e79faf15aab5",
+          "gdn0_numeric_summary": {
+            "elements": 786432,
+            "max_abs": 30.103599548339844,
+            "maximum": 30.103599548339844,
+            "minimum": -26.11552619934082,
+            "nonfinite": 0,
+            "sum": 2671.8527213356024,
+            "sum_squared": 46099.59324959216
+          }
+        }
+      }
+    },
+    {
+      "tag": "short-r1-a2",
+      "actual_chunks": [
+        1280,
+        1280,
+        1280,
+        256
+      ],
+      "actual_prefill_chunk": 1280,
+      "anchor": 95726,
+      "native_logits_selfcheck": true,
+      "output_sha256": "3464e5414ddd47602fc9df62a9edd47499db926f89f9fbc04fc457e9d60351f4",
+      "snapshots": {
+        "continuation": {
+          "execution_frontier": 4112,
+          "ledger_frontier": 4113,
+          "component_count": 168,
+          "semantic_component_manifest_sha256": "69cd7193a7c0e9e03b0eab90ed4a51445d6ae00cbbd436aef6d947128bd20336",
+          "gdn0_numeric_summary": {
+            "elements": 786432,
+            "max_abs": 30.647979736328125,
+            "maximum": 30.647979736328125,
+            "minimum": -26.88499641418457,
+            "nonfinite": 0,
+            "sum": 2772.6175178046024,
+            "sum_squared": 53821.61592911915
+          }
+        },
+        "prefill": {
+          "execution_frontier": 4096,
+          "ledger_frontier": 4097,
+          "component_count": 168,
+          "semantic_component_manifest_sha256": "bd49cd6c07830defd60c954c26f7d5fdf40bf15328083b9c1307ee7f84905e14",
+          "gdn0_numeric_summary": {
+            "elements": 786432,
+            "max_abs": 30.103437423706055,
+            "maximum": 30.103437423706055,
+            "minimum": -26.116104125976562,
+            "nonfinite": 0,
+            "sum": 2671.9203160950533,
+            "sum_squared": 46101.10252835225
+          }
+        }
+      }
+    }
+  ],
+  "control_deterministic": true,
+  "validation_errors": [
+    [],
+    [],
+    []
+  ],
+  "coverage_per_snapshot": {
+    "GDN": 48,
+    "conv": 48,
+    "hidden_logits_sampler": 4,
+    "target_KV_planes": 64,
+    "MTP_KV_planes": 4,
+    "total": 168
+  },
+  "comparison": "A1/A2 all168 components per snapshot equal and entire output JSON bytes identical. A1/B1 differ166/168 per snapshot: all48GDN,conv1..47,all64targetKV+4MTPKV,continuation_hidden/tail_hidden/target_logits; conv0 and token_counts equal. All three choose anchor95726.",
+  "interpretation": "Exact-state replacement is disproved on this input. Not proof of a bug or unacceptable quality. Numeric summaries are not pairwise full errors. No 32K or timing run under this failed exact protocol. Future numerical/quality trial must define its own contract.",
+  "bindings": [
+    {
+      "tag": "short-r1-a1",
+      "receipt_sha256": "00c3ae60523894f05594e63b98b2c0fc8a010ef66798ed2319776a44f4424c10",
+      "output_sha256": "3464e5414ddd47602fc9df62a9edd47499db926f89f9fbc04fc457e9d60351f4"
+    },
+    {
+      "tag": "short-r1-b1",
+      "receipt_sha256": "bb13dbb2eede8ed81c90dc67d53c16c1f0efafb6a87a937f26b74a15539c2489",
+      "output_sha256": "ca040b47bc339833c62b854f9fde5aebdd8797b9494387fa1bd3584fae88f681"
+    },
+    {
+      "tag": "short-r1-a2",
+      "receipt_sha256": "d29ffd3b5294aa552e707e84d283ca57ecfaf09897e04d657e136cf601656e81",
+      "output_sha256": "3464e5414ddd47602fc9df62a9edd47499db926f89f9fbc04fc457e9d60351f4"
+    }
+  ],
+  "source_proof_sha256": {
+    "build.sh": "40bbc60126869bdad1d165ddb80b84313dfa4deb3ac36e2bc5cdafa16306187a",
+    "compare.py": "4512ecb0c963774a4e6b5c0fb53421349b0834174114a68b21fd6760a1a0c1f4",
+    "main.cpp": "f37e0dbc7168e9e45dd6262e0837dea84a2fda299ab3d4bcd660ca7dc21d877f",
+    "run.py": "7bbd0edbba89390c63075791698133af4a90b482acc673b023f75dcec691d4d6"
+  },
+  "input_recipe": {
+    "python": "3.11 random.Random",
+    "seed_hex": "0x309010241280",
+    "draw": "randrange(1000,200000)",
+    "prompt_draws": 4096,
+    "following_forced_draws": 16
+  },
+  "independent_review": {
+    "status": "PASS_FAIL_REPRODUCED_INDEPENDENTLY",
+    "components_per_phase": 168,
+    "repeat_mismatches": 0,
+    "treatment_mismatches": 166,
+    "physical_prefixes_recomputed": true,
+    "mtp_drafts_equal": true,
+    "receipt_output_sha256_verified": true
+  },
+  "candidate_mechanism": "gdn_gating_proj k27Routes selects SplitK4 for T1024/1280 and SplitK8 for the A tail T256. Different partial-sum arithmetic can change g/beta despite equal conv0. Source-supported candidate, not a uniquely established first cause."
+}
