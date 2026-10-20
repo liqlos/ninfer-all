@@ -105,5 +105,12 @@
     "reason": "Primary region reduction0.656% is too small for paired-planner cost;Q4 regions effectively neutral.",
     "CI_or_full_FFN_or_runtime": false
   },
-  "cleanup": "Owned GPU container removed,reservation released,production unchanged."
+  "cleanup": "Owned GPU container removed,reservation released,production unchanged.",
+  "independent_audit": {
+    "status": "PASS_WITH_RECORDED_WARMUP_LABEL_DISCREPANCY",
+    "timings_and_selection": "All3regions and9rawblocks independently recalculated;primary0.655618% below prespecified10%.",
+    "warmup_actual": "ABAB;8calls per position,16calls per arm,32total. Frozen protocol field calls_per_warmup_arm=8 is mislabeled;do not interpret this as a formal confirmation-protocol pass.",
+    "export_proof": "Preserved bind/build/controller receipts;no claim of current export revalidation.",
+    "scope": "Exploratory real-weight/synthetic-input operator region only;not wholeFFN/request/CI."
+  }
 }
