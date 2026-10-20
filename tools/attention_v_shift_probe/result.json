@@ -1,8 +1,8 @@
 {
-  "status": "COMPILED_RESOURCE_PASS_MECHANISM_REVIEW_PENDING_NO_GPU",
+  "status": "COMPILED_RESOURCE_AND_MECHANISM_PASS_NO_GPU",
   "default_off_flag": "NINFER_PROMPT_V_SHIFT_CTA",
   "target": "SM86 CausalD256H24Kv4 Warps8 K8/V8 PackedValues=false PagedKVBatchMetadata<false>",
-  "mechanism": "One producer warp copies paired V-scales with partial zero-fill; exact previous max/shift before the existing publication barrier; two shared stage shifts replace eight repeated reductions.",
+  "mechanism": "One producer warp copies paired V-scales with partial zero-fill; exact previous max/shift before the existing publication barrier; two shared stage shifts replace up to eight repeated query-warp reductions.",
   "cpu_proof": {
     "cpu_address_proof": {
       "status": "PASS_ADDRESS_TAIL_AND_OWN_COPY_PROOF",
@@ -162,9 +162,11 @@
   "gpu_correctness_qualified": false,
   "performance_claim": false,
   "next_gate": [
-    "Review actual PTX/SASS producer-warp dominance, copy/wait/reduction/barrier ordering and unchanged QK/PV mathematics.",
-    "Only after mechanism admission prepare an isolated actual-geometry exact/oracle/short-screen harness using the two retained objects.",
-    "Full FFN request gate remains ahead of this GPU series."
+    "Source-only minimal host harness is being prepared; reuse the two frozen objects, do not recompile the kernels.",
+    "Short fragmented-page/tail/reuse/rescale cases and actual T1280/base31488 exact+FP64 qualification before a single long-region screen.",
+    "Run only after the full FFN request series; no concurrent GPU or CPU build/export."
   ],
-  "receipt": "results/attention-v-shift/compile-r1.json"
+  "receipt": "results/attention-v-shift/compile-r1.json",
+  "mechanism_receipt": "results/attention-v-shift/mechanism-r1.json",
+  "mechanism_receipt_sha256": "c3729d2d2faac2c12ea4c1acafc571c8c931f8748eb76be6d5877e5ff967640d"
 }
