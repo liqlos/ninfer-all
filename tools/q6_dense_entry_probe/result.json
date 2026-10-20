@@ -1,0 +1,570 @@
+{
+  "status": "OPERATOR_ONLY_STORE_GEOMETRY_EFFECT_NO_DOMINANT_DOWN_WIN",
+  "switch": "NINFER_GGUF_Q6_MMQ_DENSE_ENTRY",
+  "default": 0,
+  "runtime_integrated": false,
+  "whole_request_gain_claim": false,
+  "binary_sha256": "75d6110526ccbe5ec01b67f740a01ad8c908cf3ab4f2f229c998178a835dac6a",
+  "correctness": "Six fresh exported-binary launches: full FP32/BF16 equality, original nonzero carry,64 independent FP64 samples per case, canaries/API/dispatch PASS.",
+  "fixture_caveat": "Down actual weight000143; Store cases use actual head000131 prefixes at GDN and attention-V geometries, not those tensors.",
+  "protocol": {
+    "created_at": "2026-10-20T14:46:03.415893+00:00",
+    "status": "FIXED_BEFORE_CONFIRMATION",
+    "selection_excluded": "screen-r1",
+    "tags": [
+      "confirm-r2-baseline-first-1",
+      "confirm-r2-candidate-first-2",
+      "confirm-r2-candidate-first-3",
+      "confirm-r2-baseline-first-4",
+      "confirm-r2-baseline-first-5",
+      "confirm-r2-candidate-first-6"
+    ],
+    "unit": "fresh CUDA process/container launch; each with full correctness gates",
+    "cases": [
+      "down-k17408-n5120",
+      "head-prefix-at-gdn-geometry",
+      "head-prefix-at-attention-v-geometry"
+    ],
+    "primary_case": "down-k17408-n5120",
+    "repetitions_per_sample": 32,
+    "warmup_samples_per_case": 4,
+    "timing_blocks_per_case": 3,
+    "orders": "ABBA/BAAB/ABBA for baseline-first, inverse for candidate-first; warmup alternates arms and starts with named first arm",
+    "estimate": "Within each launch mean(log(baseline_ms/candidate_ms)) over 3 blocks. Across 6 independent launch units mean and two-sided Student-t CI on log ratio. Three predeclared endpoints, Bonferroni familywise 95% coverage. Report exp(mean) speed ratio and 1-exp(-mean) time decrease distinctly.",
+    "stopping": "Complete all six valid launches; no optional stopping or outlier removal. Admission/correctness failure invalidates launch and is reported, not silently discarded.",
+    "scope": "operator only, not whole-request or runtime integration",
+    "integration_gate": "No full-server build for a small operator effect without plausible request-level benefit."
+  },
+  "protocol_sha256": "3c5b390bf5d5ac7311b78bb129b21160c187a3834c98cd745fdb7cf7eab446dc",
+  "endpoints": {
+    "down-k17408-n5120": {
+      "launch_log_ratios": [
+        -0.0024385785278085315,
+        -0.029829639925811766,
+        0.00032066293270774024,
+        0.00790797927976416,
+        0.002573998797171812,
+        -0.03311360679549392
+      ],
+      "n": 6,
+      "df": 5,
+      "t_critical": 3.5341107040583704,
+      "familywise_coverage": 0.95,
+      "multiplicity": "Bonferroni_3_predeclared_endpoints",
+      "speed_increase_percent": -0.9055282437930608,
+      "speed_increase_ci_percent": [
+        -3.403006385874457,
+        1.6565212357265455
+      ],
+      "time_decrease_percent": -0.913802987941496,
+      "time_decrease_ci_percent": [
+        -3.522890577183377,
+        1.6295277623019542
+      ],
+      "positive_operator_effect_confirmed": false
+    },
+    "head-prefix-at-gdn-geometry": {
+      "launch_log_ratios": [
+        0.0132882093643804,
+        0.013495672897623774,
+        0.016781702495035595,
+        0.007500488068265032,
+        0.022456553067384814,
+        0.01090047393768516
+      ],
+      "n": 6,
+      "df": 5,
+      "t_critical": 3.5341107040583704,
+      "familywise_coverage": 0.95,
+      "multiplicity": "Bonferroni_3_predeclared_endpoints",
+      "speed_increase_percent": 1.416997227422943,
+      "speed_increase_ci_percent": [
+        0.6684233932048785,
+        2.171137482236343
+      ],
+      "time_decrease_percent": 1.3971989569414998,
+      "time_decrease_ci_percent": [
+        0.6639851610609383,
+        2.125000793510614
+      ],
+      "positive_operator_effect_confirmed": true
+    },
+    "head-prefix-at-attention-v-geometry": {
+      "launch_log_ratios": [
+        0.028382074967153382,
+        0.06922141462031281,
+        0.11191834428173997,
+        0.02155777758329867,
+        0.023076516417693718,
+        0.01639880877032123
+      ],
+      "n": 6,
+      "df": 5,
+      "t_critical": 3.5341107040583704,
+      "familywise_coverage": 0.95,
+      "multiplicity": "Bonferroni_3_predeclared_endpoints",
+      "speed_increase_percent": 4.612461091394909,
+      "speed_increase_ci_percent": [
+        -0.9569986182419976,
+        10.495106801299597
+      ],
+      "time_decrease_percent": 4.409093374990216,
+      "time_decrease_ci_percent": [
+        -0.9662455750439931,
+        9.498254814281204
+      ],
+      "positive_operator_effect_confirmed": false
+    }
+  },
+  "launches": [
+    {
+      "tag": "confirm-r2-baseline-first-1",
+      "receipt_sha256": "2415f819e4e89f829724a8e6b926377636acf541a4f12227bb045806a85c530d",
+      "binding_sha256": "bfe7a0e3a9ece8afc0e495b05fa905c2e026c2fb1a9cd188c34d62adf99f0f2d",
+      "output_sha256": "1cab92dc623b680c6237fe2393a8cf6d117937c2d891a435c2ff0af1e21cf89e",
+      "blocks": [
+        [
+          "down-k17408-n5120",
+          0,
+          "ABBA",
+          2.731008053,
+          2.719200015
+        ],
+        [
+          "down-k17408-n5120",
+          1,
+          "BAAB",
+          2.777071953,
+          2.769472003
+        ],
+        [
+          "down-k17408-n5120",
+          2,
+          "ABBA",
+          2.73892796,
+          2.778623939
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          0,
+          "ABBA",
+          1.579984009,
+          1.550992012
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          1,
+          "BAAB",
+          1.58168,
+          1.550208032
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          2,
+          "ABBA",
+          1.580160022,
+          1.578192055
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          0,
+          "ABBA",
+          0.1527040005,
+          0.1457110047
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          1,
+          "BAAB",
+          0.1652959958,
+          0.1622060016
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          2,
+          "ABBA",
+          0.1658560038,
+          0.1626695022
+        ]
+      ]
+    },
+    {
+      "tag": "confirm-r2-candidate-first-2",
+      "receipt_sha256": "8ff532131f0db4577885fd8bd26877237cbc604142c93e16a7b4ae36bd10dba1",
+      "binding_sha256": "792c5efbf80f6287d81a3439ed2af32b78a4217417891426b7af2674aeb9f128",
+      "output_sha256": "5692666f1678281f8c70eba8611f8e55f6ed3f0f787935e56945875f7aee6a17",
+      "blocks": [
+        [
+          "down-k17408-n5120",
+          0,
+          "BAAB",
+          2.731215954,
+          2.744015932
+        ],
+        [
+          "down-k17408-n5120",
+          1,
+          "ABBA",
+          2.754415989,
+          2.760640025
+        ],
+        [
+          "down-k17408-n5120",
+          2,
+          "BAAB",
+          2.729824066,
+          2.964751959
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          0,
+          "BAAB",
+          1.581807971,
+          1.550176024
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          1,
+          "ABBA",
+          1.581776023,
+          1.550544024
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          2,
+          "BAAB",
+          1.578944027,
+          1.578400016
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          0,
+          "BAAB",
+          0.1420159936,
+          0.1449569985
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          1,
+          "ABBA",
+          0.1669760048,
+          0.1625234932
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          2,
+          "BAAB",
+          0.1995199993,
+          0.1631679982
+        ]
+      ]
+    },
+    {
+      "tag": "confirm-r2-candidate-first-3",
+      "receipt_sha256": "ce6ab25fa77f2972e7be2435ffba0a6f93f746d6edd50ef15f53f1f1e8306f78",
+      "binding_sha256": "6fa171916e2acb0e1044ff827ce51a758b982f35d3e8c283b520eabaffe67443",
+      "output_sha256": "d25c926da6f5f7e9bfa9e6c4eb4f42d508aaab29cc55c54e8e57c3181764d68c",
+      "blocks": [
+        [
+          "down-k17408-n5120",
+          0,
+          "BAAB",
+          2.765200019,
+          2.720079422
+        ],
+        [
+          "down-k17408-n5120",
+          1,
+          "ABBA",
+          2.757471919,
+          2.783264041
+        ],
+        [
+          "down-k17408-n5120",
+          2,
+          "BAAB",
+          2.730768085,
+          2.747696042
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          0,
+          "BAAB",
+          1.582623959,
+          1.550143957
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          1,
+          "ABBA",
+          1.58188802,
+          1.568687975
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          2,
+          "BAAB",
+          1.582063973,
+          1.548831999
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          0,
+          "BAAB",
+          0.1972800046,
+          0.1589735001
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          1,
+          "ABBA",
+          0.1723360047,
+          0.1564960033
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          2,
+          "BAAB",
+          0.1613889933,
+          0.1576479971
+        ]
+      ]
+    },
+    {
+      "tag": "confirm-r2-baseline-first-4",
+      "receipt_sha256": "af08b46503d565c82ac0edde5c35622d6c07bf8c2726b37dcd780ee08b25d997",
+      "binding_sha256": "fc6b6f9d44dd91ec19dbbcb91a42b0386a4d893eaaee7fd4b76bd9f515ffda2b",
+      "output_sha256": "0e995bdfcc9df892a0b434b80b1e49561a924ebee6110813f2c1d858e33ac123",
+      "blocks": [
+        [
+          "down-k17408-n5120",
+          0,
+          "ABBA",
+          2.74908793,
+          2.719856024
+        ],
+        [
+          "down-k17408-n5120",
+          1,
+          "BAAB",
+          2.801136017,
+          2.753791928
+        ],
+        [
+          "down-k17408-n5120",
+          2,
+          "ABBA",
+          2.75383997,
+          2.764912009
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          0,
+          "ABBA",
+          1.588223994,
+          1.551504016
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          1,
+          "BAAB",
+          1.595903993,
+          1.625008047
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          2,
+          "ABBA",
+          1.586336017,
+          1.559311986
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          0,
+          "ABBA",
+          0.1539839953,
+          0.1522880048
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          1,
+          "BAAB",
+          0.1656754985,
+          0.1625120044
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          2,
+          "ABBA",
+          0.1678880006,
+          0.1622240022
+        ]
+      ]
+    },
+    {
+      "tag": "confirm-r2-baseline-first-5",
+      "receipt_sha256": "150310fed77d4451b42bf2827eda97468d8cc9f3c1de3d227b57ce70854ca78d",
+      "binding_sha256": "9aea3bb59d1b90e99a7b1e1a8599fcc349955c13bbbaa2880dd1d6793f410210",
+      "output_sha256": "8b87720b4b67767d97ef51928dc67f94c5bc854bf969ab54ede27b1e59584163",
+      "blocks": [
+        [
+          "down-k17408-n5120",
+          0,
+          "ABBA",
+          2.757423997,
+          2.744895935
+        ],
+        [
+          "down-k17408-n5120",
+          1,
+          "BAAB",
+          2.773952007,
+          2.776656032
+        ],
+        [
+          "down-k17408-n5120",
+          2,
+          "ABBA",
+          2.751791954,
+          2.74041605
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          0,
+          "ABBA",
+          1.590799987,
+          1.550671995
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          1,
+          "BAAB",
+          1.605791986,
+          1.57564801
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          2,
+          "ABBA",
+          1.588608027,
+          1.552688003
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          0,
+          "ABBA",
+          0.1438305005,
+          0.1417599991
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          1,
+          "BAAB",
+          0.1669280007,
+          0.1614879966
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          2,
+          "ABBA",
+          0.1657759994,
+          0.1622340009
+        ]
+      ]
+    },
+    {
+      "tag": "confirm-r2-candidate-first-6",
+      "receipt_sha256": "c1f13b3c5123ea273740fcb33677d96de63f9a63fa5e97221fcc4ab2838c54db",
+      "binding_sha256": "e6f826ad7983d78bcf390b71af82bd4eddbef15eb1dbcf4de0efe53d7cd05f98",
+      "output_sha256": "53ac012dad1555c855002ddc63f14dbcf9a6db3a41794df09288e89fd6e6bf6d",
+      "blocks": [
+        [
+          "down-k17408-n5120",
+          0,
+          "BAAB",
+          2.731536031,
+          2.784783959
+        ],
+        [
+          "down-k17408-n5120",
+          1,
+          "ABBA",
+          2.744976044,
+          2.759407997
+        ],
+        [
+          "down-k17408-n5120",
+          2,
+          "BAAB",
+          2.819311976,
+          3.038256049
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          0,
+          "BAAB",
+          1.59416002,
+          1.569231987
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          1,
+          "ABBA",
+          1.596112013,
+          1.561872005
+        ],
+        [
+          "head-prefix-at-gdn-geometry",
+          2,
+          "BAAB",
+          1.584511995,
+          1.592048049
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          0,
+          "BAAB",
+          0.1418559998,
+          0.1412634999
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          1,
+          "ABBA",
+          0.1650719941,
+          0.1614720002
+        ],
+        [
+          "head-prefix-at-attention-v-geometry",
+          2,
+          "BAAB",
+          0.1661719978,
+          0.1623999998
+        ]
+      ]
+    }
+  ],
+  "resources": {
+    "baseline_store_accumulate_fp32_registers": [
+      242,
+      248,
+      242
+    ],
+    "candidate_store_accumulate_fp32_registers": [
+      251,
+      242,
+      242
+    ],
+    "stack_spills": 0,
+    "shared_bytes": 57856,
+    "unchanged_one_cta_tier": true
+  },
+  "decision": "Do not build full server for this candidate: primary down endpoint not positive; small Store geometry effect alone does not establish request-level value. Keep opt-in source as a donor; continue architectural gates.",
+  "no_outlier_removal": true,
+  "selection_data_excluded": true,
+  "analyzer_sha256": "09d797d27011bbe4bf25109262d0fe14af2029a210b8a69980cbe54bd5903429",
+  "analysis_dependencies": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "scipy": "1.18.1"
+  }
+}

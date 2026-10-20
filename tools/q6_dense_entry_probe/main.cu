@@ -49,7 +49,7 @@ namespace {
 
 constexpr int kColumns = 1280;
 constexpr int kBlocks = 3;
-constexpr int kRepetitions = 4;
+constexpr int kRepetitions = 32;
 constexpr std::size_t kGuardBytes = 64;
 
 void check(cudaError_t status, const char* label) {
@@ -416,8 +416,16 @@ void run_case(const Case& c, const std::string& tag) {
               << ",\"baseline_and_candidate_carry_expected\":true,\"candidate_kernel\":\"q6_dense_entry_kernel\""
               << ",\"tag\":\"" << json_string(tag) << "\"}\n" << std::flush;
     constexpr std::array<int, 4> abba{0, 1, 1, 0}, baab{1, 0, 0, 1};
+    const bool candidate_first = tag.find("candidate-first") != std::string::npos;
+    for (int warmup = 0; warmup < 4; ++warmup) {
+        const bool enabled = (warmup + int(candidate_first)) % 2 != 0;
+        time_sample(enabled ? q6_dense_entry_on_run : q6_dense_entry_off_run,
+                    enabled ? on : off, c, weight, activation,
+                    enabled ? on_bf16 : off_bf16, initial, stride);
+    }
     for (int block = 0; block < kBlocks; ++block) {
-        const auto& order = block % 2 == 0 ? abba : baab;
+        const bool baseline_outer = (block + int(candidate_first)) % 2 == 0;
+        const auto& order = baseline_outer ? abba : baab;
         std::array<double, 4> times{};
         double baseline = 0.0, candidate = 0.0;
         for (int position = 0; position < 4; ++position) {
@@ -429,8 +437,9 @@ void run_case(const Case& c, const std::string& tag) {
         std::cout << std::setprecision(10)
                   << "{\"kind\":\"timing\",\"case\":\"" << c.name << "\",\"rows\":" << c.rows
                   << ",\"k\":" << c.k << ",\"columns\":" << kColumns << ",\"output_mode\":\"" << mode
-                  << "\",\"block\":" << block << ",\"order\":\"" << (block % 2 == 0 ? "ABBA" : "BAAB")
+                  << "\",\"block\":" << block << ",\"order\":\"" << (baseline_outer ? "ABBA" : "BAAB")
                   << "\",\"repetitions_per_sample\":" << kRepetitions
+                  << ",\"warmup_samples\":4"
                   << ",\"baseline_ms\":" << baseline << ",\"candidate_ms\":" << candidate
                   << ",\"samples_ms\":[" << times[0] << ',' << times[1] << ',' << times[2] << ',' << times[3]
                   << "],\"operator_time_decrease_percent\":" << 100.0 * (baseline - candidate) / baseline
