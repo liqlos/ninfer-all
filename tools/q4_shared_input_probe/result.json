@@ -1,0 +1,73 @@
+{
+  "status": "SOURCE_PREPARED_CPU_CHECKS_PASS_COMPILE_NOT_RUN",
+  "default_off_flag": "NINFER_Q4_SHARED_INPUT_PROBE",
+  "scope": "SM86 native cooperative Q4 fused gate/up, T4 K5120 N17408, literal packed half2 Q8 metadata",
+  "hypothesis": "Stage the 23040-byte packed Q8 input once per existing persistent CTA, then replace repeated global input loads by bank-swizzled shared loads across native grid-stride rows. Weight loads and ordered arithmetic remain native.",
+  "compile_entry": "kernel<GGML_TYPE_Q4_K,4,true,5120,true,false,2>",
+  "launch_contract_for_future_harness": {
+    "weight_rows": 34816,
+    "output_rows": 17408,
+    "weight_row_bytes": 2880,
+    "grid": [328, 1, 1],
+    "block": [128, 1, 1],
+    "dynamic_shared_OFF": 0,
+    "dynamic_shared_ON": 23040,
+    "epilogue": "BF16 Store",
+    "runtime_admission_guards_not_implemented_before_compile_gate": true
+  },
+  "control": {
+    "native_reference_and_generated_OFF": true,
+    "source_OFF_identity_after_include_rebinding": true,
+    "ON_reverse_transform_byte_exact": true,
+    "actual_native_OFF_machine_text_identity": "required; not compiled",
+    "same_KS_unroll_and_common_compile_flags": true,
+    "W_flags": ["NINFER_GGUF_Q4_COOPERATIVE_DECODE", "NINFER_GGUF_Q6_COOPERATIVE_DECODE", "NINFER_GGUF_MMQ_STORE_FUSION"],
+    "unrelated_GGUF_switches": "rejected by generated guards"
+  },
+  "CPU_checks": {
+    "source_pins_and_reverse_transforms": "PASS",
+    "Q8_code_words_roundtripped": 5120,
+    "literal_metadata_bytes_range": 2560,
+    "modeled_128byte_transactions": 160,
+    "modeled_max_bank_multiplicity": 1,
+    "bank_model_is_not_GPU_evidence": true,
+    "row_ownership_count": 17408,
+    "resource_and_ELF_parser_rejection_self_tests": "PASS",
+    "actual_SASS_pointer_and_math_proof": "MANUAL_GATE_PENDING"
+  },
+  "cost_filter": {
+    "packed_bytes_per_CTA": 23040,
+    "four_CTA_shared_including_1KiB_reserve_each": 96256,
+    "SM86_shared_bytes": 102400,
+    "FP32_metadata_expansion_four_CTA_shared": 106496,
+    "baseline_logical_global_input_bytes_per_FFN": 401080320,
+    "candidate_preload_bytes_per_FFN": 7557120,
+    "DRAM_savings_claim": false,
+    "risk": "The baseline input is already cache-hot; shared occupancy consumes L1 capacity and shared loads retain the input LSU work.",
+    "saved_W_RU_r2_affected_kernel_seconds": 1.370853009,
+    "saved_W_RU_r2_selected_phase_spans_seconds": 7.300675771,
+    "operator_time_reduction_needed_for_1pct_selected_spans": 0.05325644487825609,
+    "scope_of_bound": "CPU sensitivity calculation over an existing instrumented RU4089/512 capture; not client-wall or JSON32K prediction"
+  },
+  "compile_kill_rules": [
+    "A source pin or reversible transform fails.",
+    "The actual native and OFF kernel machine text differs.",
+    "More than 128 registers, any stack/local memory/spill, or fewer than four CTA per documented SM86 resource bound.",
+    "A new CTA barrier appears inside the row or K loop.",
+    "Manual SASS review cannot establish input LDG only before rows, shared code/metadata loads inside rows, unchanged weight loads and ordered arithmetic. Histogram equality alone never passes this gate.",
+    "Actual CUDA occupancy does not admit four CTA with the candidate launch dynamic shared bytes when a runtime harness is later authorized."
+  ],
+  "future_usefulness_kill_rule": "Only after resource/manual mechanism and exact/oracle gates: a short fixed balanced pack+fused region screen should reduce time by at least 6 percent with all blocks positive. Otherwise stop before runtime integration or CI.",
+  "commands": {
+    "CPU_check": "python -B tools/q4_shared_input_probe/self_test.py",
+    "source_check": "python -B tools/q4_shared_input_probe/generate.py --check-only",
+    "compile_recipe_not_run": "bash /lab/source/tools/q4_shared_input_probe/build.sh",
+    "compile_output": "/build/q4-shared-input",
+    "analyzer": "python3 -B /lab/source/tools/q4_shared_input_probe/sass_gate.py --build-root /build/q4-shared-input"
+  },
+  "compile_run": false,
+  "host_or_GPU_harness_created": false,
+  "GPU_run": false,
+  "performance_claim": false,
+  "production_changed": false
+}
