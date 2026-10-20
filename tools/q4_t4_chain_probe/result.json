@@ -1,5 +1,5 @@
 {
-  "status": "RESOURCE_PASS_STATIC_REVIEW_PARTIAL_GPU_UNQUALIFIED",
+  "status": "CLOSED_NUMERICAL_PASS_SCREEN_REJECTED",
   "default_off_flag": "NINFER_Q4_T4_CHAIN_PROBE",
   "target": "SM86 currentW nativeQ4/T4/K5120; N6144/17408/34816, N1024 native only.",
   "mechanism": "16 realrows,4warps,16FP32partials/thread, literalK-chainupdate andXOR16/8/4/2/1order; twoMMA/lowhighpair, noMMAcountgain claimed.",
@@ -38,18 +38,21 @@
   "first_gate": "Original blanket CALL gate failed; retained unchanged in compile-r1 receipt.",
   "resource_gate": "PASS: 80 registers, no stack/local/spills, 2048 bytes shared.",
   "static_review": "Five K iterations, packed-word reuse, native FP32 update structure and XOR reduction grouping reviewed. Candidate loop-exit CALL is control flow; four math calls are confined to GateProduct, unavailable through this probe API.",
-  "unresolved": "Full symbolic execution of compiled operands and numerical GPU qualification remain unproven; static review is not a correctness pass.",
-  "GPU_correctness": "NOT_RUN",
-  "fragment_and_FP64_oracle": "NOT_RUN",
-  "full_projection_with_helperpack_and_epilogue": "NOT_RUN",
+  "unresolved": "Numerical operator acceptance passed; cycle-level root-cause attribution not measured. Fused GateProduct and runtime remain unqualified.",
+  "GPU_correctness": "PASS:9modecases/3real-fixture shapes;direct32calls and4graphnodes x8replays,API/fallback/canaries.",
+  "fragment_and_FP64_oracle": "PASS: exact full FP32/BF16 outputs; independent64FP64samples perarm/shape.",
+  "full_projection_with_helperpack_and_epilogue": "MEASURED: all six exploratory endpoints slower; no confirmation or runtime integration.",
   "fused_gate_up": "NOT_QUALIFIED",
   "performance_claim": false,
   "receipts": {
     "compile": "results/q4-t4-chain/compile-r1.json",
-    "resource_review": "results/q4-t4-chain/resource-review-r2.json"
+    "resource_review": "results/q4-t4-chain/resource-review-r2.json",
+    "host_build": "results/q4-t4-chain/host-build-r1.json",
+    "exported_operator": "results/q4-t4-chain/screen-r1-receipt.json",
+    "raw_operator": "results/q4-t4-chain/screen-r1.jsonl"
   },
   "host_harness": {
-    "status": "SOURCE_ONLY_NOT_COMPILED",
+    "status": "HOST_BUILD_AND_EXPORTED_GPU_GATE_COMPLETE",
     "files": {
       "main.cu": "c4d6bcf55d888de0c9133e331e9578c1f359bd5bd892651697d033df2f99ad44",
       "build_main.py": "97a0ada9710920cbbe27fe893f0d700f80cb69f800d1070638004c1c0f99b913"
@@ -58,15 +61,301 @@
     "correctness": "Three real-fixture shapes, all three output modes, 64 FP64 samples per arm/shape, exact full outputs, native Q8 pack, 32-call direct and graph carry, canaries/API and N1024 native-only guard.",
     "screen": "Six Store endpoints: N6144/17408/34816, projection-only and preparation+projection+Store. Primary N34816 prepared requires mean time reduction>=1% and >=2/3 positive blocks; all five other endpoints require no mean regression>1%.",
     "scope": "N6144 is a real-fixture prefix/geometry proxy; N17408 is its gate half; N34816 is the actual merged matrix single-projection Store. No fused GateProduct or runtime qualification.",
-    "build": "Reuse the exact compiled chain.o; compile/link host only after current FFN worker exits.",
+    "build": "Host-only compile/link6.5714s; reused frozen chain.o, no kernel/core rebuild.",
     "exported_operator_controller": {
       "path": "tools/q4_t4_chain_probe/run.py",
       "sha256": "c3569201715b64dd747771abbb93f62d7492fd351279d2f5f14782b90a8ae8db",
-      "status": "SOURCE_ONLY_NOT_EXECUTED",
+      "status": "EXECUTED_SCREEN_REJECTED",
       "checks": "AST, frozen source pins and actual host-build schema checked; parser accepts a pass and a completed negative screen, rejects16 malformed cases.",
       "admission": "Five mutexes, CPU24GiB/C20, fresh broker budget/reserve30/no foreign work; repeat after own reservation, exact owned container/finally cleanup.",
       "binding": "One export; fresh read-only binary/real-fixture full hashes before exec in the same GPU container. No profiler or hash inside timing.",
-      "actual_build_receipt": "Must supply the real host_build.json and its SHA after host compilation; no future build hash is assumed."
+      "actual_build_receipt": "results/q4-t4-chain/host-build-r1.json"
     }
-  }
+  },
+  "screen_results": [
+    {
+      "N": 6144,
+      "scope": "projection_only",
+      "primary": false,
+      "native_mean_ms": 0.0266559999436,
+      "chain_mean_ms": 0.0470026663194,
+      "mean_time_gain_percent": -76.3305312831,
+      "positive_blocks": 0,
+      "blocks": [
+        {
+          "order": "ABBA",
+          "native_ms": 0.0266399998218,
+          "chain_ms": 0.0469599999487,
+          "time_gain_percent": -76.2762772631,
+          "samples_ms": [
+            0.0265599992126,
+            0.0468159988523,
+            0.0471040010452,
+            0.0267200004309
+          ]
+        },
+        {
+          "order": "BAAB",
+          "native_ms": 0.0265919994563,
+          "chain_ms": 0.0471039991826,
+          "time_gain_percent": -77.135981294,
+          "samples_ms": [
+            0.0469439998269,
+            0.0265919994563,
+            0.0265919994563,
+            0.0472639985383
+          ]
+        },
+        {
+          "order": "ABBA",
+          "native_ms": 0.0267360005528,
+          "chain_ms": 0.0469439998269,
+          "time_gain_percent": -75.5834786667,
+          "samples_ms": [
+            0.0267520006746,
+            0.0469760000706,
+            0.0469119995832,
+            0.0267200004309
+          ]
+        }
+      ]
+    },
+    {
+      "N": 6144,
+      "scope": "prepared",
+      "primary": false,
+      "native_mean_ms": 0.0304623326908,
+      "chain_mean_ms": 0.0402865012487,
+      "mean_time_gain_percent": -32.2502175314,
+      "positive_blocks": 0,
+      "blocks": [
+        {
+          "order": "ABBA",
+          "native_ms": 0.0317759988829,
+          "chain_ms": 0.0403155013919,
+          "time_gain_percent": -26.8740647317,
+          "samples_ms": [
+            0.0330879986286,
+            0.0403520017862,
+            0.0402790009975,
+            0.0304639991373
+          ]
+        },
+        {
+          "order": "BAAB",
+          "native_ms": 0.0298509998247,
+          "chain_ms": 0.0402400009334,
+          "time_gain_percent": -34.8028580942,
+          "samples_ms": [
+            0.0402880012989,
+            0.0298560000956,
+            0.0298459995538,
+            0.0401920005679
+          ]
+        },
+        {
+          "order": "ABBA",
+          "native_ms": 0.0297599993646,
+          "chain_ms": 0.0403040014207,
+          "time_gain_percent": -35.4301151923,
+          "samples_ms": [
+            0.0297919996083,
+            0.0403200015426,
+            0.0402880012989,
+            0.029727999121
+          ]
+        }
+      ]
+    },
+    {
+      "N": 17408,
+      "scope": "projection_only",
+      "primary": false,
+      "native_mean_ms": 0.0640296675265,
+      "chain_mean_ms": 0.130750834942,
+      "mean_time_gain_percent": -104.203520013,
+      "positive_blocks": 0,
+      "blocks": [
+        {
+          "order": "ABBA",
+          "native_ms": 0.0636455006897,
+          "chain_ms": 0.130127504468,
+          "time_gain_percent": -104.45672209,
+          "samples_ms": [
+            0.063450999558,
+            0.130207002163,
+            0.130048006773,
+            0.0638400018215
+          ]
+        },
+        {
+          "order": "BAAB",
+          "native_ms": 0.0641920007765,
+          "chain_ms": 0.131053000689,
+          "time_gain_percent": -104.157837586,
+          "samples_ms": [
+            0.131743997335,
+            0.0648000016809,
+            0.0635839998722,
+            0.130362004042
+          ]
+        },
+        {
+          "order": "ABBA",
+          "native_ms": 0.0642515011132,
+          "chain_ms": 0.131071999669,
+          "time_gain_percent": -103.998346184,
+          "samples_ms": [
+            0.0648960024118,
+            0.13046400249,
+            0.131679996848,
+            0.0636069998145
+          ]
+        }
+      ]
+    },
+    {
+      "N": 17408,
+      "scope": "prepared",
+      "primary": false,
+      "native_mean_ms": 0.0671519997219,
+      "chain_mean_ms": 0.129097335041,
+      "mean_time_gain_percent": -92.2464492125,
+      "positive_blocks": 0,
+      "blocks": [
+        {
+          "order": "ABBA",
+          "native_ms": 0.0684159994125,
+          "chain_ms": 0.129518501461,
+          "time_gain_percent": -89.3102528249,
+          "samples_ms": [
+            0.0703039988875,
+            0.129308998585,
+            0.129728004336,
+            0.0665279999375
+          ]
+        },
+        {
+          "order": "BAAB",
+          "native_ms": 0.066383998841,
+          "chain_ms": 0.128894001245,
+          "time_gain_percent": -94.1642617133,
+          "samples_ms": [
+            0.12889200449,
+            0.0665279999375,
+            0.0662399977446,
+            0.128895998001
+          ]
+        },
+        {
+          "order": "ABBA",
+          "native_ms": 0.0666560009122,
+          "chain_ms": 0.128879502416,
+          "time_gain_percent": -93.3501870078,
+          "samples_ms": [
+            0.0665920004249,
+            0.129087999463,
+            0.128671005368,
+            0.0667200013995
+          ]
+        }
+      ]
+    },
+    {
+      "N": 34816,
+      "scope": "projection_only",
+      "primary": false,
+      "native_mean_ms": 0.123965332905,
+      "chain_mean_ms": 0.256560000281,
+      "mean_time_gain_percent": -106.961086836,
+      "positive_blocks": 0,
+      "blocks": [
+        {
+          "order": "ABBA",
+          "native_ms": 0.123836997896,
+          "chain_ms": 0.247023999691,
+          "time_gain_percent": -99.4751196227,
+          "samples_ms": [
+            0.123935997486,
+            0.246784001589,
+            0.247263997793,
+            0.123737998307
+          ]
+        },
+        {
+          "order": "BAAB",
+          "native_ms": 0.12497600168,
+          "chain_ms": 0.276256002486,
+          "time_gain_percent": -121.047240088,
+          "samples_ms": [
+            0.307007998228,
+            0.125312000513,
+            0.124640002847,
+            0.245504006743
+          ]
+        },
+        {
+          "order": "ABBA",
+          "native_ms": 0.12308299914,
+          "chain_ms": 0.246399998665,
+          "time_gain_percent": -100.190115927,
+          "samples_ms": [
+            0.122432000935,
+            0.246079996228,
+            0.246720001101,
+            0.123733997345
+          ]
+        }
+      ]
+    },
+    {
+      "N": 34816,
+      "scope": "prepared",
+      "primary": true,
+      "native_mean_ms": 0.126900168757,
+      "chain_mean_ms": 0.242676163713,
+      "mean_time_gain_percent": -91.2339172523,
+      "positive_blocks": 0,
+      "blocks": [
+        {
+          "order": "ABBA",
+          "native_ms": 0.127532504499,
+          "chain_ms": 0.24273249507,
+          "time_gain_percent": -90.3299053235,
+          "samples_ms": [
+            0.128128007054,
+            0.243224993348,
+            0.242239996791,
+            0.126937001944
+          ]
+        },
+        {
+          "order": "BAAB",
+          "native_ms": 0.125695995986,
+          "chain_ms": 0.242192000151,
+          "time_gain_percent": -92.6807598364,
+          "samples_ms": [
+            0.243200004101,
+            0.12572799623,
+            0.125663995743,
+            0.241183996201
+          ]
+        },
+        {
+          "order": "ABBA",
+          "native_ms": 0.127472005785,
+          "chain_ms": 0.243103995919,
+          "time_gain_percent": -90.711673848,
+          "samples_ms": [
+            0.127872005105,
+            0.243423998356,
+            0.242783993483,
+            0.127072006464
+          ]
+        }
+      ]
+    }
+  ],
+  "decision": "Close default-OFF; do not repeat unchanged, collect CI, or integrate runtime. Lower registers alone did not overcome candidate overhead.",
+  "postmortem": "Source-level candidate repeats K/metadata/decode work across16-row CTAs and executes IMMA/terminal shared reduction; native DP4A retains better useful ownership. This is a plausible mechanism, not hardware-counter causal attribution."
 }
