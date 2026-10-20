@@ -22,10 +22,33 @@ OPERATOR_SHA = "a381c6be36f572170ccc9c7e4a3f8b25e5061e4eb633649399f3ec9759cb43e2
 HEAD_SHA = "2155d6e1f7c5549077438c4760e6e150945dd5e406484b29162dff7b03d05da0"
 BUILDER_IMAGE = "sha256:501c92a90c3d85adc616455a6783bb5ae8b82008f469cf8dc3d6da538f75475b"
 OWNER = "ninfer-switch-matrix"
+LAB_CONTROLLERS = {
+    "tools/lab/build_switch_matrix.py", "tools/lab/profile_long_context.py",
+    "tools/lab/qualify_switch_matrix.py", "tools/lab/run_switch_matrix.py",
+    "tools/lab/switch_matrix_route.py",
+}
 
 
 def load(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def build_inputs_sha(build):
+    files = {name: sha for name, sha in build["source_files"].items()
+             if name not in LAB_CONTROLLERS}
+    return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+
+
+def reference_inputs_sha(reference):
+    matches = []
+    for path in OUT.glob("*-build.json"):
+        build = load(path)
+        if (build.get("status") == "BUILT_EXPORTED_NOT_GPU_QUALIFIED" and
+                build.get("arm") == "w" and
+                build.get("source_manifest_sha256") == reference["source_manifest_sha256"]):
+            matches.append(build_inputs_sha(build))
+    assert matches and len(set(matches)) == 1, "Pinned W build inputs missing or ambiguous"
+    return matches[0]
 
 
 def verify_export(arm):
@@ -141,12 +164,15 @@ def main():
         fixture_hashes, fixture_receipts = verify_fixtures()
         record.update(export_manifest_sha256=manifest_sha, build_receipt_sha256=build_sha,
                       export=manifest, source_manifest_sha256=manifest["source_manifest_sha256"],
+                      compiled_inputs_sha256=build_inputs_sha(build),
+                      source_comparison_excludes=sorted(LAB_CONTROLLERS),
                       fixture_sha256=fixture_hashes,
                       fixture_receipts=fixture_receipts)
         if arm != "w" or reference_path.exists():
             reference = load(reference_path)
             assert reference["status"] == "PASS" and reference["arm"] == "w"
-            assert reference["source_manifest_sha256"] == manifest["source_manifest_sha256"]
+            assert reference_inputs_sha(reference) == build_inputs_sha(build), \
+                "Compiled source/test inputs differ from W"
             assert reference["fixture_sha256"] == fixture_hashes
         reservation = uuid.uuid4().hex
         granted = lab.api("/v1/photo-gpu-reservations", {

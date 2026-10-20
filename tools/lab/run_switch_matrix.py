@@ -7,6 +7,7 @@ import re
 import socket
 import sys
 import time
+import traceback
 import urllib.request
 import uuid
 
@@ -28,22 +29,30 @@ def load(path):
 
 def serving_admission(reservation):
     status = lab.api("/v1/status")
-    assert not status["agents"] and not status["queue"] and not status["leases"]
-    assert not status["inference"]["active_requests"]
     grant = status["admission"]["photo_gpu_reservation"]
-    assert grant["active"] and grant["owner"] == lab.OWNER
-    assert not status["admission"]["active_batches"]
-    assert not status["inference"]["active_sequences"]
     allowed = {"dwm", "explorer", "ChatGPT", "Codex", "chrome", "msedge", "firefox",
                "csrss", "vmmemWSL", "vmmem"}
-    assert all(p["process"] in allowed for p in status["windows_gpu"]["process_memory"])
-    assert not status.get("external_growth_pressure", {}).get("active")
+    checks = {
+        "broker_idle": not status["agents"] and not status["queue"] and not status["leases"],
+        "inference_idle": not status["inference"]["active_requests"] and not status["inference"]["active_sequences"],
+        "owned_reservation": grant["active"] and grant["owner"] == lab.OWNER,
+        "no_batches": not status["admission"]["active_batches"],
+        "allowed_processes": all(p["process"] in allowed for p in status["windows_gpu"]["process_memory"]),
+        "no_external_growth": not status.get("external_growth_pressure", {}).get("active"),
+    }
+    if not all(checks.values()):
+        raise RuntimeError(json.dumps({"admission_checks": checks,
+                                      "process_memory": status["windows_gpu"]["process_memory"],
+                                      "reservation": grant,
+                                      "external_growth_pressure": status.get("external_growth_pressure")}))
 
 
 def main():
-    arm, mode, tag, operator_tag = sys.argv[1:]
+    arm, mode, tag, operator_tag = sys.argv[1:5]
+    control_tag = sys.argv[5] if len(sys.argv) == 6 else "w-screen-r1"
+    assert len(sys.argv) in (5, 6)
     assert arm in matrix.VARIANTS and mode in {"profile", "screen"}
-    assert all(re.fullmatch(r"[a-z0-9-]+", s) for s in (tag, operator_tag))
+    assert all(re.fullmatch(r"[a-z0-9-]+", s) for s in (tag, operator_tag, control_tag))
     receipt = OUT / (tag + "-runtime.json")
     assert not receipt.exists()
     assert not list(OUT.glob(tag + "-*"))
@@ -89,6 +98,19 @@ def main():
         assert protocol["bench_sha256"] == BENCH_SHA
         assert protocol["prompts_sha256"] == lab.sha(PROMPTS)
         record["protocol_sha256"] = lab.sha(OUT / "protocol.json")
+        golden_path = OUT / (control_tag + "-runtime.json")
+        golden_record = load(golden_path) if golden_path.exists() else None
+        if golden_record is not None:
+            assert golden_record["status"] == "SCREENED" and golden_record["arm"] == "w"
+            assert golden_record["mode"] == "screen"
+            assert golden_record["protocol_sha256"] == record["protocol_sha256"]
+            assert golden_record["model_sha256"] == MODEL_SHA
+            assert golden_record["prompts_sha256"] == lab.sha(PROMPTS)
+            record["control_receipt_sha256"] = lab.sha(golden_path)
+        else:
+            assert arm == "w" and (mode == "profile" or tag == control_tag)
+        golden = golden_record["samples"] if golden_record else None
+        record["control_tag"] = control_tag
         prompts = load(PROMPTS)
         record.update(model_sha256=MODEL_SHA, bench_sha256=BENCH_SHA,
                       prompts_sha256=lab.sha(PROMPTS))
@@ -154,11 +176,6 @@ def main():
         events = OUT / (tag + "-events.jsonl")
         rows, used, prior = [], set(), 0
         selected = prompts["categories"] if mode == "screen" else prompts["categories"][:1]
-        golden_path = OUT / "w-screen-r1-runtime.json"
-        golden_record = load(golden_path) if golden_path.exists() else None
-        if golden_record is not None:
-            assert golden_record["status"] == "SCREENED"
-        golden = golden_record["samples"] if golden_record else None
         for item in selected:
             serving_admission(reservation)
             offset = bench.request_log_offset(events)
@@ -187,6 +204,7 @@ def main():
     except BaseException as exc:
         record["status"] = "INCOMPLETE"
         record["failure"] = type(exc).__name__ + ": " + str(exc)
+        record["failure_traceback"] = traceback.format_exc()
     finally:
         if ident:
             try:
