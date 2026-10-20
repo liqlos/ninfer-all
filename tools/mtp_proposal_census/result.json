@@ -37,14 +37,22 @@
     "abi_declarations": 6,
     "cpu_contract_positive_cases": 1,
     "cpu_contract_negative_cases": 9,
-    "request_epoch_coverage_negative_cases": 5
+    "request_epoch_coverage_negative_cases": 5,
+    "controller_ast": "PASS",
+    "controller_request_epoch_binding": {
+      "positive": 2,
+      "negative": 10,
+      "source_author_checked": true,
+      "GPU": false
+    }
   },
   "source_freeze_sha256": {
     "observer.h": "d8753dfbd9fb34588d1713844db12edf06186988b478d5c8731587d01046dfc5",
     "observer.cu": "d7a5626a29b4d2290730ace8696d2bbf706e25824a8a8c97e0a825575434c5bb",
     "wrapper.cpp": "af96092b8ddc0a0b501113b9715d7a9b1a33eff6b326bf8fb8fe51d4df1f1e0f",
     "build.py": "4ee26bd2a592e66639721fb49e5c20ee275c10f984304b12e663710b0a2e5ac0",
-    "check.py": "2612b22b2b004b60b571caca1fe0ab3a3a4bec86979a8c7aa1b4b70d73c23d29"
+    "check.py": "2612b22b2b004b60b571caca1fe0ab3a3a4bec86979a8c7aa1b4b70d73c23d29",
+    "run.py": "146c516d07e815b47d0bdec7714c5bc4a5a84cc76d6f7ff842e19160e3045f5b"
   },
   "pending_gates": [
     "Native read-only preflight of the six exact U/PLT32/T seams, no LTO, source pins, freshness and original 29-input link",
@@ -62,5 +70,6 @@
     "causal_sampling": "Q/P joins, native penalties and licensed-span count updates agree with source. Counterfactual adjusted Q is limited to the original prefix, not an alternative trajectory.",
     "checker_fixes": "Observed-union top2 dominance checked with three direct negative cases. CLI requires positive unique target epochs; runner must bind all expected full requests to epochs and explicitly exclude warmup.",
     "limitations": "Source reviews and compact checks do not establish global top2, GPU interception or output equivalence."
-  }
+  },
+  "runtime_controller": "Source-only fresh OFF/ON diagnostic runner prepared. Explicit immutable protocol/build hashes required; epochs 1 warmup, 2 RU4K, 3 JSON32K; every full request needs16 linked records and exact output/full MTP-work equality. Not executed."
 }
