@@ -156,12 +156,28 @@ def validate_rebuild_policy(name, protocol_sha, compiled):
     evidence = json.loads(diagnostic.read_text(encoding="utf-8"))
     assert evidence["status"] == "PASS_NONALLOC_STRTAB_VARIATION_DIAGNOSIS"
     assert evidence["compiled_inputs_sha256"] == compiled
+    diagnostic_builds = []
+    for filename, digest in evidence["build_receipts"].items():
+        build_path = OUT / filename
+        assert build_path.parent == OUT and lab.sha(build_path) == digest
+        build = json.loads(build_path.read_text(encoding="utf-8"))
+        assert build["status"] == "BUILT_EXPORTED_NOT_GPU_QUALIFIED"
+        assert qualification.build_inputs_sha(build) == compiled
+        diagnostic_builds.append(build)
+    assert len(diagnostic_builds) == 2
+    left_build, right_build = diagnostic_builds
+    for key in ("arm", "options", "cuda_symbol_seeds"):
+        assert left_build[key] == right_build[key]
+    for name in ("CMakeCache.txt", "build.ninja"):
+        assert left_build["export_sha256"][name] == right_build["export_sha256"][name]
     inventories = []
     for filename, digest in evidence["inventories"].items():
         inventory = OUT / filename
         assert inventory.parent == OUT and lab.sha(inventory) == digest
         inventories.append(json.loads(inventory.read_text(encoding="utf-8")))
     assert len(inventories) == 2
+    assert {row["serve"]["sha256"] for row in inventories} == {
+        build["export_sha256"]["ninfer-serve"] for build in diagnostic_builds}
     before, after = inventories
     for kind in ("object", "serve"):
         left, right = before[kind]["sections"], after[kind]["sections"]
