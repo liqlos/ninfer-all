@@ -87,12 +87,13 @@ for name,sha in expected.items():
     src=(source/name).resolve()
     dst=(destination/name).resolve()
     assert src.is_relative_to(source) and dst.is_relative_to(destination)
+    if dst.is_file() and hashlib.sha256(dst.read_bytes()).hexdigest()==sha:
+        continue
     data=src.read_bytes()
     assert hashlib.sha256(data).hexdigest()==sha,name
-    if not dst.is_file() or dst.read_bytes()!=data:
-        dst.parent.mkdir(parents=True,exist_ok=True)
-        dst.write_bytes(data)
-        changed.append(name)
+    dst.parent.mkdir(parents=True,exist_ok=True)
+    dst.write_bytes(data)
+    changed.append(name)
 for name,sha in expected.items():
     assert hashlib.sha256((destination/name).read_bytes()).hexdigest()==sha,name
 print(json.dumps({'changed':changed,'nonbuild_extras':extras}))
