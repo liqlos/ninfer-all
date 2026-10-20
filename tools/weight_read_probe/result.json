@@ -1,0 +1,28 @@
+{
+  "status": "CPU_DIRECT_READ_SCREEN_PASS",
+  "scope": "Loader I/O only; fixed contiguous2GiB window from the existing unchanged model bind. No CUDA or product changes.",
+  "O_DIRECT": true,
+  "slot_bytes": 67108864,
+  "slot_count": 4,
+  "order": [
+    1,
+    2,
+    4,
+    4,
+    2,
+    1
+  ],
+  "mean_seconds": {
+    "1": 7.596173876998364,
+    "2": 4.020864705482381,
+    "4": 3.5293251874973066
+  },
+  "QD2_read_time_reduction_percent": 47.06723713029025,
+  "QD4_read_time_reduction_percent": 53.538120050354564,
+  "boundary_hashes_and_model_identity": "PASS",
+  "model_load_or_inference_gain": false,
+  "statistical_confirmation": false,
+  "source_sha256": "67117c0677235ea2ccfb680858a9f108fc12cfcecbc24c7a881b4cd2927c0417",
+  "receipt": "results/weight-read/screen-r1.json",
+  "next_gate": "Bounded default-OFF lab read-ahead preserving file lifetime, aligned tails/errors and every uploaded byte. Actual complete load/output comparison before any loader gain claim."
+}
