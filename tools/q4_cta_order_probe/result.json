@@ -1,0 +1,82 @@
+{
+  "status": "CLOSED_NO_USEFUL_EXPLORATORY_GAIN",
+  "variant": "NINFER_GGUF_Q4_MMQ_CTA_GROUP_I4",
+  "shape": {
+    "N": 17408,
+    "K": 5120,
+    "T": 1280,
+    "I": 128,
+    "J": 128,
+    "blocks": 1360,
+    "fixup": false
+  },
+  "device": "RTX3090 SM86",
+  "binary_sha256": "52c072c95dae2d4f2efcd73605c8935e4159f02d05123a5759c953565bc42664",
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 0.0001337271832,
+    "fp64_max_rel_error": 0.01851431004,
+    "input_seed": 4228552285,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r1-d55fc0ba70214717a3f859fca702eb44"
+  },
+  "canaries_scope": "BF16 output guards; full FP32 planes are compared bitwise",
+  "blocks": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.521492004,
+      "candidate_ms": 4.512084007,
+      "speedup_percent": 0.2080728468
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.676607847,
+      "candidate_ms": 4.672128201,
+      "speedup_percent": 0.09578837544
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.67699194,
+      "candidate_ms": 4.673792124,
+      "speedup_percent": 0.06841610573
+    }
+  ],
+  "geometric_operator_speed_gain_percent": 0.12426494797796998,
+  "registers": {
+    "baseline": 221,
+    "candidate": 221
+  },
+  "shared_bytes": 57856,
+  "spills_bytes": 0,
+  "decision": "Keep product unchanged/OFF. Observed 0.068\u20130.208 percent operator time reduction is too small to justify a full-model build or long confirmation. This does not establish a zero effect or statistically bound the underlying effect. Revisit only for a concrete interaction/new workload.",
+  "scope": "One operator launch with three balanced blocks, no CI or whole-model speed claim",
+  "receipts": {
+    "screen-r1.jsonl": "884e986bb093c98f521849e287eb3fe0a1252417da8364122f123041d1695e9b",
+    "screen-r1-receipt.json": "35426400c4a9f494272d796f6d9575d65541af1c1c26ed3ebdc8b4f46e94eaf8",
+    "screen-r1-binding.json": "d4dc4c7f33f83ffe5b5cc6a5697223c8b58a0096e6e6e7f87b48c6862a75a7af",
+    "build-r1.json": "5f4d702abc6cc660b7d5a3883c3f03942b494a08315dbe30bd873889fc747914",
+    "body-r1.json": "32c6d81c4c9a5edfedb37ba079e650b82828b7d70d1e6c1ec52e8aa615a429e7",
+    "export-r1.json": "c73d2b8627d5998282fc5496f6a0f1f72af0da386f2f1520cc8695313c280dfd"
+  }
+}
