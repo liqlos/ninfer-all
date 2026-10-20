@@ -1,0 +1,62 @@
+{
+  "status": "COMPILE_RESOURCE_PASS_GPU_PENDING",
+  "default_off_flag": "NINFER_LAB_MMQ_TWO_INPUT=0",
+  "lab_only": true,
+  "native_kernel_edits": false,
+  "runtime_or_CMake_edits": false,
+  "compile_elapsed_seconds": 31.59299999999348,
+  "all_six_OFF_ON_SASS_bytes_identical": true,
+  "resources": [
+    {
+      "profile": "Q6",
+      "mode": "accumulate",
+      "registers": 248,
+      "stack": 0,
+      "local": 0
+    },
+    {
+      "profile": "Q6",
+      "mode": "store",
+      "registers": 242,
+      "stack": 0,
+      "local": 0
+    },
+    {
+      "profile": "Q6",
+      "mode": "plain",
+      "registers": 242,
+      "stack": 0,
+      "local": 0
+    },
+    {
+      "profile": "Q4",
+      "mode": "accumulate",
+      "registers": 221,
+      "stack": 0,
+      "local": 0
+    },
+    {
+      "profile": "Q4",
+      "mode": "store",
+      "registers": 221,
+      "stack": 0,
+      "local": 0
+    },
+    {
+      "profile": "Q4",
+      "mode": "plain",
+      "registers": 221,
+      "stack": 0,
+      "local": 0
+    }
+  ],
+  "dynamic_shared_bytes": 57856,
+  "spills": 0,
+  "CPU_address_proof": "PASS: independent dense/interval coverage, native packed panels, sample/column strides and carry addresses; compiled API calls pending.",
+  "ordering": "token tile, then sample, then row tile; paired weight tile reuse distance10CTA instead1360Q4/400Q6. Only L2 locality hypothesis; no guaranteed inter-CTA reuse or lower logical traffic.",
+  "compile_receipt": "results/mmq-two-input/compile-r1.json",
+  "GPU_run": false,
+  "numerical_oracle": "PENDING",
+  "performance_claim": false,
+  "next_gate": "Actual exported operator: two different native-packed inputs, exact FP32/BF16/carry, independent real-fixture FP64 oracle, canaries and compiled API guards; short balanced region screen. Whole paired FFN versus folded16 only after a useful primary down gain."
+}
