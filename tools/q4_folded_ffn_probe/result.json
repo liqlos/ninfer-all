@@ -1,7 +1,7 @@
 {
-  "status": "STAGE1_GPU_EQUALITY_PASS_PAIR_REGION_MIXED",
+  "status": "STAGE2_EXPORTED_WHOLE_FFN_EQUALITY_PASS_EXPLORATORY_SELECTED",
   "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_MMQ",
-  "full_ffn_qualified": false,
+  "full_ffn_qualified": true,
   "full_request_measured": false,
   "performance_claim": false,
   "target": "SM86 Q4_K N17408/K5120/T1280 I128/J128,2720CTA",
@@ -194,9 +194,8 @@
   "ratio_of_sums_time_reduction_percent": 0.5110379292657452,
   "interpretation": "Single warmed 32-repeat exploratory screen is mixed, not a confirmed gain or zero effect. This stage omits down pack/down projection; planned D4/DS4 packed whole-FFN remains necessary before architecture selection. Do not build server/CI or repeat unchanged pair-only screen.",
   "remaining": [
-    "BF16-round then exact D4 andDS4 activation packs",
-    "real Q4/Q6 down with nonzero residual Accumulate and whole-region screen",
-    "only after useful whole-region result: runtime routes/request screen; confirmation excludes selectiondata"
+    "whole-request potential and scoped lab integration decision",
+    "actual runtime route/API/output gate and short full-request screen before independent statistical confirmation"
   ],
   "binary_sha256": "ae706c8d464bfee82f7def68832dd1a565e15028d22da6aca76aed48efb97f8b",
   "independent_review": "Frozen generator/variant/API/build source reviewed read-only; six loader line changes, native dot/K schedule and all ownership checked independently. Not GPU proof by itself.",
@@ -226,5 +225,270 @@
       "kind": "tensor"
     },
     "model_sha256": "781fcd7da81eb72a123091054ec9b2bd163798a374a127b0f90f68dae3edbf27"
-  }
+  },
+  "phase2": {
+    "status": "EXPORTED_GPU_EQUALITY_PASS_WHOLE_FFN_EXPLORATORY_SELECTED",
+    "default_off_flag": "NINFER_GGUF_FFN_FOLDED16_PACK",
+    "layouts": [
+      "D4",
+      "DS4"
+    ],
+    "native_k_body_and_pack_arithmetic_source_preserved": true,
+    "shared_bytes": 57856,
+    "packed_output_bytes": 25067520,
+    "registers": {
+      "1/1": 241,
+      "0/1": 241,
+      "1/0": 244,
+      "0/0": 241
+    },
+    "stack_local_spills": 0,
+    "compile_seconds": 11.375,
+    "cpu_finite_pack_byte_comparisons": 110592,
+    "gpu_correctness_qualified": true,
+    "whole_ffn_measured": true,
+    "performance_claim": false,
+    "body_receipt": "results/q4-folded-ffn/pack-body-r2.json",
+    "next_gate": "evaluate whole-request potential and scoped default-OFF lab integration; no operator confirmation before request screen; selection data excluded from confirmation",
+    "binary_sha256": "5c6e3edc4742789ac051182a9a4bad5055cbcd9f4b8d93d5ce744e02992a38c9",
+    "cases": {
+      "Q6_D4": {
+        "ratio_of_sums_time_reduction_percent": 1.4546843953593231,
+        "positive_blocks": 3,
+        "blocks": [
+          {
+            "kind": "timing",
+            "case": "Q6_D4",
+            "block": 0,
+            "order": "ABBA",
+            "repetitions_per_sample": 32,
+            "warmup_samples": 4,
+            "baseline_ms": 7.623231888,
+            "candidate_ms": 7.411776066,
+            "samples_ms": [
+              7.637023926,
+              7.464064121,
+              7.35948801,
+              7.60943985
+            ],
+            "operator_time_decrease_percent": 2.773834315,
+            "scope": "prequantized_gate_input_to_accumulated_residual",
+            "common_input_pack_outside_events": true,
+            "carry_reset_outside_events": true,
+            "evolving_carry_calls": 32,
+            "evolving_carry_exact": true,
+            "exploratory_only": true,
+            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+          },
+          {
+            "kind": "timing",
+            "case": "Q6_D4",
+            "block": 1,
+            "order": "BAAB",
+            "repetitions_per_sample": 32,
+            "warmup_samples": 4,
+            "baseline_ms": 7.548207998,
+            "candidate_ms": 7.502272129,
+            "samples_ms": [
+              7.483808041,
+              7.597824097,
+              7.4985919,
+              7.520736217
+            ],
+            "operator_time_decrease_percent": 0.6085665528,
+            "scope": "prequantized_gate_input_to_accumulated_residual",
+            "common_input_pack_outside_events": true,
+            "carry_reset_outside_events": true,
+            "evolving_carry_calls": 32,
+            "evolving_carry_exact": true,
+            "exploratory_only": true,
+            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+          },
+          {
+            "kind": "timing",
+            "case": "Q6_D4",
+            "block": 2,
+            "order": "ABBA",
+            "repetitions_per_sample": 32,
+            "warmup_samples": 4,
+            "baseline_ms": 7.546864033,
+            "candidate_ms": 7.473776102,
+            "samples_ms": [
+              7.562880039,
+              7.467904091,
+              7.479648113,
+              7.530848026
+            ],
+            "operator_time_decrease_percent": 0.9684543191,
+            "scope": "prequantized_gate_input_to_accumulated_residual",
+            "common_input_pack_outside_events": true,
+            "carry_reset_outside_events": true,
+            "evolving_carry_calls": 32,
+            "evolving_carry_exact": true,
+            "exploratory_only": true,
+            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+          }
+        ],
+        "selected": true
+      },
+      "Q4_DS4": {
+        "ratio_of_sums_time_reduction_percent": 1.5229176419515826,
+        "positive_blocks": 3,
+        "blocks": [
+          {
+            "kind": "timing",
+            "case": "Q4_DS4",
+            "block": 0,
+            "order": "ABBA",
+            "repetitions_per_sample": 32,
+            "warmup_samples": 4,
+            "baseline_ms": 7.159999847,
+            "candidate_ms": 7.049135923,
+            "samples_ms": [
+              7.220895767,
+              6.988351822,
+              7.109920025,
+              7.099103928
+            ],
+            "operator_time_decrease_percent": 1.54837886,
+            "scope": "prequantized_gate_input_to_accumulated_residual",
+            "common_input_pack_outside_events": true,
+            "carry_reset_outside_events": true,
+            "evolving_carry_calls": 32,
+            "evolving_carry_exact": true,
+            "exploratory_only": true,
+            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+          },
+          {
+            "kind": "timing",
+            "case": "Q4_DS4",
+            "block": 1,
+            "order": "BAAB",
+            "repetitions_per_sample": 32,
+            "warmup_samples": 4,
+            "baseline_ms": 7.15377593,
+            "candidate_ms": 7.040431976,
+            "samples_ms": [
+              6.977952003,
+              7.171967983,
+              7.135583878,
+              7.102911949
+            ],
+            "operator_time_decrease_percent": 1.584393406,
+            "scope": "prequantized_gate_input_to_accumulated_residual",
+            "common_input_pack_outside_events": true,
+            "carry_reset_outside_events": true,
+            "evolving_carry_calls": 32,
+            "evolving_carry_exact": true,
+            "exploratory_only": true,
+            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+          },
+          {
+            "kind": "timing",
+            "case": "Q4_DS4",
+            "block": 2,
+            "order": "ABBA",
+            "repetitions_per_sample": 32,
+            "warmup_samples": 4,
+            "baseline_ms": 7.105104208,
+            "candidate_ms": 7.003120184,
+            "samples_ms": [
+              7.048960209,
+              7.075136185,
+              6.931104183,
+              7.161248207
+            ],
+            "operator_time_decrease_percent": 1.435362819,
+            "scope": "prequantized_gate_input_to_accumulated_residual",
+            "common_input_pack_outside_events": true,
+            "carry_reset_outside_events": true,
+            "evolving_carry_calls": 32,
+            "evolving_carry_exact": true,
+            "exploratory_only": true,
+            "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+          }
+        ],
+        "selected": true
+      }
+    },
+    "correctness": [
+      {
+        "kind": "correctness",
+        "status": "PASS",
+        "case": "Q6_D4",
+        "gate_k": 5120,
+        "intermediate_rows": 17408,
+        "down_rows": 5120,
+        "columns": 1280,
+        "fixture_gate_sha256": "be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790",
+        "fixture_down_sha256": "a381c6be36f572170ccc9c7e4a3f8b25e5061e4eb633649399f3ec9759cb43e2",
+        "exact_packed_bytes": 25067520,
+        "exact_gate_up_fp32": true,
+        "exact_intermediate_bf16": true,
+        "exact_down_fp32": true,
+        "exact_down_bf16": true,
+        "diagnostic_matches_timed_pack": true,
+        "nonzero_carry_expected": true,
+        "carry_sensitive_outputs": 6553586,
+        "gate_fp64_samples": 80,
+        "gate_fp64_max_abs": 0.0002832690156,
+        "producer_oracle_groups": 4352,
+        "down_fp64_samples": 64,
+        "down_fp64_max_abs": 6.473223982e-08,
+        "down_fp64_max_bound_ratio": 3.23156038e-06,
+        "down_oracle_bound": "0.02+2e-4*abs(reference)",
+        "down_J": 128,
+        "down_I": 128,
+        "down_blocks": 400,
+        "down_shared_bytes": 57856,
+        "down_fixup": false,
+        "down_store_fusion": true,
+        "canaries": true,
+        "activation_slack_untouched": true,
+        "invalid_pack_api_guards": true,
+        "input_seed": 3243835100,
+        "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+      },
+      {
+        "kind": "correctness",
+        "status": "PASS",
+        "case": "Q4_DS4",
+        "gate_k": 5120,
+        "intermediate_rows": 17408,
+        "down_rows": 5120,
+        "columns": 1280,
+        "fixture_gate_sha256": "be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790",
+        "fixture_down_sha256": "8a5bbd71b5016c0382895b156c554ff9909e7b7f1dccf1158a7de191b94ef3ce",
+        "exact_packed_bytes": 25067520,
+        "exact_gate_up_fp32": true,
+        "exact_intermediate_bf16": true,
+        "exact_down_fp32": true,
+        "exact_down_bf16": true,
+        "diagnostic_matches_timed_pack": true,
+        "nonzero_carry_expected": true,
+        "carry_sensitive_outputs": 6553600,
+        "gate_fp64_samples": 80,
+        "gate_fp64_max_abs": 0.0002832690156,
+        "producer_oracle_groups": 4352,
+        "down_fp64_samples": 64,
+        "down_fp64_max_abs": 4.429539165e-05,
+        "down_fp64_max_bound_ratio": 0.03467072047,
+        "down_oracle_bound": "half_coefficient_bound+gamma1632*L1",
+        "down_J": 128,
+        "down_I": 128,
+        "down_blocks": 400,
+        "down_shared_bytes": 57856,
+        "down_fixup": false,
+        "down_store_fusion": true,
+        "canaries": true,
+        "activation_slack_untouched": true,
+        "invalid_pack_api_guards": true,
+        "input_seed": 3243835100,
+        "fresh_launch_id": "screen-whole-r1-b062f99db4694453a70826515901c7ca"
+      }
+    ],
+    "decision_receipt": "results/q4-folded-ffn/screen-whole-r1-decision.json"
+  },
+  "runtime_integrated": false,
+  "qualification_scope": "Fixed N17408/K5120/T1280 gate-up and N5120/K17408 down, two pinned real Q4/Q6 fixtures; no full-runtime qualification"
 }
