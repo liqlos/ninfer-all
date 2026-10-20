@@ -1,0 +1,30 @@
+{
+  "status": "CPU_ANALYSIS_READY_NATIVE_CAPTURE_PENDING",
+  "lab_only": true,
+  "default_off_flag": "NINFER_LAB_MTP_COPY_CENSUS=0",
+  "purpose": "Capture exact native ledger/output IDs and full MTP boundaries, then measure causal history-only K3 admission before changing graphs or proposer policy.",
+  "model_or_KV_or_sampling_changed": false,
+  "core_source_modified": false,
+  "CPU_analysis": {
+    "tests": 8,
+    "seconds": 0.055,
+    "selector": "longest suffix then most recent legal source; min8/16/32,max256,history65536,full3alreadyknown continuation",
+    "independent_reference": "Exhaustive binary histories plus randomized bounded-history brute-force checks; native frontier/result/counter mutation cases.",
+    "ready_first_round_excluded": true,
+    "terminal_drain_saving_included": false,
+    "new_trajectory_or_speed_claim": false,
+    "files_sha256": {
+      "analysis.py": "5053ac51f94e5bee0092273225e2b8b1da981af251cd251dd6ff66ae25de05d0",
+      "test_analysis.py": "e83ff41160d7f055bc6245cb865eea9819426133c8b4bc2b5890978a392463ef"
+    }
+  },
+  "native_capture": {
+    "status": "SOURCE_PREPARATION",
+    "GPU_copies_or_synchronizations_added": false,
+    "exact_inputs": "First native SequenceState ledger plus incremental committed deltas; actual GenerationHandle::wait generated_token_ids and prompt summary,not retokenized text.",
+    "output_equality_and_native_counter_gate": "pending",
+    "build_run": false,
+    "GPU_run": false
+  },
+  "next_gate": "Native ABI/noLTO/freshness preflight,host-only OFF/ON wrapper compile/link; then own-reservation fresh diagnostic OFF/ON RU/JSON with exact outputs/counters. No timing claim."
+}
