@@ -133,6 +133,9 @@ print(json.dumps({'changed':changed,'nonbuild_extras':extras}))
         assert all(actual[name] == ("ON" if name in on else "OFF") for name in options)
         assert not {name for name, value in actual.items() if value == "ON"} - on
         ninja = lab.docker("exec", BUILDER, "cat", "/build/build.ninja").stdout
+        seeds = ["ninfer-ggml_vec_q4_k", "ninfer-ggml_mmq_q6_k"]
+        assert all(ninja.count("--frandom-seed=" + seed) == 1 for seed in seeds)
+        record["cuda_symbol_seeds"] = seeds
         effective = set(re.findall(r"(?:-D|/D)(NINFER_\w+)(?:=\S+)?", ninja))
         permitted = on | {"NINFER_SM8X_COMPAT", "NINFER_PYTHON_EXECUTABLE",
                           "NINFER_SOURCE_DIR", "NINFER_TEST_LINK_WRAP"}

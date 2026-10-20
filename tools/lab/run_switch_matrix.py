@@ -58,10 +58,11 @@ def serving_admission(reservation, attempts=1):
 
 def main():
     arm, mode, tag, operator_tag = sys.argv[1:5]
-    control_tag = sys.argv[5] if len(sys.argv) == 6 else "w-screen-r1"
-    assert len(sys.argv) in (5, 6)
+    control_tag = sys.argv[5] if len(sys.argv) >= 6 else "w-screen-r1"
+    route_tag = sys.argv[6] if len(sys.argv) == 7 else arm + "-route"
+    assert len(sys.argv) in (5, 6, 7)
     assert arm in matrix.VARIANTS and mode in {"profile", "screen"}
-    assert all(re.fullmatch(r"[a-z0-9-]+", s) for s in (tag, operator_tag, control_tag))
+    assert all(re.fullmatch(r"[a-z0-9-]+", s) for s in (tag, operator_tag, control_tag, route_tag))
     receipt = OUT / (tag + "-runtime.json")
     assert not receipt.exists()
     assert not list(OUT.glob(tag + "-*"))
@@ -96,8 +97,10 @@ def main():
         record["build_options"] = build["options"]
         record["build_receipt_sha256"] = lab.sha(ROOT / "artifacts/experimental/build-receipt.json")
         if mode == "screen":
-            route = load(OUT / (arm + "-route.json"))
+            route_path = OUT / (route_tag + ".json")
+            route = load(route_path)
             assert route["status"] == "PASS" and route["executable_sha256"] == exe_sha
+            record["route_receipt"] = {"file": route_path.name, "sha256": lab.sha(route_path)}
         gate = load(OUT / (operator_tag + "-qualification.json"))
         assert gate["status"] == "PASS" and gate["arm"] == arm
         assert gate["export"]["files"] == export["files"]

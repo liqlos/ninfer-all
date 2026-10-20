@@ -421,6 +421,12 @@ if(NINFER_GGUF_FFN_PAIR_MMQ_FUSION)
 endif()
 
 option(NINFER_GGUF_Q6_MMQ_A_X4 "Load adjacent SM86 Q6 MMQ A fragments with one x4 instruction" OFF)
+if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA" AND CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "13.1")
+  foreach(unit ggml_vec_q4_k ggml_mmq_q6_k)
+    set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/${unit}.cu"
+      APPEND PROPERTY COMPILE_OPTIONS "--frandom-seed=ninfer-${unit}")
+  endforeach()
+endif()
 if(NINFER_GGUF_Q6_MMQ_A_X4)
   if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
     message(FATAL_ERROR "Q6 MMQ A x4 loads require sm_86")
