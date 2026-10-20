@@ -1,5 +1,5 @@
 {
-  "status": "R2_REQUEST_SCREEN_SELECTED_FRESH_CONFIRMATION_R2_RUNNING",
+  "status": "CONFIRMED_JSON_ENDPOINT_LAB_ONLY",
   "default_off_flag": "NINFER_LAB_FOLDED16_RUNTIME",
   "scope": "Temporary link-time lab gate; not product integration or CMake option. Core archives/source and production unchanged.",
   "closed_route": "SM86, merged gate/up Q4_K N34816/K5120/T1280; down Q4_K or Q6_K N5120/K17408; BF16 contiguous operands, no gather, GgufBlocks, J128/I128 native stream_k=true with zero fixup.",
@@ -22,9 +22,9 @@
   "runtime_route_qualified": true,
   "numerical_runtime_pass": "Both frozen RU4K/JSON32K output+usage+finish+full MTP dict exact across W/C/C/W; full state snapshot not asserted.",
   "full_request_measured": true,
-  "performance_claim": false,
+  "performance_claim": "Workload-specific Windows client time reduction against same lab W; not production integration or a universal context gain.",
   "host_diagnostic": "NINFER_LAB_FOLDED16_HOST_ADMISSIONS=1 counts host admissions/capture, not CUDA graph replays; OFF during timing.",
-  "next_gate": "Fresh fixed independent8pairR2; wait unreserved for41GiB start margin, keep strict40GiB fullmodelguard; allR1partial/selection/profilingdata excluded. Nooptionalextension.",
+  "next_gate": "Retain default-OFF lab source and fixed-series evidence; no automatic production change. Continue independent Q4/T4 operator screen.",
   "receipts": {
     "build": "results/q4-folded-ffn-runtime/build-r2.json",
     "static": "results/q4-folded-ffn-runtime/static-link-r2.json",
@@ -32,7 +32,9 @@
     "route": "results/q4-folded-ffn-runtime/r2-on-profile-route.json",
     "screen": "results/q4-folded-ffn-runtime/screen-r2-decision.json",
     "confirmation_protocol": "results/q4-folded-ffn-runtime/confirmation-protocol-r2.json",
-    "confirmation_abort": "results/q4-folded-ffn-runtime/confirmation-r1-abort.json"
+    "confirmation_abort": "results/q4-folded-ffn-runtime/confirmation-r1-abort.json",
+    "confirmation_decision": "results/q4-folded-ffn-runtime/confirmation-r2-decision.json",
+    "confirmation_driver": "results/q4-folded-ffn-runtime/confirmation-r2-driver.json"
   },
   "prior_route_failure": "R1 untimed profile exact-output but zero folded kernel calls: wrapper incorrectly rejected native stream_k=true, conflating stream-k scheduling with fixup. Corrected before candidate timing; R1 excluded from fresh R2 screen.",
   "static_checks_reuse": "R1 actual linked-call/cubin proof reused under identical original link/native input hashes/build recipe and whole OFF executable; R2 modifies only ON C++ guard and untimed metadata.",
@@ -52,11 +54,222 @@
     "statistical_confirmation": false
   },
   "independent_confirmation": {
-    "status": "RUNNING",
-    "worker_identity": "results/q4-folded-ffn-runtime/confirmation-r2-worker-identity.json",
-    "planned_launches": 16,
-    "prior_abort": "R1 stopped before slot4 GPU on freecommit<40GiB; its three valid launches are excluded, with no statistical estimate.",
+    "status": "CONFIRMED_JSON_ENDPOINT",
+    "independent_pair_units": 8,
+    "completed_launches": 16,
+    "pair_orders": [
+      "AB",
+      "BA",
+      "BA",
+      "AB",
+      "AB",
+      "BA",
+      "BA",
+      "AB"
+    ],
+    "estimand": "-100*expm1(-mean(log(OFF client seconds/ON client seconds)))",
+    "CI_method": "paired log ratios, Student t df7, critical2.3646242510102993; transformed time-reduction interval",
+    "primary_endpoint": "JSON32K",
+    "scores": {
+      "RU4K": {
+        "pairs": [
+          {
+            "pair": 1,
+            "order": "AB",
+            "off_seconds": 7.5841567,
+            "on_seconds": 7.5318478,
+            "log_ratio": 0.0069210231846616515,
+            "time_reduction_percent": 0.689712806171316
+          },
+          {
+            "pair": 2,
+            "order": "BA",
+            "off_seconds": 7.6022464,
+            "on_seconds": 7.5779323,
+            "log_ratio": 0.003203403763908382,
+            "time_reduction_percent": 0.31982783404653486
+          },
+          {
+            "pair": 3,
+            "order": "BA",
+            "off_seconds": 7.5718158,
+            "on_seconds": 7.5366413,
+            "log_ratio": 0.004656274736510946,
+            "time_reduction_percent": 0.464545109509929
+          },
+          {
+            "pair": 4,
+            "order": "AB",
+            "off_seconds": 7.556326,
+            "on_seconds": 7.5599479,
+            "log_ratio": -0.0004792054038277941,
+            "time_reduction_percent": -0.04793202410800875
+          },
+          {
+            "pair": 5,
+            "order": "AB",
+            "off_seconds": 7.5617945,
+            "on_seconds": 7.5306016,
+            "log_ratio": 0.004133597370282284,
+            "time_reduction_percent": 0.412506581605737
+          },
+          {
+            "pair": 6,
+            "order": "BA",
+            "off_seconds": 7.5581679,
+            "on_seconds": 7.5598531,
+            "log_ratio": -0.00022293923351207362,
+            "time_reduction_percent": -0.022296408630983592
+          },
+          {
+            "pair": 7,
+            "order": "BA",
+            "off_seconds": 7.5818846,
+            "on_seconds": 7.5351481,
+            "log_ratio": 0.006183309890907514,
+            "time_reduction_percent": 0.616423257088358
+          },
+          {
+            "pair": 8,
+            "order": "AB",
+            "off_seconds": 7.578452,
+            "on_seconds": 7.5308711,
+            "log_ratio": 0.006298238110443353,
+            "time_reduction_percent": 0.6278445782859178
+          }
+        ],
+        "mean_log_ratio": 0.003836712802421783,
+        "sd_log_ratio": 0.0028622524206424753,
+        "point_time_reduction_percent": 0.382936202380475,
+        "CI95_time_reduction_percent": [
+          0.1442768104303964,
+          0.6210251883132855
+        ],
+        "secondary_ratio_of_sums_time_reduction_percent": 0.3828720152870967,
+        "descriptive_subgroup_point_reduction_percent": {
+          "AB": 0.42095283078754886,
+          "BA": 0.3449050602370626,
+          "first_four": 0.3568990031151036,
+          "last_four": 0.40896659800626856
+        }
+      },
+      "JSON32K": {
+        "pairs": [
+          {
+            "pair": 1,
+            "order": "AB",
+            "off_seconds": 24.4195227,
+            "on_seconds": 24.2311294,
+            "log_ratio": 0.007744777656388019,
+            "time_reduction_percent": 0.7714864140239781
+          },
+          {
+            "pair": 2,
+            "order": "BA",
+            "off_seconds": 24.4370216,
+            "on_seconds": 24.282799,
+            "log_ratio": 0.006331021470415424,
+            "time_reduction_percent": 0.6311022780288439
+          },
+          {
+            "pair": 3,
+            "order": "BA",
+            "off_seconds": 24.4211376,
+            "on_seconds": 24.2331375,
+            "log_ratio": 0.007728037680828884,
+            "time_reduction_percent": 0.7698253172284651
+          },
+          {
+            "pair": 4,
+            "order": "AB",
+            "off_seconds": 24.459487,
+            "on_seconds": 24.2848214,
+            "log_ratio": 0.007166635585204711,
+            "time_reduction_percent": 0.7141016489838927
+          },
+          {
+            "pair": 5,
+            "order": "AB",
+            "off_seconds": 24.47258,
+            "on_seconds": 24.255305,
+            "log_ratio": 0.008917950778506623,
+            "time_reduction_percent": 0.887830379959942
+          },
+          {
+            "pair": 6,
+            "order": "BA",
+            "off_seconds": 24.4580161,
+            "on_seconds": 24.2236235,
+            "log_ratio": 0.00962968434128271,
+            "time_reduction_percent": 0.9583467401511754
+          },
+          {
+            "pair": 7,
+            "order": "BA",
+            "off_seconds": 24.5559483,
+            "on_seconds": 24.2618676,
+            "log_ratio": 0.012048234930835506,
+            "time_reduction_percent": 1.197594555939027
+          },
+          {
+            "pair": 8,
+            "order": "AB",
+            "off_seconds": 24.5279934,
+            "on_seconds": 24.2508708,
+            "log_ratio": 0.011362527032067244,
+            "time_reduction_percent": 1.1298217325841193
+          }
+        ],
+        "mean_log_ratio": 0.00886610868444114,
+        "sd_log_ratio": 0.0020287657149211575,
+        "point_time_reduction_percent": 0.8826920643500871,
+        "CI95_time_reduction_percent": [
+          0.7144374846445206,
+          1.0506615109217448
+        ],
+        "secondary_ratio_of_sums_time_reduction_percent": 0.8828288289963714,
+        "descriptive_subgroup_point_reduction_percent": {
+          "AB": 0.8759383851657901,
+          "BA": 0.8894452833819061,
+          "first_four": 0.7216453544480353,
+          "last_four": 1.0434775285570135
+        }
+      }
+    },
+    "checks": {
+      "JSON_CI_lower_positive": true,
+      "JSON_point_at_least_0_5_percent": true,
+      "RU_mean_regression_within_0_3_percent": true
+    },
+    "protocol_sha256": "529472b6d838b9abd1a78cac1f857417722f21121d69de8b85d319620b1eb710",
+    "receipts": {
+      "confirm-r2-01-runtime.json": "34f79b24ff0b537e6d9aa5f3e9530ddd983b6bad8b2a1cf8d46c31ca18d2a142",
+      "confirm-r2-02-runtime.json": "73cee9e397dffd98295179c08a7c478cee4e8461681372645eb40f8c2fc047c9",
+      "confirm-r2-03-runtime.json": "90bffd357b2ac47f1ecd7746047f4594c0837816a0e7cd0b47549f9826089969",
+      "confirm-r2-04-runtime.json": "d543a77190c45eeec9da5004a625623965974d7a43731248ff15b2d5034c775a",
+      "confirm-r2-05-runtime.json": "8cf382d4508b8bb59b4927a49b0fba6d8115642781e355b16d9887c55227a01f",
+      "confirm-r2-06-runtime.json": "18c026c913be572ff66b6b8e742cb953795af6f00b0d80be54b7e1460fbc4220",
+      "confirm-r2-07-runtime.json": "0f7fcbfdf575936948dfc8ee14ab1c243bd241b14c97e3f10582ef0a60254a9d",
+      "confirm-r2-08-runtime.json": "879a03a6c45ec9b5912a52a2db09ef6c83896424f31d083f8c8dbc23d27a36cc",
+      "confirm-r2-09-runtime.json": "d1e7d95b0d459eb5496d7678345cd5401d421f8d6cfc510536e1c46be8bd7ca6",
+      "confirm-r2-10-runtime.json": "a1f9c26b97f0521351c2f6f105394fbcacc8680d781e2d14c8723ae3b461752c",
+      "confirm-r2-11-runtime.json": "d2bf05ae5717eebc704a32b8a2524906f908f9d0aba9ea01a5119e771a3e46da",
+      "confirm-r2-12-runtime.json": "93ca9923d08253d6c9b93c7a623ac2991aecf025c8eb577cb532e654c9b02dd0",
+      "confirm-r2-13-runtime.json": "f33191b064347e9143cf8142c445d2167d30ffc1a03bc5b62ca0d9aa523754aa",
+      "confirm-r2-14-runtime.json": "fbe35f4a724983e9712840cda2b298e589db784b5c61786afc65ca1df1e3ffce",
+      "confirm-r2-15-runtime.json": "fa964a5e3f2d1b29083e0210367d5b77e1fdcad65df5dd03dec32be48fa3e2a0",
+      "confirm-r2-16-runtime.json": "7d236aef4a7a3bdebec9f2de09e0aacc818d89853268957cd772c7d5aeaf41c6"
+    },
+    "selection_or_profile_data_reused_for_confirmation": false,
     "partial_data_reused_for_confirmation": false,
-    "selection_or_profile_data_reused_for_confirmation": false
+    "prior_abort": "R1 stopped before slot4 GPU on freecommit<40GiB; all three launches excluded.",
+    "CI_assumptions": "approximately independent launch-pair log differences with suitable t approximation; shared GPU/WDDM/thermal drift may violate assumptions",
+    "RU_CI_secondary_not_simultaneous": true,
+    "RU_noninferiority_proven_by_mean_guard": false,
+    "true_gain_at_least_0_5_percent_proven_by_point_gate": false,
+    "historical_W_percent_not_added": true,
+    "production_change": false,
+    "root_recomputed_from_all_16_receipts": true,
+    "independent_review": "PASS: Astra6 independent stdlib recomputation from16raw receipts, all32event segments/protocol/source/route/output/MTP/cleanup pins; point/CI/subgroups match within1e-12. No numeric imports, new GPU or selection reuse."
   }
 }
