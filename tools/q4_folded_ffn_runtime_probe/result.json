@@ -1,5 +1,5 @@
 {
-  "status": "R2_REQUEST_SCREEN_SELECTED_FRESH_CONFIRMATION_R2_READY",
+  "status": "R2_REQUEST_SCREEN_SELECTED_FRESH_CONFIRMATION_R2_RUNNING",
   "default_off_flag": "NINFER_LAB_FOLDED16_RUNTIME",
   "scope": "Temporary link-time lab gate; not product integration or CMake option. Core archives/source and production unchanged.",
   "closed_route": "SM86, merged gate/up Q4_K N34816/K5120/T1280; down Q4_K or Q6_K N5120/K17408; BF16 contiguous operands, no gather, GgufBlocks, J128/I128 native stream_k=true with zero fixup.",
@@ -52,10 +52,11 @@
     "statistical_confirmation": false
   },
   "independent_confirmation": {
-    "status": "INCOMPLETE",
-    "valid_launches": 3,
+    "status": "RUNNING",
+    "worker_identity": "results/q4-folded-ffn-runtime/confirmation-r2-worker-identity.json",
     "planned_launches": 16,
-    "failure": "Pre-slot4 freecommit<40GiB; noGPU/timing for failed slot; no statistical estimate.",
-    "partial_data_reused_for_confirmation": false
+    "prior_abort": "R1 stopped before slot4 GPU on freecommit<40GiB; its three valid launches are excluded, with no statistical estimate.",
+    "partial_data_reused_for_confirmation": false,
+    "selection_or_profile_data_reused_for_confirmation": false
   }
 }

@@ -1,0 +1,51 @@
+{
+  "status": "RESOURCE_PASS_STATIC_REVIEW_PARTIAL_GPU_UNQUALIFIED",
+  "default_off_flag": "NINFER_Q4_T4_CHAIN_PROBE",
+  "target": "SM86 currentW nativeQ4/T4/K5120; N6144/17408/34816, N1024 native only.",
+  "mechanism": "16 realrows,4warps,16FP32partials/thread, literalK-chainupdate andXOR16/8/4/2/1order; twoMMA/lowhighpair, noMMAcountgain claimed.",
+  "symbolic": "2048chains/CTA,5updates/chain,10240updates,256symbolicK32coordinates, actualK5120=160; nibble/scale/minmapping preserved.",
+  "compile_seconds": 6.171999999991385,
+  "resources": {
+    "_ZN6ninfer3ops4gguf6detail4q4tc18q4_t4_chain_kernelENS2_7VecArgsE": {
+      "REG": 80,
+      "STACK": 0,
+      "SHARED": 2048,
+      "LOCAL": 0,
+      "TEXTURE": 0,
+      "SURFACE": 0,
+      "SAMPLER": 0
+    },
+    "_ZN6ninfer3ops4gguf6detail3vec6kernelIL9ggml_type12ELi4ELb0ELi5120ELb1ELb0ELi2EEEvNS2_7VecArgsE": {
+      "REG": 99,
+      "STACK": 0,
+      "SHARED": 0,
+      "LOCAL": 0,
+      "TEXTURE": 0,
+      "SURFACE": 0,
+      "SAMPLER": 0
+    }
+  },
+  "spill_reports": [
+    [
+      "0",
+      "0"
+    ],
+    [
+      "0",
+      "0"
+    ]
+  ],
+  "first_gate": "Original blanket CALL gate failed; retained unchanged in compile-r1 receipt.",
+  "resource_gate": "PASS: 80 registers, no stack/local/spills, 2048 bytes shared.",
+  "static_review": "Five K iterations, packed-word reuse, native FP32 update structure and XOR reduction grouping reviewed. Candidate loop-exit CALL is control flow; four math calls are confined to GateProduct, unavailable through this probe API.",
+  "unresolved": "Full symbolic execution of compiled operands and numerical GPU qualification remain unproven; static review is not a correctness pass.",
+  "GPU_correctness": "NOT_RUN",
+  "fragment_and_FP64_oracle": "NOT_RUN",
+  "full_projection_with_helperpack_and_epilogue": "NOT_RUN",
+  "fused_gate_up": "NOT_QUALIFIED",
+  "performance_claim": false,
+  "receipts": {
+    "compile": "results/q4-t4-chain/compile-r1.json",
+    "resource_review": "results/q4-t4-chain/resource-review-r2.json"
+  }
+}
