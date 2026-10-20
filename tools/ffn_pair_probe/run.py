@@ -12,6 +12,10 @@ import profile_long_context as lab
 
 OUT_SUBDIR = 'ffn-pair'
 PROBE_NAME = 'ffn-pair-probe'
+FIXTURES = [(ROOT / 'fixtures/operators/q4-full-k5120.bin',
+             'be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790')]
+PROBE_INPUTS = ['/lab/fixtures/operators/q4-full-k5120.bin']
+EXPECTED_TIMING_BLOCKS = 3
 
 
 def main():
@@ -40,8 +44,10 @@ def main():
                 raise RuntimeError('Laboratory mutex busy: ' + name)
             handles.append(h)
         record['admission'] = lab.admission()
-        fixture = ROOT / 'fixtures/operators/q4-full-k5120.bin'
-        assert lab.sha(fixture) == 'be10db58b96b5614830c01afe1e28f9d55c4581a6c481827fa7b9d885a6e2790'
+        record['fixtures'] = {}
+        for fixture, digest in FIXTURES:
+            assert fixture.is_file() and lab.sha(fixture) == digest
+            record['fixtures'][fixture.relative_to(ROOT).as_posix()] = digest
         binary = ROOT / 'artifacts/experimental' / PROBE_NAME
         record['binary_sha256'] = lab.sha(binary)
         reservation = uuid.uuid4().hex
@@ -54,7 +60,7 @@ def main():
             '--label', 'io.codex.ninfer-owner=' + reservation, '--gpus', 'all',
             '--mount', 'type=bind,source=' + lab.WSL_ROOT + ',target=/lab,readonly',
             '--entrypoint', '/lab/artifacts/experimental/' + PROBE_NAME, image,
-            '/lab/fixtures/operators/q4-full-k5120.bin', tag + '-' + reservation).stdout.strip()
+            *PROBE_INPUTS, tag + '-' + reservation).stdout.strip()
         assert len(ident) == 64
         record['container_id'] = ident
         start = time.monotonic()
@@ -69,7 +75,7 @@ def main():
         rows = [json.loads(line) for line in p.stdout.splitlines() if line.startswith('{')]
         assert rows[0]['kind'] == 'correctness' and rows[0]['status'] == 'PASS'
         assert rows[-1]['kind'] == 'complete' and rows[-1]['status'] == 'PASS'
-        assert len([r for r in rows if r['kind'] == 'timing']) == 3
+        assert len([r for r in rows if r['kind'] == 'timing']) == EXPECTED_TIMING_BLOCKS
         record['status'] = 'PASS'
         print(p.stdout, flush=True)
     except BaseException as exc:
