@@ -1,0 +1,83 @@
+{
+  "schema": "q4-child-cta-decision-v1",
+  "status": "REJECT_AFTER_EXPLORATORY_SCREEN",
+  "default": "OFF",
+  "switch": "NINFER_GGUF_Q4_MMQ_CHILD_CTA",
+  "geometry": {
+    "K": 5120,
+    "N": 17408,
+    "T": 1280,
+    "J": 128
+  },
+  "implementation": "Restore corrected archived child-CTA to current source, restrict shape and stream one K slice inside child only; no global K_STREAM",
+  "history": "Prior correctness-only child-CTA had no valid timing; this is first isolated current-source screen, not repeat of a measured negative",
+  "compiled_resources": {
+    "baseline_regs": 221,
+    "child_regs": 118,
+    "stack": 0,
+    "spill_stores": 0,
+    "spill_loads": 0,
+    "child_shared_bytes": 38400,
+    "native_preload_regs": 254,
+    "native_preload_rejected_before_gpu": true
+  },
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 7.441463137e-05,
+    "fp64_max_rel_error": 0.2100571711,
+    "input_seed": 3974835228,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-0286c6c9d3de4112ba3550189d5dda01"
+  },
+  "timing_blocks": [
+    {
+      "kind": "timing",
+      "block": 0,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.795903921,
+      "candidate_ms": 5.353543997,
+      "speedup_percent": -11.62742384
+    },
+    {
+      "kind": "timing",
+      "block": 1,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.681452036,
+      "candidate_ms": 5.583580017,
+      "speedup_percent": -19.27026004
+    },
+    {
+      "kind": "timing",
+      "block": 2,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.759148121,
+      "candidate_ms": 5.583856106,
+      "speedup_percent": -17.32889929
+    }
+  ],
+  "geometric_latency_increase_percent": 16.029749568039886,
+  "interpretation": "All3 balanced blocks slower by11.6-19.3% operator latency; reject without costly confirmation/model build. Two-CTA resource ceiling is satisfied but extra CTA/Y work and per-K schedule may erase benefit; no causal attribution without counters, no model speed claim. Historical K-stream control differs, so do not ascribe result solely to CTA split.",
+  "independent_confirmation": "NOT_JUSTIFIED",
+  "model_performance_claim": false,
+  "protocol_sha256": "01a8cdb4f2b455ce060d74498f872633cd5f33ba85faa788d2c0766dd47dca2b",
+  "binary_sha256": "b142ed9d4378cdb78e3fb2302385b8fb60a573b1cfcb84507ff1b7316a4ca2a5",
+  "production_config_unchanged": true,
+  "owned_container_removed": true,
+  "reservation_released": true,
+  "review": "Independent static lane/ownership/fallback review found no blocker; actual exported standalone operator exactFP32/BF16 all22282240 results/API/canaries/40FP64samples PASS"
+}

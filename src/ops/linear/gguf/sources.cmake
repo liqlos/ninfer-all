@@ -28,6 +28,7 @@ option(NINFER_GGUF_VECTOR_PREFETCH2 "Prefetch one SM86 Q4_K/Q6_K vector weight s
 option(NINFER_GGUF_Q4_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_ASYNC_X "Use SM86 cp.async raw-weight staging for GGUF Q4_K MMQ" OFF)
 option(NINFER_GGUF_Q4_MMQ_K_STREAM "Stream SM86 Q4_K MMQ K slices to shorten live A fragments" OFF)
+option(NINFER_GGUF_Q4_MMQ_CHILD_CTA "Split SM86 Q4_K J128 MMQ logical row tiles across two physical child CTAs" OFF)
 option(NINFER_GGUF_Q6_MMQ_ASYNC_Y "Use SM86 cp.async activation staging for GGUF Q6_K MMQ" OFF)
 option(NINFER_GGUF_SM86_MMQ_TILE_CAP "Limit the column tile of wide SM86 Q4_K/Q6_K MMQ products" OFF)
 set(NINFER_GGUF_SM86_MMQ_MAX_J "64" CACHE STRING "Maximum column tile for the SM86 MMQ experiment")
@@ -339,6 +340,16 @@ if(NINFER_GGUF_Q4_MMQ_K_STREAM)
   set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu"
     "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_dual_q4_k.cu" APPEND
     PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_K_STREAM=1)
+endif()
+if(NINFER_GGUF_Q4_MMQ_CHILD_CTA)
+  if(NINFER_GGUF_Q4_MMQ_ASYNC_X OR NINFER_GGUF_Q4_MMQ_ASYNC_Y OR NINFER_GGUF_Q4_MMQ_K_STREAM OR NINFER_GGUF_Q4_MMQ_PACKED_DM)
+    message(FATAL_ERROR "GGUF child-CTA must be qualified separately from Q4 staging/layout experiments")
+  endif()
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+    message(FATAL_ERROR "GGUF Q4 MMQ child-CTA row remap requires sm_86")
+  endif()
+  set_property(SOURCE "${CMAKE_CURRENT_LIST_DIR}/ggml_mmq_q4_k.cu" APPEND
+    PROPERTY COMPILE_DEFINITIONS NINFER_GGUF_Q4_MMQ_CHILD_CTA=1)
 endif()
 add_library(ninfer_ggml_quants STATIC
   "${CMAKE_CURRENT_LIST_DIR}/ggml_vec_swiglu_q8.cu"
