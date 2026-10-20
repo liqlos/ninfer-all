@@ -4,6 +4,7 @@ import json
 import pathlib
 import re
 import sys
+import traceback
 import uuid
 
 import build_switch_matrix as matrix
@@ -110,24 +111,29 @@ def verify_fixtures():
 
 def serving_admission(reservation):
     status = lab.api("/v1/status")
-    assert not status["agents"] and not status["queue"] and not status["leases"]
-    assert not status["inference"]["active_requests"]
     grant = status["admission"]["photo_gpu_reservation"]
-    assert grant["active"] and grant["owner"] == OWNER
-    assert not status["admission"]["active_batches"]
-    assert not status["inference"]["active_sequences"]
-    assert not status.get("external_growth_pressure", {}).get("active")
-    assert status["windows_gpu"]["available"]
-    assert status["windows_gpu"]["external_reserve_fraction"] == 0.3
     allowed = {"dwm", "explorer", "ChatGPT", "Codex", "chrome", "msedge", "firefox",
                "csrss", "vmmemWSL", "vmmem"}
-    assert all(p.get("process") in allowed for p in status["windows_gpu"]["process_memory"])
     capacities = status["capacity_estimate"]
-    assert len(capacities) == 1
+    assert len(capacities) == 1, "Expected one GPU capacity record"
     capacity = capacities[0]
-    assert capacity["sample_age_seconds"] <= 15 and capacity["measurement"] == "measured"
-    assert capacity["external_reserve_satisfied"]
-    assert capacity["available_llm_budget_bytes"] >= 24_000_000_000
+    checks = {
+        "broker_idle": not status["agents"] and not status["queue"] and not status["leases"],
+        "inference_idle": not status["inference"]["active_requests"] and not status["inference"]["active_sequences"],
+        "owned_reservation": grant["active"] and grant["owner"] == OWNER,
+        "no_batches": not status["admission"]["active_batches"],
+        "no_external_growth": not status.get("external_growth_pressure", {}).get("active"),
+        "windows_available": status["windows_gpu"]["available"],
+        "reserve_unchanged": status["windows_gpu"]["external_reserve_fraction"] == 0.3,
+        "allowed_processes": all(p.get("process") in allowed for p in status["windows_gpu"]["process_memory"]),
+        "capacity_fresh": capacity["sample_age_seconds"] <= 15 and capacity["measurement"] == "measured",
+        "reserve_satisfied": capacity["external_reserve_satisfied"],
+        "budget_sufficient": capacity["available_llm_budget_bytes"] >= 24_000_000_000,
+    }
+    if not all(checks.values()):
+        raise RuntimeError(json.dumps({"admission_checks": checks, "capacity": capacity,
+                                      "process_memory": status["windows_gpu"]["process_memory"],
+                                      "reservation": grant}))
     return {"at": lab.now(), "capacity": capacity,
             "process_memory": status["windows_gpu"]["process_memory"]}
 
@@ -316,6 +322,7 @@ def main():
     except BaseException as exc:
         record["status"] = "INCOMPLETE"
         record["failure"] = type(exc).__name__ + ": " + str(exc)
+        record["traceback"] = traceback.format_exc()
     finally:
         container_gone = ident is None
         if ident:
