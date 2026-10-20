@@ -14,7 +14,7 @@ import qualify_switch_matrix as qualification
 OUT = lab.ROOT / "results/switch-matrix"
 
 
-def analyze(records, protocol, protocol_sha, control_tag, control_sha):
+def analyze(records, protocol, protocol_sha, control_tag, control_sha, allow_recipe_rebuilds=False):
     assert len(records) == len(protocol["screen_schedule"]) == 8
     assert [r["arm"] for r in records] == protocol["screen_schedule"]
     categories = ["ru", "en", "code", "json"]
@@ -52,7 +52,8 @@ def analyze(records, protocol, protocol_sha, control_tag, control_sha):
         arm = record["arm"]
         binary = record["running_executable_sha256"]
         assert binary == record["export"]["files"]["ninfer-serve"]
-        assert binaries.setdefault(arm, binary) == binary
+        previous_binary = binaries.setdefault(arm, binary)
+        assert allow_recipe_rebuilds or previous_binary == binary
         expected_on = set(protocol["common_on"] + protocol["arms"][arm])
         actual_on = {name for name, value in record["build_options"].items()
                      if value and name not in {"NINFER_BUILD_APPS", "NINFER_BUILD_BENCHMARKS"}}
@@ -93,6 +94,7 @@ def analyze(records, protocol, protocol_sha, control_tag, control_sha):
             "performance_claim": False, "protocol_sha256": protocol_sha, "scores": scores,
             "selected_arm": selected, "confirmation_pairs": 6 if selected else 0,
             "confirmation_order": ["AB", "BA", "AB", "BA", "AB", "BA"] if selected else [],
+            "artifact_scope": "fixed_source_recipe" if allow_recipe_rebuilds else "same_executable_per_arm",
             "interpretation": "Descriptive screening only; candidate selection is not confirmation"}
 
 
@@ -136,10 +138,45 @@ def validate_evidence(records):
     return inputs.pop()
 
 
+def validate_rebuild_policy(name, protocol_sha, compiled):
+    path = OUT / name
+    assert path.parent == OUT and path.suffix == ".json"
+    policy = json.loads(path.read_text(encoding="utf-8"))
+    assert policy["schema"] == "ninfer-exploratory-rebuild-policy-v1"
+    assert policy["protocol_sha256"] == protocol_sha
+    assert policy["compiled_inputs_sha256"] == compiled
+    assert policy["scope"] == "exploratory_fixed_source_recipe"
+    assert policy["per_executable_qualification_and_route_required"]
+    assert policy["selection_rules_unchanged"]
+    assert not policy["historical_binary_equivalence_claimed"]
+    assert policy["confirmation_requires_independent_qualified_fixed_recipe"]
+    binding = policy["diagnostic"]
+    diagnostic = OUT / binding["file"]
+    assert diagnostic.parent == OUT and lab.sha(diagnostic) == binding["sha256"]
+    evidence = json.loads(diagnostic.read_text(encoding="utf-8"))
+    assert evidence["status"] == "PASS_NONALLOC_STRTAB_VARIATION_DIAGNOSIS"
+    assert evidence["compiled_inputs_sha256"] == compiled
+    inventories = []
+    for filename, digest in evidence["inventories"].items():
+        inventory = OUT / filename
+        assert inventory.parent == OUT and lab.sha(inventory) == digest
+        inventories.append(json.loads(inventory.read_text(encoding="utf-8")))
+    assert len(inventories) == 2
+    before, after = inventories
+    for kind in ("object", "serve"):
+        left, right = before[kind]["sections"], after[kind]["sections"]
+        assert left.keys() == right.keys()
+        assert {key for key in left if left[key] != right[key]} == {".strtab"}
+        assert left[".strtab"]["flags"] == right[".strtab"]["flags"] == 0
+    assert before["cubins"] and before["cubins"] == after["cubins"]
+    return {"file": path.name, "sha256": lab.sha(path), "limitation": policy["limitation"]}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("tags", nargs=8)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--rebuild-policy")
     args = parser.parse_args()
     assert all(pathlib.Path(tag).name == tag for tag in args.tags)
     paths = [OUT / (tag + "-runtime.json") for tag in args.tags]
@@ -147,7 +184,10 @@ def main():
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
     records = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     compiled = validate_evidence(records)
-    result = analyze(records, protocol, lab.sha(protocol_path), args.tags[0], lab.sha(paths[0]))
+    policy = validate_rebuild_policy(args.rebuild_policy, lab.sha(protocol_path), compiled) if args.rebuild_policy else None
+    result = analyze(records, protocol, lab.sha(protocol_path), args.tags[0], lab.sha(paths[0]), policy is not None)
+    if policy:
+        result["rebuild_policy"] = policy
     result["compiled_inputs_sha256"] = compiled
     result["inputs"] = {path.name: lab.sha(path) for path in paths}
     output = OUT / args.output
