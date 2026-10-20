@@ -24,5 +24,11 @@
   "statistical_confirmation": false,
   "source_sha256": "67117c0677235ea2ccfb680858a9f108fc12cfcecbc24c7a881b4cd2927c0417",
   "receipt": "results/weight-read/screen-r1.json",
-  "next_gate": "Bounded default-OFF lab read-ahead preserving file lifetime, aligned tails/errors and every uploaded byte. Actual complete load/output comparison before any loader gain claim."
+  "ext4_diagnostic": {
+    "receipt": "results/weight-read/ext4-screen-r1.json",
+    "existing_production_model_sha256_matches": true,
+    "mean_seconds_QD1_QD2_QD4": [0.2925270389969228, 0.269105387487798, 0.2694768669898622],
+    "scope": "Same source, window and QD order; separate diagnostic cohort, uncontrolled host-cache state. No complete-load/request claim or CI."
+  },
+  "next_gate": "Use the existing verified production ext4 model readonly in both lab arms, qualify actual complete load/readiness/output before a loading claim. No new model copy. Defer additional read-ahead until this cheaper storage-path gate."
 }

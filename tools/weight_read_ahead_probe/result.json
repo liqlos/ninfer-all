@@ -1,0 +1,21 @@
+{
+  "status": "CPU_CALLBACK_QUALIFIED_WRAPPER_NOT_BUILT",
+  "default_off_flag": "NINFER_LAB_WEIGHT_READ_AHEAD=0",
+  "lab_only": true,
+  "GPU_run": false,
+  "performance_claim": false,
+  "native_kernel_or_runtime_edits": false,
+  "receipt": "results/weight-read-ahead/cpu-r1.json",
+  "fake_native_contract_cases": 6,
+  "real_native_paired_reads": 22,
+  "full_compared_bytes": 1140860416,
+  "real_native_hits": 14,
+  "real_native_async_launched": 18,
+  "real_native_async_discarded_and_retired": 4,
+  "maximum_extra_pageable_buffer_bytes": 268435456,
+  "tail_EOF_empty_canaries_file_switch_alignment_error": "PASS",
+  "native_materializer_and_destructor_wrap_seams": "ABI/relocation source preflight only; actual wrapped server not built or run.",
+  "source_review": "No lifetime blocker in one immutable-file loader scope. Native object rechecks and an ignored-nodiscard warning were corrected after CPU-r1; numerical queue/read contract unchanged.",
+  "measurement_boundary": "Complete outer materialization including final speculative drain; native upload_seconds excludes that drain. Extra buffers coexist with up to256MiB native pinned staging.",
+  "next_gate": "Defer wrapper/runtime work until full-load qualification of the existing verified ext4 production model path. Keep this bounded default-OFF source; no loading or inference gain established."
+}
