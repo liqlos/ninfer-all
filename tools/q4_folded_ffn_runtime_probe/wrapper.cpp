@@ -126,6 +126,23 @@ bool try_folded(const ninfer::Tensor& x, const ninfer::Weight& gate,
                 const ninfer::Weight* up, const ninfer::Weight& down,
                 ninfer::Tensor& residual, ninfer::WorkspaceArena& workspace,
                 cudaStream_t stream) {
+    if (host_admissions.enabled && x.ne[1] == kTokens) {
+        static std::atomic<bool> described{false};
+        if (!described.exchange(true, std::memory_order_relaxed)) {
+            std::fprintf(stderr,
+                "{\"kind\":\"ninfer_lab_folded16_first_wide_call\","
+                "\"x_shape\":[%d,%d,%d,%d],\"residual_shape\":[%d,%d,%d,%d],"
+                "\"gate\":[%d,%d,%d,%d],\"down\":[%d,%d,%d,%d],"
+                "\"up_present\":%s,\"gate_gather\":%s,\"down_gather\":%s,"
+                "\"arena_used\":%zu,\"arena_capacity\":%zu}\n",
+                x.ne[0], x.ne[1], x.ne[2], x.ne[3],
+                residual.ne[0], residual.ne[1], residual.ne[2], residual.ne[3],
+                gate.n, gate.k, static_cast<int>(gate.qtype), static_cast<int>(gate.layout),
+                down.n, down.k, static_cast<int>(down.qtype), static_cast<int>(down.layout),
+                up ? "true" : "false", gate.input_columns ? "true" : "false",
+                down.input_columns ? "true" : "false", workspace.used(), workspace.capacity());
+        }
+    }
     if (up != nullptr || gate.qtype != ninfer::QType::GGUF_Q4_K ||
         gate.layout != ninfer::QuantLayout::GgufBlocks || gate.n != 2 * kIntermediate ||
         gate.k != kHidden || gate.input_columns != nullptr ||
@@ -152,7 +169,7 @@ bool try_folded(const ninfer::Tensor& x, const ninfer::Weight& gate,
     if (gguf::matrix_activation_layout(gguf::GgmlType::Q4_K) != 1 ||
         layout != (q6 ? 0 : 1) ||
         !gguf::matrix_bf16_store_plan(down_type, kHidden, kTokens, plan) ||
-        plan.J != 128 || plan.I != 128 || plan.stream_k ||
+        plan.J != 128 || plan.I != 128 || !plan.stream_k ||
         gguf::matrix_fixup_bytes(down_type, kHidden, kTokens) != 0 ||
         gguf::matrix_activation_bytes(kHidden, kTokens) != kInputBytes ||
         gguf::matrix_activation_bytes(kIntermediate, kTokens) != kPackedBytes) {

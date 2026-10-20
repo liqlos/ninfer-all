@@ -21,10 +21,10 @@ from run_switch_matrix import serving_admission
 
 ROOT = lab.ROOT
 OUT = ROOT / "results/q4-folded-ffn-runtime"
-PROTOCOL = OUT / "protocol-r1.json"
-PROTOCOL_SHA = "55e69644eff4af2c1a2f1621177381b9bd64ce50c6d58ad4c746d60077928599"
-BUILD = OUT / "build-r1.json"
-BUILD_SHA = "dfda05d6c189f4112bc44686d1a6bb8d894cc5a25a6299d819b9cbfb0ca1fd53"
+PROTOCOL = OUT / "protocol-r2.json"
+PROTOCOL_SHA = "1ff33e339731bfe6a7ac22f8364ce8e21fbb05e93c243ea0e29f721c5e2a5574"
+BUILD = OUT / "build-r2.json"
+BUILD_SHA = "6f7426bc1e6dcad9a4cdf347f1d97e23bd0fae6ed88ed5f6859cbb485d8d6e89"
 EXPORT = ROOT / "artifacts/experimental/folded16-runtime-serve"
 EXE = "/usr/local/bin/ninfer-serve"
 LABEL = "io.codex.ninfer-owner"
@@ -77,7 +77,7 @@ def main():
     assert not sys.flags.optimize, "Run without Python -O"
     assert all(re.fullmatch(r"[a-z0-9-]+", value) for value in (args.tag, args.control_tag))
     receipt = OUT / (args.tag + "-runtime.json")
-    record = {"schema": "folded16-runtime-launch-r1", "arm": args.arm, "mode": args.mode,
+    record = {"schema": "folded16-runtime-launch-r2", "arm": args.arm, "mode": args.mode,
               "tag": args.tag, "control_tag": args.control_tag, "started_at": lab.now(),
               "status": "INCOMPLETE", "lab_only": True, "product_integration": False,
               "diagnostic_only": args.mode == "profile", "performance_claim": False,
@@ -118,7 +118,7 @@ def main():
         output = build["build"]["outputs"][args.arm]
         assert output["path"] == "/build/q4-folded-ffn/runtime/ninfer-serve-" + args.arm
         exe_sha = output["sha256"]
-        static_path = OUT / "static-link-r1.json"
+        static_path = OUT / "static-link-r2.json"
         static = load(static_path)
         assert static["status"] == "PASS_STATIC_WRAPPED_FFN_CALL_AND_IDENTICAL_LINKED_DEVICE_KERNELS"
         assert all(static["arms"][arm]["binary_sha256"] == entry["sha256"]
