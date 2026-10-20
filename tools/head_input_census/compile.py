@@ -33,8 +33,9 @@ def sha(path):
 
 def base_driver(root):
     for name, expected in PINS.items():
-        require(sha(root / name) == expected, "Source pin changed: " + name)
-    path = root / "tools/mtp_proposal_census/build.py"
+        path = (ROOT if name.startswith("tools/") else root) / name
+        require(sha(path) == expected, "Source pin changed: " + name)
+    path = ROOT / "tools/mtp_proposal_census/build.py"
     scope = {"__file__": str(path), "__name__": "_head_census_base"}
     exec(compile(path.read_text(), str(path), "exec"), scope)
     scope["source_check"](root)
@@ -60,7 +61,7 @@ def read(arguments):
 
 def vector_seam():
     caller = BUILD / "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o"
-    definition = BUILD / "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/ggml_bridge.cu.o"
+    definition = BUILD / "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o"
     names = [line.split()[-1] for line in read(["nm", "--undefined-only", str(caller)]).splitlines()
              if line.split()]
     names = [name for name in names if name.startswith("_ZN6ninfer3ops4gguf14vector_productE")]
@@ -134,6 +135,13 @@ def main():
                       vector_object_sha256=objects, commands=commands)
         if args.compile_only:
             frozen = {str(path): sha(path) for path in inputs}
+            for relative, expected in result["base_object_sha256"].items():
+                path = BUILD / relative
+                require(sha(path) == expected, "Native census object changed: " + relative)
+                frozen[str(path)] = expected
+            for path, expected in objects.items():
+                require(sha(pathlib.Path(path)) == expected, "Native vector object changed: " + path)
+                frozen[path] = expected
             OUTPUT.mkdir(parents=True, exist_ok=True)
             for command in commands["compile_only"]:
                 subprocess.run(command, cwd=BUILD, check=True)
