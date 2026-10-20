@@ -181,6 +181,20 @@ def admission(token=None, ident=None):
     return result
 
 
+def prelaunch_admission():
+    started = time.monotonic()
+    while True:
+        try:
+            result = admission()
+            result["host_budget_recovery_wait_seconds"] = time.monotonic() - started
+            return result
+        except RuntimeError as error:
+            require(str(error) in ("Prelaunch full-model host budget failed", "Free commit below 24 GiB"),
+                    str(error))
+            require(time.monotonic() - started < 60, "Host budget did not recover within 60 seconds")
+            time.sleep(2)
+
+
 def owned(target, name, token, ident=None):
     value = guard.inspect(lab, target)
     labels = value["Config"].get("Labels") or {}
@@ -315,7 +329,7 @@ def launch(index, arm, directory, protocol, protocol_sha, source, bench, request
     try:
         require(lab.sha(directory / "protocol.json") == protocol_sha, "Immutable protocol changed")
         record["model_identity_before"] = unchanged(protocol)
-        record["admission_before_bind"] = admission()
+        record["admission_before_bind"] = prelaunch_admission()
         record["fresh_readonly_executable_bind"] = fresh_bind(token)
         record["admission_before_reservation"] = admission()
         reservation = True
@@ -524,6 +538,7 @@ def main():
                     "startup_clock": "Windows time.monotonic_ns (QPC), separate from native Linux steady_clock",
                     "startup_boundary": "Immediately before docker start until first successful health response; create/bind/proof outside.",
                     "health_poll_seconds": 0.1, "startup_deadline_seconds": 300,
+                    "prelaunch_host_budget_recovery_deadline_seconds": 60,
                     "request_deadline_seconds": 180,
                     "request_timeout": "Unmodified frozenbench in daemon thread; 180-second join deadline, then owned-server cleanup",
                     "memory_guards_gib": {"before_launch_free_commit": 40, "before_cpu_preparation_free_commit": 24,
