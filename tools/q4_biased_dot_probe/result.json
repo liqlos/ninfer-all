@@ -1,0 +1,99 @@
+{
+  "status": "CLOSED_NEGATIVE_EXPLORATORY_SCREEN",
+  "variant": "NINFER_GGUF_Q4_MMQ_BIASED_DOT",
+  "device": "RTX3090 SM86",
+  "shape": {
+    "N": 17408,
+    "K": 5120,
+    "T": 1280,
+    "I": 128,
+    "J": 128,
+    "blocks": 1360,
+    "fixup": false
+  },
+  "correctness": {
+    "kind": "correctness",
+    "status": "PASS",
+    "fixture": "q4-full-k5120.bin",
+    "fixture_bytes": 100270080,
+    "rows": 17408,
+    "k": 5120,
+    "columns": 1280,
+    "baseline": "two Q4_K FP32 MMQ products plus store_plane GateProduct",
+    "common_activation_pack": "Q8_1 DS4 outside timing",
+    "exact_bf16_all_outputs": true,
+    "exact_fp32_planes": true,
+    "output_canaries": true,
+    "independent_fp64_samples": 40,
+    "fp64_max_abs_error": 0.0001983232624,
+    "fp64_max_rel_error": 0.05263035086,
+    "input_seed": 1808517727,
+    "invalid_api_guards": "PASS",
+    "fresh_launch_id": "screen-r1-f788ece5ef3543cf96ca29425a19ff20"
+  },
+  "blocks": [
+    {
+      "block": 0,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.489596128,
+      "candidate_ms": 4.671744108,
+      "operator_time_decrease_percent": -4.057112812
+    },
+    {
+      "block": 1,
+      "order": "BAAB",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.649600029,
+      "candidate_ms": 4.916975975,
+      "operator_time_decrease_percent": -5.750514977
+    },
+    {
+      "block": 2,
+      "order": "ABBA",
+      "repetitions_per_sample": 4,
+      "baseline_ms": 4.917727947,
+      "candidate_ms": 4.944116116,
+      "operator_time_decrease_percent": -0.536592683
+    }
+  ],
+  "geometric_operator_speed_gain_percent": -3.3117147177167183,
+  "resources": {
+    "candidate": {
+      "REG": 225,
+      "STACK": 0,
+      "LOCAL": 0
+    },
+    "baseline": {
+      "REG": 221,
+      "STACK": 0,
+      "LOCAL": 0
+    }
+  },
+  "sass_counts": {
+    "candidate": {
+      "MOV": 81,
+      "IMMA.16832.S8.S8": 256,
+      "FADD": 1024,
+      "FMUL": 1024,
+      "FFMA": 2048
+    },
+    "baseline": {
+      "MOV": 69,
+      "IMMA.16832.S8.S8": 256,
+      "I2FP.F32.S32": 1024,
+      "FMUL": 1024,
+      "FFMA": 2048
+    }
+  },
+  "decision": "Keep OFF. All three balanced blocks are slower, so no long confirmation/full-model build. Exact planes/BF16/oracle/API gates pass. Replacing 1024 I2FP by FADD does not help this workload; seed instructions and register/pipeline changes are plausible costs, not measured causal attribution. This rejects this direct lowering, not all bias or conversion techniques.",
+  "scope": "One exploratory operator launch with three balanced blocks, no CI or full-request performance claim",
+  "receipts": {
+    "build-r1.json": "409f79f1ea39706543783c88f358a13b301cf7de51cb3a0de093ee3cd04c8468",
+    "body-r2.json": "968d646b0fab31b902c62ee8ff5ff266809f7a2f13960a2ed6f07b070749b068",
+    "export-r1.json": "a643d8401c773a5f6fa52c8ee5904a7d5db22e9402ad0dcd1976ae16d4165d36",
+    "screen-r1.jsonl": "2d9a10c563b8bff1ea0381540b4bf6c28352907246a2524244f052656a5e1ae1",
+    "screen-r1-receipt.json": "5d74ba13f3a95e758704afeba4f858f5ae3a66f5875ccefbcc3928a313d5a278",
+    "screen-r1-binding.json": "18da2e9e25602f920ee0705e4f539a3d164e0ba2cf32a5d6b3f4467ec602aa77"
+  }
+}
