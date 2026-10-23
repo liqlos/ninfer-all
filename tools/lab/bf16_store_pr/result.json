@@ -1,0 +1,2195 @@
+{
+  "status": "PASS_STORE_FIXUP_QUALIFICATION_WITH_Q6_T16_REGRESSION",
+  "qualified_commit": "6846e521c00833945606903df9541833520b05c3",
+  "published_commit": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+  "identical_source_tree": "e7457e68e0415211989e4543d5fce0697c88f3cd",
+  "baseline_commit": "032eb711af147047eb654a3cd0c8b96e3acb8e1e",
+  "hardware": {
+    "gpu": "RTX 3090",
+    "sm_count": 82,
+    "driver": "616.92",
+    "OS": "Ubuntu 24.04 Docker on Windows WSL2",
+    "GCC": "13.3",
+    "runtime_CUDA": "13.1.115"
+  },
+  "scope": "Public Linear/GGUF Ops only; no full server/model build/run, Windows build or non86 GPU execution",
+  "builds": {
+    "control": {
+      "source": "032eb711af147047eb654a3cd0c8b96e3acb8e1e",
+      "status": "PASS_OP_BUILD_LINK",
+      "binary_bytes": 168166752,
+      "binary_sha256": "dae4e04559867ea38c5596ee7e689b6bb0117b29abe94fb5f443683a051160d6",
+      "scope": "public Linear/GGUF Op qualification; softmax_attention excluded from lab link",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "--fresh",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 9.313000000000102,
+          "exit": 0
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j"
+          ],
+          "seconds": 1394.2029999999995,
+          "exit": 2
+        },
+        {
+          "argv": [
+            "cmake",
+            "--fresh",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 7.311999999999898,
+          "exit": 0
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 232.70299999999952,
+          "exit": 0
+        },
+        {
+          "argv": [
+            "sh",
+            "-c",
+            "mkdir -p /lab/results/bf16-store-pr/bin; cp /build/ninfer_pr_check /lab/results/bf16-store-pr/bin/control"
+          ],
+          "seconds": 1.485000000000582,
+          "exit": 0
+        }
+      ]
+    },
+    "candidate": {
+      "source": "6846e521c00833945606903df9541833520b05c3",
+      "status": "PASS_OP_BUILD_LINK",
+      "binary_bytes": 176484712,
+      "binary_sha256": "0a87bdd454dd398f8ebc1a272ebf5deb2da62dd11970d6d08d34b9d1cf7ca744",
+      "scope": "public Linear/GGUF Op qualification; softmax_attention excluded from lab link",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "--fresh",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 6.718999999999141,
+          "exit": 0
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 252.17200000000048,
+          "exit": 0
+        },
+        {
+          "argv": [
+            "sh",
+            "-c",
+            "mkdir -p /lab/results/bf16-store-pr/bin; cp /build/ninfer_pr_check /lab/results/bf16-store-pr/bin/candidate"
+          ],
+          "seconds": 1.5470000000004802,
+          "exit": 0
+        }
+      ]
+    }
+  },
+  "protocol": {
+    "scope": "public Linear Op, synthetic GGUF weights, cold-cache eager execution",
+    "builds": {
+      "control": {
+        "source": "032eb711af147047eb654a3cd0c8b96e3acb8e1e",
+        "binary_sha256": "dae4e04559867ea38c5596ee7e689b6bb0117b29abe94fb5f443683a051160d6",
+        "binary_bytes": 168166752
+      },
+      "candidate": {
+        "source": "6846e521c00833945606903df9541833520b05c3",
+        "binary_sha256": "0a87bdd454dd398f8ebc1a272ebf5deb2da62dd11970d6d08d34b9d1cf7ca744",
+        "binary_bytes": 176484712
+      }
+    },
+    "points": [
+      [
+        "q4_k",
+        17408,
+        5120
+      ],
+      [
+        "q6_k",
+        5120,
+        17408
+      ]
+    ],
+    "tokens": [
+      16,
+      128,
+      512,
+      1024
+    ],
+    "orders": [
+      "ABBA",
+      "BAAB",
+      "ABBA"
+    ],
+    "warmup": 20,
+    "repeat": 50,
+    "flush_mib": 256,
+    "profile_in_timing": false
+  },
+  "gpu_tests": [
+    {
+      "label": "control-oracle",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 30.07799999999952,
+      "output": "OK   gguf q8_0 K=1536\nOK   gguf q8_0 K=2560\nOK   gguf q8_0 K=2816\nOK   gguf q8_0 K=2112\nOK   gguf q8_0 K=704\nOK   gguf q2_k K=1536\nOK   gguf q2_k K=2560\nOK   gguf q2_k K=2816\nOK   gguf q3_k K=1536\nOK   gguf q3_k K=2560\nOK   gguf q3_k K=2816\nOK   gguf q4_k K=1536\nOK   gguf q4_k K=2560\nOK   gguf q4_k K=2816\nOK   gguf q5_k K=1536\nOK   gguf q5_k K=2560\nOK   gguf q5_k K=2816\nOK   gguf q6_k K=1536\nOK   gguf q6_k K=2560\nOK   gguf q6_k K=2816\nOK   gguf iq2_xxs K=1536\nOK   gguf iq2_xxs K=2560\nOK   gguf iq2_xxs K=2816\nOK   gguf iq2_xs K=1536\nOK   gguf iq2_xs K=2560\nOK   gguf iq2_xs K=2816\nOK   gguf iq2_s K=1536\nOK   gguf iq2_s K=2560\nOK   gguf iq2_s K=2816\nOK   gguf iq3_xxs K=1536\nOK   gguf iq3_xxs K=2560\nOK   gguf iq3_xxs K=2816\nOK   gguf iq3_s K=1536\nOK   gguf iq3_s K=2560\nOK   gguf iq3_s K=2816\nOK   gguf iq1_s K=1536\nOK   gguf iq1_s K=2560\nOK   gguf iq1_s K=2816\nOK   gguf iq1_m K=1536\nOK   gguf iq1_m K=2560\nOK   gguf iq1_m K=2816\nOK   gguf iq4_nl K=1536\nOK   gguf iq4_nl K=2560\nOK   gguf iq4_nl K=2816\nOK   gguf iq4_nl K=2112\nOK   gguf iq4_nl K=704\nOK   gguf iq4_xs K=1536\nOK   gguf iq4_xs K=2560\nOK   gguf iq4_xs K=2816\nOK   gguf q4_0 K=1536\nOK   gguf q4_0 K=2560\nOK   gguf q4_0 K=2816\nOK   gguf q4_0 K=2112\nOK   gguf q4_0 K=704\nOK   gguf q5_0 K=1536\nOK   gguf q5_0 K=2560\nOK   gguf q5_0 K=2816\nOK   gguf q5_0 K=2112\nOK   gguf q5_0 K=704\nOK   gguf q2_0 K=1536\nOK   gguf q2_0 K=2560\nOK   gguf q2_0 K=2816\nOK   gguf q2_0 K=2112\nOK   gguf q2_0 K=704\nOK GGUF Linear\n"
+    },
+    {
+      "label": "candidate-store",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 2.9840000000003783,
+      "output": "OK GGUF MMQ BF16 q8_0 nonfixup/split=1\nOK GGUF MMQ BF16 q2_k nonfixup/split=1\nOK GGUF MMQ BF16 q3_k nonfixup/split=1\nOK GGUF MMQ BF16 q4_k nonfixup/split=1\nOK GGUF MMQ BF16 q5_k nonfixup/split=1\nOK GGUF MMQ BF16 q6_k nonfixup/split=1\nOK GGUF MMQ BF16 iq2_xxs nonfixup/split=1\nOK GGUF MMQ BF16 iq2_xs nonfixup/split=1\nOK GGUF MMQ BF16 iq2_s nonfixup/split=1\nOK GGUF MMQ BF16 iq3_xxs nonfixup/split=1\nOK GGUF MMQ BF16 iq3_s nonfixup/split=1\nOK GGUF MMQ BF16 iq1_s nonfixup/split=1\nOK GGUF MMQ BF16 iq4_nl nonfixup/split=1\nOK GGUF MMQ BF16 iq4_xs nonfixup/split=1\nOK GGUF MMQ BF16 q4_0 nonfixup/split=1\nOK GGUF MMQ BF16 q5_0 nonfixup/split=1\nOK GGUF MMQ BF16 q2_0 nonfixup/split=1\nOK GGUF MMQ BF16 store, sm=82\n"
+    },
+    {
+      "label": "candidate-oracle",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 27.09400000000096,
+      "output": "OK   gguf q8_0 K=1536\nOK   gguf q8_0 K=2560\nOK   gguf q8_0 K=2816\nOK   gguf q8_0 K=2112\nOK   gguf q8_0 K=704\nOK   gguf q2_k K=1536\nOK   gguf q2_k K=2560\nOK   gguf q2_k K=2816\nOK   gguf q3_k K=1536\nOK   gguf q3_k K=2560\nOK   gguf q3_k K=2816\nOK   gguf q4_k K=1536\nOK   gguf q4_k K=2560\nOK   gguf q4_k K=2816\nOK   gguf q5_k K=1536\nOK   gguf q5_k K=2560\nOK   gguf q5_k K=2816\nOK   gguf q6_k K=1536\nOK   gguf q6_k K=2560\nOK   gguf q6_k K=2816\nOK   gguf iq2_xxs K=1536\nOK   gguf iq2_xxs K=2560\nOK   gguf iq2_xxs K=2816\nOK   gguf iq2_xs K=1536\nOK   gguf iq2_xs K=2560\nOK   gguf iq2_xs K=2816\nOK   gguf iq2_s K=1536\nOK   gguf iq2_s K=2560\nOK   gguf iq2_s K=2816\nOK   gguf iq3_xxs K=1536\nOK   gguf iq3_xxs K=2560\nOK   gguf iq3_xxs K=2816\nOK   gguf iq3_s K=1536\nOK   gguf iq3_s K=2560\nOK   gguf iq3_s K=2816\nOK   gguf iq1_s K=1536\nOK   gguf iq1_s K=2560\nOK   gguf iq1_s K=2816\nOK   gguf iq1_m K=1536\nOK   gguf iq1_m K=2560\nOK   gguf iq1_m K=2816\nOK   gguf iq4_nl K=1536\nOK   gguf iq4_nl K=2560\nOK   gguf iq4_nl K=2816\nOK   gguf iq4_nl K=2112\nOK   gguf iq4_nl K=704\nOK   gguf iq4_xs K=1536\nOK   gguf iq4_xs K=2560\nOK   gguf iq4_xs K=2816\nOK   gguf q4_0 K=1536\nOK   gguf q4_0 K=2560\nOK   gguf q4_0 K=2816\nOK   gguf q4_0 K=2112\nOK   gguf q4_0 K=704\nOK   gguf q5_0 K=1536\nOK   gguf q5_0 K=2560\nOK   gguf q5_0 K=2816\nOK   gguf q5_0 K=2112\nOK   gguf q5_0 K=704\nOK   gguf q2_0 K=1536\nOK   gguf q2_0 K=2560\nOK   gguf q2_0 K=2816\nOK   gguf q2_0 K=2112\nOK   gguf q2_0 K=704\nOK GGUF Linear\n"
+    }
+  ],
+  "process_benchmarks": [
+    {
+      "label": "q4_k-t16-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.625,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 0,
+      "position": 0,
+      "median_us": 111.616
+    },
+    {
+      "label": "q4_k-t16-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.639999999999418,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 0,
+      "position": 1,
+      "median_us": 106.496
+    },
+    {
+      "label": "q4_k-t16-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6569999999992433,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 0,
+      "position": 2,
+      "median_us": 106.496
+    },
+    {
+      "label": "q4_k-t16-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 0,
+      "position": 3,
+      "median_us": 111.616
+    },
+    {
+      "label": "q4_k-t16-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 1,
+      "position": 0,
+      "median_us": 106.496
+    },
+    {
+      "label": "q4_k-t16-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5310000000008586,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 1,
+      "position": 1,
+      "median_us": 111.616
+    },
+    {
+      "label": "q4_k-t16-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.485000000000582,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 1,
+      "position": 2,
+      "median_us": 111.616
+    },
+    {
+      "label": "q4_k-t16-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.4840000000003783,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 1,
+      "position": 3,
+      "median_us": 106.496
+    },
+    {
+      "label": "q4_k-t16-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.4689999999991414,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 2,
+      "position": 0,
+      "median_us": 111.616
+    },
+    {
+      "label": "q4_k-t16-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 2,
+      "position": 1,
+      "median_us": 106.496
+    },
+    {
+      "label": "q4_k-t16-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.514999999999418,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 2,
+      "position": 2,
+      "median_us": 106.496
+    },
+    {
+      "label": "q4_k-t16-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 16,
+      "block": 2,
+      "position": 3,
+      "median_us": 111.616
+    },
+    {
+      "label": "q4_k-t128-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5470000000004802,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 0,
+      "position": 0,
+      "median_us": 268.288
+    },
+    {
+      "label": "q4_k-t128-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5309999999990396,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 0,
+      "position": 1,
+      "median_us": 251.904
+    },
+    {
+      "label": "q4_k-t128-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5630000000001019,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 0,
+      "position": 2,
+      "median_us": 251.904
+    },
+    {
+      "label": "q4_k-t128-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5469999999986612,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 0,
+      "position": 3,
+      "median_us": 268.288
+    },
+    {
+      "label": "q4_k-t128-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 1,
+      "position": 0,
+      "median_us": 251.904
+    },
+    {
+      "label": "q4_k-t128-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 1,
+      "position": 1,
+      "median_us": 268.288
+    },
+    {
+      "label": "q4_k-t128-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 1,
+      "position": 2,
+      "median_us": 268.288
+    },
+    {
+      "label": "q4_k-t128-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5159999999996217,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 1,
+      "position": 3,
+      "median_us": 251.904
+    },
+    {
+      "label": "q4_k-t128-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5470000000004802,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 2,
+      "position": 0,
+      "median_us": 268.288
+    },
+    {
+      "label": "q4_k-t128-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5159999999996217,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 2,
+      "position": 1,
+      "median_us": 250.88
+    },
+    {
+      "label": "q4_k-t128-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.4840000000003783,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 2,
+      "position": 2,
+      "median_us": 251.904
+    },
+    {
+      "label": "q4_k-t128-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.514999999999418,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 128,
+      "block": 2,
+      "position": 3,
+      "median_us": 268.288
+    },
+    {
+      "label": "q4_k-t512-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.4689999999991414,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 0,
+      "position": 0,
+      "median_us": 948.224
+    },
+    {
+      "label": "q4_k-t512-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 0,
+      "position": 1,
+      "median_us": 911.36
+    },
+    {
+      "label": "q4_k-t512-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5619999999998981,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 0,
+      "position": 2,
+      "median_us": 898.048
+    },
+    {
+      "label": "q4_k-t512-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5310000000008586,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 0,
+      "position": 3,
+      "median_us": 934.912
+    },
+    {
+      "label": "q4_k-t512-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5470000000004802,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 1,
+      "position": 0,
+      "median_us": 898.048
+    },
+    {
+      "label": "q4_k-t512-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 1,
+      "position": 1,
+      "median_us": 942.08
+    },
+    {
+      "label": "q4_k-t512-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5310000000008586,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 1,
+      "position": 2,
+      "median_us": 941.056
+    },
+    {
+      "label": "q4_k-t512-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5310000000008586,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 1,
+      "position": 3,
+      "median_us": 893.952
+    },
+    {
+      "label": "q4_k-t512-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.514999999999418,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 2,
+      "position": 0,
+      "median_us": 941.056
+    },
+    {
+      "label": "q4_k-t512-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 2,
+      "position": 1,
+      "median_us": 897.024
+    },
+    {
+      "label": "q4_k-t512-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5630000000001019,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 2,
+      "position": 2,
+      "median_us": 904.192
+    },
+    {
+      "label": "q4_k-t512-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5159999999996217,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 512,
+      "block": 2,
+      "position": 3,
+      "median_us": 942.08
+    },
+    {
+      "label": "q4_k-t1024-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5779999999995198,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 0,
+      "position": 0,
+      "median_us": 1889.28
+    },
+    {
+      "label": "q4_k-t1024-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5779999999995198,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 0,
+      "position": 1,
+      "median_us": 1823.74
+    },
+    {
+      "label": "q4_k-t1024-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5780000000013388,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 0,
+      "position": 2,
+      "median_us": 1823.74
+    },
+    {
+      "label": "q4_k-t1024-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6560000000008586,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 0,
+      "position": 3,
+      "median_us": 1901.57
+    },
+    {
+      "label": "q4_k-t1024-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5939999999991414,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 1,
+      "position": 0,
+      "median_us": 1813.5
+    },
+    {
+      "label": "q4_k-t1024-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6869999999998981,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 1,
+      "position": 1,
+      "median_us": 1900.54
+    },
+    {
+      "label": "q4_k-t1024-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.7029999999995198,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 1,
+      "position": 2,
+      "median_us": 1890.3
+    },
+    {
+      "label": "q4_k-t1024-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.640000000001237,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 1,
+      "position": 3,
+      "median_us": 1824.77
+    },
+    {
+      "label": "q4_k-t1024-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6410000000014406,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 2,
+      "position": 0,
+      "median_us": 1901.57
+    },
+    {
+      "label": "q4_k-t1024-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.7810000000008586,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 2,
+      "position": 1,
+      "median_us": 1820.67
+    },
+    {
+      "label": "q4_k-t1024-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6880000000001019,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 2,
+      "position": 2,
+      "median_us": 1824.77
+    },
+    {
+      "label": "q4_k-t1024-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.609999999998763,
+      "qtype": "q4_k",
+      "n": 17408,
+      "k": 5120,
+      "t": 1024,
+      "block": 2,
+      "position": 3,
+      "median_us": 1900.54
+    },
+    {
+      "label": "q6_k-t16-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5779999999995198,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 0,
+      "position": 0,
+      "median_us": 148.48
+    },
+    {
+      "label": "q6_k-t16-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 0,
+      "position": 1,
+      "median_us": 150.528
+    },
+    {
+      "label": "q6_k-t16-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 0,
+      "position": 2,
+      "median_us": 150.528
+    },
+    {
+      "label": "q6_k-t16-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5310000000008586,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 0,
+      "position": 3,
+      "median_us": 148.48
+    },
+    {
+      "label": "q6_k-t16-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 1,
+      "position": 0,
+      "median_us": 150.528
+    },
+    {
+      "label": "q6_k-t16-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5310000000008586,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 1,
+      "position": 1,
+      "median_us": 147.456
+    },
+    {
+      "label": "q6_k-t16-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.514999999999418,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 1,
+      "position": 2,
+      "median_us": 148.48
+    },
+    {
+      "label": "q6_k-t16-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 1,
+      "position": 3,
+      "median_us": 150.528
+    },
+    {
+      "label": "q6_k-t16-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5159999999996217,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 2,
+      "position": 0,
+      "median_us": 148.48
+    },
+    {
+      "label": "q6_k-t16-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 2,
+      "position": 1,
+      "median_us": 150.528
+    },
+    {
+      "label": "q6_k-t16-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.4689999999991414,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 2,
+      "position": 2,
+      "median_us": 150.528
+    },
+    {
+      "label": "q6_k-t16-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 16,
+      "block": 2,
+      "position": 3,
+      "median_us": 147.456
+    },
+    {
+      "label": "q6_k-t128-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5619999999998981,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 0,
+      "position": 0,
+      "median_us": 289.792
+    },
+    {
+      "label": "q6_k-t128-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5619999999998981,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 0,
+      "position": 1,
+      "median_us": 280.576
+    },
+    {
+      "label": "q6_k-t128-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5469999999986612,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 0,
+      "position": 2,
+      "median_us": 279.552
+    },
+    {
+      "label": "q6_k-t128-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.514999999999418,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 0,
+      "position": 3,
+      "median_us": 289.792
+    },
+    {
+      "label": "q6_k-t128-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.8130000000001019,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 1,
+      "position": 0,
+      "median_us": 280.576
+    },
+    {
+      "label": "q6_k-t128-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5319999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 1,
+      "position": 1,
+      "median_us": 288.768
+    },
+    {
+      "label": "q6_k-t128-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5309999999990396,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 1,
+      "position": 2,
+      "median_us": 289.792
+    },
+    {
+      "label": "q6_k-t128-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 1,
+      "position": 3,
+      "median_us": 279.552
+    },
+    {
+      "label": "q6_k-t128-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5159999999996217,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 2,
+      "position": 0,
+      "median_us": 288.768
+    },
+    {
+      "label": "q6_k-t128-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5460000000002765,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 2,
+      "position": 1,
+      "median_us": 280.576
+    },
+    {
+      "label": "q6_k-t128-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5159999999996217,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 2,
+      "position": 2,
+      "median_us": 280.576
+    },
+    {
+      "label": "q6_k-t128-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.4840000000003783,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 128,
+      "block": 2,
+      "position": 3,
+      "median_us": 288.768
+    },
+    {
+      "label": "q6_k-t512-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5779999999995198,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 0,
+      "position": 0,
+      "median_us": 1054.72
+    },
+    {
+      "label": "q6_k-t512-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5630000000001019,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 0,
+      "position": 1,
+      "median_us": 1032.19
+    },
+    {
+      "label": "q6_k-t512-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5779999999995198,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 0,
+      "position": 2,
+      "median_us": 1030.14
+    },
+    {
+      "label": "q6_k-t512-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5630000000001019,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 0,
+      "position": 3,
+      "median_us": 1049.6
+    },
+    {
+      "label": "q6_k-t512-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6880000000001019,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 1,
+      "position": 0,
+      "median_us": 1029.12
+    },
+    {
+      "label": "q6_k-t512-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5619999999998981,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 1,
+      "position": 1,
+      "median_us": 1043.46
+    },
+    {
+      "label": "q6_k-t512-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5470000000004802,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 1,
+      "position": 2,
+      "median_us": 1050.62
+    },
+    {
+      "label": "q6_k-t512-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6090000000003783,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 1,
+      "position": 3,
+      "median_us": 1032.19
+    },
+    {
+      "label": "q6_k-t512-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6089999999985594,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 2,
+      "position": 0,
+      "median_us": 1045.5
+    },
+    {
+      "label": "q6_k-t512-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5779999999995198,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 2,
+      "position": 1,
+      "median_us": 1029.12
+    },
+    {
+      "label": "q6_k-t512-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.5780000000013388,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 2,
+      "position": 2,
+      "median_us": 1030.14
+    },
+    {
+      "label": "q6_k-t512-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.5630000000001019,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 512,
+      "block": 2,
+      "position": 3,
+      "median_us": 1045.5
+    },
+    {
+      "label": "q6_k-t1024-b0-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6559999999990396,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 0,
+      "position": 0,
+      "median_us": 2120.7
+    },
+    {
+      "label": "q6_k-t1024-b0-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6720000000004802,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 0,
+      "position": 1,
+      "median_us": 2093.06
+    },
+    {
+      "label": "q6_k-t1024-b0-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6409999999996217,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 0,
+      "position": 2,
+      "median_us": 2077.7
+    },
+    {
+      "label": "q6_k-t1024-b0-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.8280000000013388,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 0,
+      "position": 3,
+      "median_us": 2121.73
+    },
+    {
+      "label": "q6_k-t1024-b1-s0-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6869999999998981,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 1,
+      "position": 0,
+      "median_us": 2094.08
+    },
+    {
+      "label": "q6_k-t1024-b1-s1-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6569999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 1,
+      "position": 1,
+      "median_us": 2136.06
+    },
+    {
+      "label": "q6_k-t1024-b1-s2-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6569999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 1,
+      "position": 2,
+      "median_us": 2120.7
+    },
+    {
+      "label": "q6_k-t1024-b1-s3-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6569999999992433,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 1,
+      "position": 3,
+      "median_us": 2094.08
+    },
+    {
+      "label": "q6_k-t1024-b2-s0-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6560000000008586,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 2,
+      "position": 0,
+      "median_us": 2120.7
+    },
+    {
+      "label": "q6_k-t1024-b2-s1-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.6719999999986612,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 2,
+      "position": 1,
+      "median_us": 2091.01
+    },
+    {
+      "label": "q6_k-t1024-b2-s2-candidate",
+      "arm": "candidate",
+      "exit": "0",
+      "seconds": 1.75,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 2,
+      "position": 2,
+      "median_us": 2093.06
+    },
+    {
+      "label": "q6_k-t1024-b2-s3-control",
+      "arm": "control",
+      "exit": "0",
+      "seconds": 1.6720000000004802,
+      "qtype": "q6_k",
+      "n": 5120,
+      "k": 17408,
+      "t": 1024,
+      "block": 2,
+      "position": 3,
+      "median_us": 2119.68
+    }
+  ],
+  "statistics": {
+    "source": {
+      "control": {
+        "source": "032eb711af147047eb654a3cd0c8b96e3acb8e1e",
+        "binary_sha256": "dae4e04559867ea38c5596ee7e689b6bb0117b29abe94fb5f443683a051160d6",
+        "binary_bytes": 168166752
+      },
+      "candidate": {
+        "source": "6846e521c00833945606903df9541833520b05c3",
+        "binary_sha256": "0a87bdd454dd398f8ebc1a272ebf5deb2da62dd11970d6d08d34b9d1cf7ca744",
+        "binary_bytes": 176484712
+      }
+    },
+    "scope": "public Linear Op, synthetic GGUF weights, cold-cache eager execution",
+    "estimand": "geometric mean of control/candidate process median latency ratios",
+    "gain_percent": "100*(control/candidate-1); positive is faster",
+    "uncertainty": "two-sided 95% Student t interval on three balanced-block log ratios (df=2)",
+    "limitations": "exploratory Op screen, only three independent blocks; intervals are unadjusted for eight endpoints and exclude timer quantization/systematic error; no whole-model claim",
+    "points": [
+      {
+        "qtype": "q4_k",
+        "n": 17408,
+        "k": 5120,
+        "t": 16,
+        "control_us": 111.616,
+        "candidate_us": 106.49600000000001,
+        "speed_gain_percent": 4.807692307692291,
+        "latency_reduction_percent": 4.587155963302736,
+        "block_t95_gain_percent": [
+          4.807692307692291,
+          4.807692307692291
+        ],
+        "block_log_ratios": [
+          0.046956983087770875,
+          0.046956983087770875,
+          0.046956983087770875
+        ],
+        "adjacent_pair_ratios": [
+          1.0480769230769231,
+          1.0480769230769231,
+          1.0480769230769231,
+          1.0480769230769231,
+          1.0480769230769231,
+          1.0480769230769231
+        ]
+      },
+      {
+        "qtype": "q4_k",
+        "n": 17408,
+        "k": 5120,
+        "t": 128,
+        "control_us": 268.288,
+        "candidate_us": 251.73304354359774,
+        "speed_gain_percent": 6.576393874781589,
+        "latency_reduction_percent": 6.170591474983011,
+        "block_t95_gain_percent": [
+          6.265536601097524,
+          6.88816049544392
+        ],
+        "block_log_ratios": [
+          0.06301296782873417,
+          0.06301296782873417,
+          0.0650496305225526
+        ],
+        "adjacent_pair_ratios": [
+          1.0650406504065042,
+          1.0650406504065042,
+          1.0650406504065042,
+          1.0650406504065042,
+          1.069387755102041,
+          1.0650406504065042
+        ]
+      },
+      {
+        "qtype": "q4_k",
+        "n": 17408,
+        "k": 5120,
+        "t": 512,
+        "control_us": 941.560065090333,
+        "candidate_us": 900.4190287082679,
+        "speed_gain_percent": 4.569098949528535,
+        "latency_reduction_percent": 4.369454260798267,
+        "block_t95_gain_percent": [
+          3.3201891391240466,
+          5.833105283928198
+        ],
+        "block_log_ratios": [
+          0.03994083007138995,
+          0.04960862209349326,
+          0.04448425042921053
+        ],
+        "adjacent_pair_ratios": [
+          1.0404494382022473,
+          1.041049030786773,
+          1.0490307867730901,
+          1.0526918671248569,
+          1.0490867579908676,
+          1.0419026047565119
+        ]
+      },
+      {
+        "qtype": "q4_k",
+        "n": 17408,
+        "k": 5120,
+        "t": 1024,
+        "control_us": 1897.2924890958964,
+        "candidate_us": 1821.8606316171638,
+        "speed_gain_percent": 4.140374744898917,
+        "latency_reduction_percent": 3.975763247483155,
+        "block_t95_gain_percent": [
+          3.670553155244858,
+          4.612325505463974
+        ],
+        "block_log_ratios": [
+          0.038548494798218834,
+          0.041080485758318984,
+          0.042079700080739184
+        ],
+        "adjacent_pair_ratios": [
+          1.0359371401625233,
+          1.042676039347714,
+          1.04799558864075,
+          1.0359113751322084,
+          1.04443419180851,
+          1.0415230412599945
+        ]
+      },
+      {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 16,
+        "control_us": 148.1378789720292,
+        "candidate_us": 150.528,
+        "speed_gain_percent": -1.5878248750868222,
+        "latency_reduction_percent": -1.6134435328468477,
+        "block_t95_gain_percent": [
+          -2.075006128770669,
+          -1.0982198727300574
+        ],
+        "block_log_ratios": [
+          -0.01369884435816169,
+          -0.017159065780448075,
+          -0.017159065780448075
+        ],
+        "adjacent_pair_ratios": [
+          0.9863945578231292,
+          0.9863945578231292,
+          0.9795918367346939,
+          0.9863945578231292,
+          0.9863945578231292,
+          0.9795918367346939
+        ]
+      },
+      {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 128,
+        "control_us": 289.2795469023001,
+        "candidate_us": 280.2342505753034,
+        "speed_gain_percent": 3.227762598050447,
+        "latency_reduction_percent": 3.1268357627964427,
+        "block_t95_gain_percent": [
+          2.5287006501809706,
+          3.9315908952822007
+        ],
+        "block_log_ratios": [
+          0.034146946856722545,
+          0.03237703350416047,
+          0.028778964550042464
+        ],
+        "adjacent_pair_ratios": [
+          1.032846715328467,
+          1.0366300366300365,
+          1.0291970802919705,
+          1.0366300366300365,
+          1.0291970802919705,
+          1.0291970802919705
+        ]
+      },
+      {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 512,
+        "control_us": 1048.2263946874068,
+        "candidate_us": 1030.4825428110912,
+        "speed_gain_percent": 1.7218973771173092,
+        "latency_reduction_percent": 1.692749959955675,
+        "block_t95_gain_percent": [
+          1.0472556564818487,
+          2.4010433413194554
+        ],
+        "block_log_ratios": [
+          0.020153497045450552,
+          0.015767876797071624,
+          0.015295848154853168
+        ],
+        "adjacent_pair_ratios": [
+          1.021827376742654,
+          1.0188906362242023,
+          1.013934235074627,
+          1.0178552398298761,
+          1.01591651119403,
+          1.0149105946764516
+        ]
+      },
+      {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 1024,
+        "control_us": 2123.2538942735323,
+        "candidate_us": 2090.4902223773865,
+        "speed_gain_percent": 1.5672721902945088,
+        "latency_reduction_percent": 1.5430878042664187,
+        "block_t95_gain_percent": [
+          1.0808453992506806,
+          2.0560397910348795
+        ],
+        "block_log_ratios": [
+          0.017044696899059426,
+          0.01624030061489615,
+          0.013368521941743771
+        ],
+        "adjacent_pair_ratios": [
+          1.0132055459470821,
+          1.0211917023631902,
+          1.020046989608802,
+          1.0127120262836184,
+          1.0141988799670971,
+          1.012718221169006
+        ]
+      }
+    ]
+  },
+  "route": {
+    "points": [
+      {
+        "qtype": "q4_k",
+        "n": 17408,
+        "k": 5120,
+        "t": 128,
+        "kernels": [
+          {
+            "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+            "count": 1
+          },
+          {
+            "name": "void mul_mat_q_stream_k_fixup<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const int *, const int *, T5 *, float *, uint3, int, int, int, uint3, int, uint3, int, uint3, float *, int)",
+            "count": 1
+          },
+          {
+            "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)1>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+            "count": 1
+          }
+        ],
+        "bf16_mmq": true,
+        "bf16_fixup": true,
+        "separate_store_plane": false
+      },
+      {
+        "qtype": "q4_k",
+        "n": 17408,
+        "k": 5120,
+        "t": 512,
+        "kernels": [
+          {
+            "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+            "count": 1
+          },
+          {
+            "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)1>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+            "count": 1
+          }
+        ],
+        "bf16_mmq": true,
+        "bf16_fixup": false,
+        "separate_store_plane": false
+      },
+      {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 128,
+        "kernels": [
+          {
+            "name": "void mul_mat_q<(ggml_type)14, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+            "count": 1
+          },
+          {
+            "name": "void mul_mat_q_stream_k_fixup<(ggml_type)14, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const int *, const int *, T5 *, float *, uint3, int, int, int, uint3, int, uint3, int, uint3, float *, int)",
+            "count": 1
+          },
+          {
+            "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)0>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+            "count": 1
+          }
+        ],
+        "bf16_mmq": true,
+        "bf16_fixup": true,
+        "separate_store_plane": false
+      },
+      {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 512,
+        "kernels": [
+          {
+            "name": "void mul_mat_q<(ggml_type)14, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+            "count": 1
+          },
+          {
+            "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)0>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+            "count": 1
+          }
+        ],
+        "bf16_mmq": true,
+        "bf16_fixup": false,
+        "separate_store_plane": false
+      }
+    ],
+    "profile_not_timing": true,
+    "status": "PASS_PUBLIC_BF16_MMQ_AND_FIXUP_ROUTE"
+  },
+  "architecture_compile": {
+    "status": "PASS_AFFECTED_UNITS_COMPILE_ALL_SIX_ARCHITECTURES",
+    "source": "6846e521c00833945606903df9541833520b05c3",
+    "compile_only": true,
+    "non86_GPU_run": false,
+    "configurations": [
+      {
+        "name": "cuda12",
+        "architectures": "70;75;80;86;89",
+        "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0\n",
+        "configure": {
+          "argv": [
+            "cmake",
+            "--fresh",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build/bf16-store-matrix",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=70;75;80;86;89",
+            "-DCMAKE_CUDA_COMPILER=/build/bf16-store-toolchain/root/usr/local/cuda-12.9/bin/nvcc",
+            "-DCUDAToolkit_ROOT=/build/bf16-store-toolchain/root/usr/local/cuda-12.9",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=OFF",
+            "-DNINFER_SM120_NATIVE=OFF",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+          ],
+          "log": "cuda12-configure.log",
+          "exit": 0,
+          "seconds": 7.79700000000048
+        },
+        "targets": [
+          "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+          "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+        ],
+        "compile": {
+          "argv": [
+            "ninja",
+            "-C",
+            "/build/bf16-store-matrix",
+            "-j",
+            "4",
+            "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+          ],
+          "log": "cuda12-compile.log",
+          "exit": 0,
+          "seconds": 583.0469999999987
+        },
+        "objects": [
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o",
+            "bytes": 47144,
+            "sha256": "82cd1208d0b22387c05c12c84c99e0ee1e0090a186561d7cee93d6f1b7320e2c"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o",
+            "bytes": 1206856,
+            "sha256": "0bd262c8bee0af9fe89d801ca027b7d53b31b101b78c3bf8778d74b6ee5a317c"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "bytes": 5080312,
+            "sha256": "7b76bb99dda4975a93315a8bbef14e92a64566afb1e4e32ecd5efa51ce1c3c96"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "bytes": 5911832,
+            "sha256": "37aa6aa6b6acafd0f50fe754875477e8caaceda6b0f6c8eb4cb7e292ddb99975"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "bytes": 5777808,
+            "sha256": "80eb3d7b64ca58b13772d7270bdcb14dd6402b2daa8bb7852a9c6defc815fac7"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "bytes": 4888000,
+            "sha256": "656cb9840b6167e48e634639489c97bf5147bf6a13199229dd440af4c9529f28"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "bytes": 5249992,
+            "sha256": "81a3711d374df85ed29afd0674c3bd804c507d5572167053aa621cd13a11d676"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "bytes": 5112328,
+            "sha256": "8d99a878ec522f9fded3739e059c53b413f3d1fe4a45fd887bd7feae75525d64"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "bytes": 4505800,
+            "sha256": "080e6baf05b08c1c58d51431fa0f5c84fea65d519106b8c49d82ee74d5dc93d1"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "bytes": 4419296,
+            "sha256": "c38926daf078455d1317a621c15df40fa160c8f254fae10fd62ec19fb97f54f6"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "bytes": 9476672,
+            "sha256": "49fb4a4b658ae0488f9c8e1dba715c02bb867898db2419940d92fe9e1e9e9495"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "bytes": 5845544,
+            "sha256": "da2349dc8cd91f9242702e7cf96eda416310f8b221826b748c81d6833d49b80d"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "bytes": 5358192,
+            "sha256": "9780c2a82d4e9838ec2b24f0e1b5531527f0499b735701f7c00f2d0371f533ce"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "bytes": 5519152,
+            "sha256": "8a3ce75ffd1110946ca4f83b8ad92ed205dec046ab3c16a4f8178c19182fb0e8"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "bytes": 6690664,
+            "sha256": "2022c5b34483a5a4a21519a31243091b5de1f3e2b973a944c397b26bcf764431"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "bytes": 4040976,
+            "sha256": "2bf9681c15f481e16482492bb2a3493d266a1200a5aa22671d8daabfa3b19b45"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "bytes": 4861496,
+            "sha256": "10f763301d2399770ba1b57390becea661d04cbf1ccd349a4974e3422df3a400"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "bytes": 5359928,
+            "sha256": "8efdfcb83e04313660a64fa97ec57ff577287473083efe15064d9beaaf50b1c9"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "bytes": 4203072,
+            "sha256": "26375f557e136667c05acea9e20e14862b0198fa532a70d4260ef5752dd62ba4"
+          },
+          {
+            "path": "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o",
+            "bytes": 76808,
+            "sha256": "6ba7546e00c59df5c6710c26727431e7582bd5369aab2361161cf30f8b2b5701"
+          }
+        ]
+      },
+      {
+        "name": "cuda13",
+        "architectures": "120a",
+        "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_Dec_16_07:23:41_PM_PST_2025\nCuda compilation tools, release 13.1, V13.1.115\nBuild cuda_13.1.r13.1/compiler.37061995_0\n",
+        "configure": {
+          "argv": [
+            "cmake",
+            "--fresh",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build/bf16-store-matrix",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=120a",
+            "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+            "-DCUDAToolkit_ROOT=/usr/local/cuda",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=OFF",
+            "-DNINFER_SM120_NATIVE=OFF",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+          ],
+          "log": "cuda13-configure.log",
+          "exit": 0,
+          "seconds": 6.875
+        },
+        "targets": [
+          "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+          "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+          "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+        ],
+        "compile": {
+          "argv": [
+            "ninja",
+            "-C",
+            "/build/bf16-store-matrix",
+            "-j",
+            "4",
+            "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+          ],
+          "log": "cuda13-compile.log",
+          "exit": 0,
+          "seconds": 140.09400000000096
+        },
+        "objects": [
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ops.dir/linear/gguf/gguf_linear.cpp.o",
+            "bytes": 41592,
+            "sha256": "418c307c137b88206cc5ec40d989bf21c54cb0a9f8b9a7bd5f654d57a2fc232e"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_bridge.cu.o",
+            "bytes": 689888,
+            "sha256": "7096e7e8a9b4ded050bf3b4ec86495d5044aca869f6e8c0c865ce5178f607f98"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "bytes": 1301416,
+            "sha256": "d8eeaa464e5b31d0eb83bfc6443bef361a1088ae7558034e237ce563add6d179"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "bytes": 1509272,
+            "sha256": "5cfb9fc6b1d3c6753bfc0d247f9ad9517196e05c6642cb04ca30476e34ce8f94"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "bytes": 1480144,
+            "sha256": "b68c1c901a851bbed1835092fbb595811b05c7d9f3fd3ecaec0a2e652cdf1fd7"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "bytes": 1233288,
+            "sha256": "ecbdca7a36efc0e700a348f4ca3d37cc9b70841143920eb6c4824867a7f8589e"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "bytes": 1287160,
+            "sha256": "779500b5f4b726359ddc714b64f202e2a1eb2599d20c917bb7a8e754cc5e13b6"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "bytes": 1250352,
+            "sha256": "1612bdfb364878b838910b186d54cfd95cd6eac9a6ae4b10fedf3d26e65cefb5"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "bytes": 1155856,
+            "sha256": "4274c6d31c79b52aac342caafaf8792285c38679ea57a3490dc8f03b75dedebb"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "bytes": 1181992,
+            "sha256": "69a1c7bd374a9df7f92ee3249a62ed6582e474ca8c7da381f26a59e5b30e19ab"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "bytes": 1793440,
+            "sha256": "4ff66158d61c67353df81c9602dded13898a7927057dd9ccbd833a4e2dec4882"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "bytes": 1486160,
+            "sha256": "182e159794972237fe93f0a0adab481bc2903d371bc889b87dc3f024f08372b7"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "bytes": 1288328,
+            "sha256": "9d4b278922be534bd4390b0263538037e413369be871a3ed9b30b1c8363ce706"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "bytes": 1346536,
+            "sha256": "b7873a47c2a3e918f1c1dbfe39da988e46730264104fc5c4cffcc302f671a4ed"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "bytes": 1508584,
+            "sha256": "7a10ac4766127930a5c67a88c3c49d856d876b763799bb71accde177e6c146af"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "bytes": 1109328,
+            "sha256": "43b6056753a4fe781fad67245e1bc1ae017eba57c233ac873fd5100cdf1f5eed"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "bytes": 1217120,
+            "sha256": "38e088a7863589c3f682691b4c19754db8e0d2885f05e7081e70a9f9ca0d18d3"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "bytes": 1339576,
+            "sha256": "2d649f405066cd2b19a69e8ab7174dcd27963ffd3ad565740195b654868770f5"
+          },
+          {
+            "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "bytes": 1120432,
+            "sha256": "81ce427649bcacb4ec4a7f95028fafeb199f1e74530f30ddd43d4ce2c03e921a"
+          },
+          {
+            "path": "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o",
+            "bytes": 73464,
+            "sha256": "b80e8833e273eccbb005b656b8be7e0dd9a9a610e089b24b20507cd751ca67ea"
+          }
+        ]
+      }
+    ]
+  },
+  "review": "Two bounded independent source reviews; final arithmetic review found no blocker. Missing split partial-plane guard was fixed before qualification.",
+  "costs": {
+    "FP32_workspace": "retained",
+    "test_runner_growth_bytes": 8317960,
+    "candidate_incremental_compile_seconds": 252.172,
+    "initial_control_build": "Interrupted after unnecessary attention compilation; narrowed external Op link, reused completed objects; no source/test failure."
+  },
+  "production_unchanged": true,
+  "cleanup_ok": true,
+  "replay": "Restore scripts under the NInfer project scripts directory and build-inputs under results/bf16-store-pr/build-inputs. Pinned source and an idle broker-owned GPU window are required; preserve existing receipts. Source6846e521 and publishedbfd1941a have identical trees.",
+  "tool_sha256": {
+    "build-inputs/cuda12.sh": "d3c6b2845f30c6d7b45514a3add1a3644c5bd6c7aac850f8e2cabee22c0829d9",
+    "build-inputs/driver.cpp": "b7c74ec9fda8aac7c1ec5438588ae297f8e97a3054d8d63fb965f86550fdd6fa",
+    "build-inputs/target.cmake": "4e4b7a92c1cf8fa07740f4a84144fa218d78dad2027e7963a13c04dbd78553b9",
+    "scripts/analyze-bf16-store.py": "fc52c85f32eb0e8ff6300bfec9d30d6d673c130a59a669b08b8fdd6a4296d480",
+    "scripts/qualify-bf16-store-build.py": "1a0ccb6bbf061f916fa26ad6a34547fdc01b60b965fd03eba67961aeb29409c6",
+    "scripts/qualify-bf16-store-gpu.py": "44ab4bdc231c74ad8915708908edccc4622857bc04262eacd025ac0d3788e7e8",
+    "scripts/qualify-bf16-store-matrix.py": "5eb3753e8eeee5b19cd91d220e5668e8f3bec87a39cabab0a889f65c68364a05",
+    "scripts/qualify-bf16-store-route.py": "2b8e90f0b71363cbab561117078eb6d09f0600d35f860a241a1bcd5af0b93218"
+  }
+}
