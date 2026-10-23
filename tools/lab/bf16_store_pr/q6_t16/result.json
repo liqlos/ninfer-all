@@ -1,0 +1,2769 @@
+{
+  "scope": "Q6_K/T16 all-split BF16-store regression fix; public Linear Op only",
+  "source": {
+    "published_source": "1e0412299f15f237f2ce5b7b04d8b81de3e1da22",
+    "published_tree": "d56276c8258c85bf35f39e5626c425db12f73a2e",
+    "tested_source_base": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+    "tested_diff_sha256": "254b504c9ec995ca0db602f7058f66b71701e3e6e7d9809c8842d65fd13dc7a7",
+    "tested_binary_sha256": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+  },
+  "records": {
+    "architecture-compile": {
+      "status": "PASS_AFFECTED_UNITS_COMPILE_ALL_SIX_ARCHITECTURES",
+      "source": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+      "compile_only": true,
+      "non86_GPU_run": false,
+      "working_diff_sha256": "254b504c9ec995ca0db602f7058f66b71701e3e6e7d9809c8842d65fd13dc7a7",
+      "configurations": [
+        {
+          "name": "cuda12",
+          "architectures": "70;75;80;86;89",
+          "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0\n",
+          "configure": {
+            "argv": [
+              "cmake",
+              "--fresh",
+              "-S",
+              "/lab/source",
+              "-B",
+              "/build/bf16-store-matrix",
+              "-G",
+              "Ninja",
+              "-DCMAKE_BUILD_TYPE=Release",
+              "-DCMAKE_CUDA_ARCHITECTURES=70;75;80;86;89",
+              "-DCMAKE_CUDA_COMPILER=/build/bf16-store-toolchain/root/usr/local/cuda-12.9/bin/nvcc",
+              "-DCUDAToolkit_ROOT=/build/bf16-store-toolchain/root/usr/local/cuda-12.9",
+              "-DNINFER_BUILD_APPS=OFF",
+              "-DBUILD_TESTING=ON",
+              "-DNINFER_BUILD_BENCHMARKS=OFF",
+              "-DNINFER_SM120_NATIVE=OFF",
+              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+            ],
+            "log": "cuda12-configure.log",
+            "exit": 0,
+            "seconds": 8.25
+          },
+          "targets": [
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+          ],
+          "compile": {
+            "argv": [
+              "ninja",
+              "-C",
+              "/build/bf16-store-matrix",
+              "-j",
+              "4",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+            ],
+            "log": "cuda12-compile.log",
+            "exit": 0,
+            "seconds": 624.530999999999
+          },
+          "objects": [
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "bytes": 5090440,
+              "sha256": "cd7cfefa4cd6c5e7f36a29b275845c816964a27ba7fba9f18be1bc71a2b5c2a6"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "bytes": 5920232,
+              "sha256": "5bcc4ece9e351dc1c0b2ad10d31629b1ffe3ba889cad6cd96b6c7cad882db4b4"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "bytes": 5784768,
+              "sha256": "cf20093fb9fd9d426e957f5d0fddcfcb193c2cc3259deb1c63d3c0c0fefc378a"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "bytes": 4897296,
+              "sha256": "933b249f5830ce850fb85e0c74a5359b4c24f3310e19b51469bd6d60a332291e"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "bytes": 5261336,
+              "sha256": "e9f7f78c20b8bb79e6416bd42dd631feff96bd30303f7bb3e3aad35ed81fb936"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "bytes": 5123192,
+              "sha256": "a622091d12efa9b95dc52b9b7913fafba074e5b500844dc59f2d85124ce23ed6"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "bytes": 4517240,
+              "sha256": "7daf833b557c50ef731d8c23e34d0db7352bfca123c5e4f81a67d421b9e51c57"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "bytes": 4428488,
+              "sha256": "06c2b4af595517e963ed072b4674925e4bf9f3993c4aed62e7e67d05ed4a29e5"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "bytes": 9482536,
+              "sha256": "7bb8a09d41903485a66779d1174855ac649fa6a488453bf2905e0c432a8bdc00"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "bytes": 5856184,
+              "sha256": "dec5ad2090e9e353baae717243f28ad6aa2bef63e6bd833bde9d7507f8963191"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "bytes": 5368224,
+              "sha256": "018489eb1882db2a1eb73b407067bc8df884583d7e3d6e45ef8997f9aec91cf2"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "bytes": 5529664,
+              "sha256": "5b684cb1888ecfd424e0daa8a0e9793a790f381a2f69ee9dcd77ae2e46a13fac"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "bytes": 6699472,
+              "sha256": "013b61d0a3e12c1dfeb061fba1802746154a2e53d1e5742123af23c5fb0772c6"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "bytes": 4049984,
+              "sha256": "cd91a207521e910b3a23cf8bd93332bb979728c6689894c09bc555bab2303c5a"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "bytes": 4887944,
+              "sha256": "88556ca8bc288956fb5a940ba23789767850023ec05dad099b7f6a20fc6bec7a"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "bytes": 5370856,
+              "sha256": "71168f30443d8d1c52c7bcc15720a61cc10f66d1b786afe14c656132e3f8b8f9"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "bytes": 4213200,
+              "sha256": "2ca667653a6b3fdd68db01594f9d12664f8725df2b8f11350dec944c83bf182e"
+            },
+            {
+              "path": "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o",
+              "bytes": 77136,
+              "sha256": "4490f46828734529b238eb5123f3f3b718d7a571913f1d078144554b4ab7cf7f"
+            }
+          ]
+        },
+        {
+          "name": "cuda13",
+          "architectures": "120a",
+          "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_Dec_16_07:23:41_PM_PST_2025\nCuda compilation tools, release 13.1, V13.1.115\nBuild cuda_13.1.r13.1/compiler.37061995_0\n",
+          "configure": {
+            "argv": [
+              "cmake",
+              "--fresh",
+              "-S",
+              "/lab/source",
+              "-B",
+              "/build/bf16-store-matrix",
+              "-G",
+              "Ninja",
+              "-DCMAKE_BUILD_TYPE=Release",
+              "-DCMAKE_CUDA_ARCHITECTURES=120a",
+              "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+              "-DCUDAToolkit_ROOT=/usr/local/cuda",
+              "-DNINFER_BUILD_APPS=OFF",
+              "-DBUILD_TESTING=ON",
+              "-DNINFER_BUILD_BENCHMARKS=OFF",
+              "-DNINFER_SM120_NATIVE=OFF",
+              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+            ],
+            "log": "cuda13-configure.log",
+            "exit": 0,
+            "seconds": 7.688000000001921
+          },
+          "targets": [
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+          ],
+          "compile": {
+            "argv": [
+              "ninja",
+              "-C",
+              "/build/bf16-store-matrix",
+              "-j",
+              "4",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+            ],
+            "log": "cuda13-compile.log",
+            "exit": 0,
+            "seconds": 156.53099999999904
+          },
+          "objects": [
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "bytes": 1311344,
+              "sha256": "d04b8ddccaf8c2292108136665560b11001bea5523229c98beb0d63d79ba0aa2"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "bytes": 1518056,
+              "sha256": "f9f7c15ee0aae948445faf1cc0eac3c8553addb8eed09a0daf08fbd717a9525a"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "bytes": 1490272,
+              "sha256": "897f0073c7e4571dbd484ae7bdde70ac7b2c20e0a69d9025d69b06d6c1814018"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "bytes": 1242264,
+              "sha256": "936a3decb58817dbf7cd7cf62458a5ab18f4ec6afddb9d1539e2376d25753c8e"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "bytes": 1296576,
+              "sha256": "e7a048b4fbf7d51e844c852918c3630d92190a3e7fda097240bbb2736d491f27"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "bytes": 1259840,
+              "sha256": "ea6eb2bddb2ef4175a6514c7d0f53a3f95d5961bfb791656f5dd683dfac20537"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "bytes": 1165280,
+              "sha256": "16ecdd7da9f901da70bd476b11c2d4b8f5d016f1f833b593c8f06e1a2f13c832"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "bytes": 1190904,
+              "sha256": "36af6e9944df266f4c326ff5ce0f78b7a266e4163596ad2df325c2adc171dd1f"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "bytes": 1802704,
+              "sha256": "d8eccc03caa65f054587e3429b65e8b9afbdd496d01211ee75eb7bb0e823baa7"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "bytes": 1495544,
+              "sha256": "59552a5babcf02bf0a4ea6e25733d8db94736cae58f0c2211a0c12f204972bd6"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "bytes": 1297688,
+              "sha256": "4e04c0e47eb20d9e96de10e4b06c53723b0e368d2c7ef1a9ff00bf2960376c19"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "bytes": 1356208,
+              "sha256": "cc23283960cc47f4c5cda82b1f5327c597bbd8d25fc048d33590ed856b4cd9be"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "bytes": 1517944,
+              "sha256": "9218a48b76329f7ba3dcddb445dacd42c7cf866d3c3297f2661f6cb207abbec8"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "bytes": 1118432,
+              "sha256": "5111cd94e2d40e4933d2505dbe56252ba202858c5fb3efc82b5b690cf67ffd47"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "bytes": 1226416,
+              "sha256": "55283011abd785b3159f7fa16004ae49321ee0b16e38c6fcd45c9c087d1f7121"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "bytes": 1350088,
+              "sha256": "a261c939f86e02e6a22d7fc9511a88bcef26651cb2b79911a693afe4ceac00f0"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "bytes": 1129632,
+              "sha256": "2166c81e1fc148657fc3b2e032d2058a6a745e23bba355192ecf18d3efe6390c"
+            },
+            {
+              "path": "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o",
+              "bytes": 73792,
+              "sha256": "05c7bae8d82ef275e46544802e555e816071043ed06a3dcc79b9150681c2dfc3"
+            }
+          ]
+        }
+      ],
+      "toolchain_preparation": {
+        "argv": [
+          "bash",
+          "/lab/results/bf16-store-pr/build-inputs/cuda12.sh"
+        ],
+        "log": "cuda12-toolchain.log",
+        "exit": 0,
+        "seconds": 34.26499999999942
+      }
+    },
+    "attribution-before-checked": {
+      "status": "PASS",
+      "mode": "pilot",
+      "runs": [
+        {
+          "arm": "before",
+          "label": "attribution-before-checked-q6_k-t16-b0-p0-before",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 0,
+          "median_us": 150.528
+        },
+        {
+          "arm": "checked",
+          "label": "attribution-before-checked-q6_k-t16-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 1,
+          "median_us": 145.408
+        },
+        {
+          "arm": "checked",
+          "label": "attribution-before-checked-q6_k-t16-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 2,
+          "median_us": 145.408
+        },
+        {
+          "arm": "before",
+          "label": "attribution-before-checked-q6_k-t16-b0-p3-before",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 3,
+          "median_us": 149.504
+        },
+        {
+          "arm": "checked",
+          "label": "attribution-before-checked-q6_k-t16-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 0,
+          "median_us": 145.408
+        },
+        {
+          "arm": "before",
+          "label": "attribution-before-checked-q6_k-t16-b1-p1-before",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 1,
+          "median_us": 150.528
+        },
+        {
+          "arm": "before",
+          "label": "attribution-before-checked-q6_k-t16-b1-p2-before",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 2,
+          "median_us": 150.528
+        },
+        {
+          "arm": "checked",
+          "label": "attribution-before-checked-q6_k-t16-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 3,
+          "median_us": 144.384
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "before": "623271a89063f8b4d7533ba8c502cefc7f2f81d8fd2981323a991091ea15b6c8",
+        "checked": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+      },
+      "protocol": {
+        "points": [
+          [
+            "q6_k",
+            5120,
+            17408,
+            16
+          ]
+        ],
+        "orders": [
+          "ABBA",
+          "BAAB"
+        ],
+        "warmup": 50,
+        "repeat": 500,
+        "flush_mib": 256,
+        "execution": "eager",
+        "scope": "public Linear Op"
+      },
+      "release": {
+        "reservation_id": "8ddd3d1d4c71406780f9937c162e9557",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "cache-reuse": {
+      "source_tree": "e7457e68e0415211989e4543d5fce0697c88f3cd",
+      "basis": "Exact clean tracked tree equals previously qualified cache; branch checkout changed mtimes only. Interrupted unnecessary recompilation and restored source timestamps before original qualified build.",
+      "stamp": 1792773445.3863316
+    },
+    "candidate-build": {
+      "status": "PASS_OP_BUILD_LINK",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 4.96900000000096,
+          "exit": 0,
+          "log": "candidate-build-0.log"
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 317.25,
+          "exit": 0,
+          "log": "candidate-build-1.log"
+        },
+        {
+          "argv": [
+            "cp",
+            "/build/ninfer_pr_check",
+            "/lab/results/bf16-store-q6-t16/bin/candidate"
+          ],
+          "seconds": 2.2190000000009604,
+          "exit": 0,
+          "log": "candidate-build-2.log"
+        }
+      ],
+      "source": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+      "diff": "diff --git a/src/ops/linear/gguf/ggml_bridge_mmq.cuh b/src/ops/linear/gguf/ggml_bridge_mmq.cuh\nindex 51a08f53..ba20d757 100644\n--- a/src/ops/linear/gguf/ggml_bridge_mmq.cuh\n+++ b/src/ops/linear/gguf/ggml_bridge_mmq.cuh\n@@ -17,6 +17,7 @@ struct MatrixLaunch {\n     std::size_t shared      = 0;\n     int row_tiles           = 0;\n     int column_tiles        = 0;\n+    int k_step              = 0;\n     bool stream_k           = false;\n     int blocks              = 0;\n     bool fixup              = false;\n@@ -40,6 +41,7 @@ MatrixLaunch select_matrix_launch(int rows, int columns) {\n             best.threads      = config.nthreads;\n             best.shared       = shared;\n             best.stream_k     = config.stream_k;\n+            best.k_step       = config.K_vram / ggml_cuda_type_traits<type>::qk;\n         }\n         if (tiles == 1) { break; }\n     }\n@@ -76,6 +78,12 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro\n                                    cudaFuncAttributeMaxDynamicSharedMemorySize,\n                                    static_cast<int>(launch.shared)),\n               \"matrix shared memory\");\n+        if constexpr (!std::is_same_v<Dst, float>) {\n+            check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8>,\n+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,\n+                                       static_cast<int>(launch.shared)),\n+                  \"matrix partial shared memory\");\n+        }\n     });\n     constexpr int qk        = ggml_cuda_type_traits<type>::qk;\n     const uint3 blocks_fd   = init_fastdiv_values(k / qk);\n@@ -96,11 +104,25 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro\n                          (!std::is_same_v<Dst, float> && partial == nullptr))) {\n         throw std::invalid_argument(\"gguf matrix product: missing FP32 stream-k storage\");\n     }\n-    mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>\n-        <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n-        weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,\n-        blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,\n-        one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);\n+    bool partials_only = false;\n+    if constexpr (!std::is_same_v<Dst, float>) {\n+        const std::int64_t work = std::int64_t(launch.row_tiles) * launch.column_tiles * (k / qk);\n+        const std::int64_t segment = (work + launch.blocks - 1) / launch.blocks + launch.k_step - 1;\n+        partials_only = launch.fixup && segment < k / qk;\n+    }\n+    if (partials_only) {\n+        mul_mat_q<type, J, false, GGML_PREC_Q8>\n+            <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n+            weight, activation, nullptr, nullptr, partial, fixup, nullptr,\n+            blocks_fd, rows, columns, stride_row_blocks, columns, rows, one_fd, one_fd, 0, 0, 0,\n+            one_fd, one_fd, 0, 0, 0, ntx_fd);\n+    } else {\n+        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>\n+            <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n+            weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,\n+            blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,\n+            one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);\n+    }\n     check(cudaGetLastError(), \"matrix product launch\");\n     if (!launch.fixup) { return; }\n     const dim3 fixup_blocks(launch.blocks, launch.I / WARP_SIZE, 1);\ndiff --git a/tests/ops/linear/test_gguf_mmq_store.cu b/tests/ops/linear/test_gguf_mmq_store.cu\nindex dd234083..26bcfa0d 100644\n--- a/tests/ops/linear/test_gguf_mmq_store.cu\n+++ b/tests/ops/linear/test_gguf_mmq_store.cu\n@@ -300,6 +300,8 @@ int main() {\n             }\n             run_direct_case(c, 512, 9, split_rows, 7, false, true);\n             run_direct_case(c, 512, 9, split_rows, 7, true, true);\n+            run_direct_case(c, 256, 9, split_rows, 7, false, true);\n+            run_direct_case(c, 256, 9, split_rows, 7, true, true);\n             const int tail_k = padded_tail_k(c);\n             if (tail_k != 0) {\n                 run_direct_case(c, tail_k, 9, nofix_rows, 7, false, false, true);\n@@ -311,6 +313,9 @@ int main() {\n \n         const TypeCase& q4 = kCases[3];\n         const TypeCase& q6 = kCases[5];\n+        for (const bool accumulate : {false, true}) {\n+            run_direct_case(q6, 17408, 16, 5120, 7, accumulate, true);\n+        }\n         for (const TypeCase* c : {&q4, &q6}) {\n             if (gguf::matrix_fixup_bytes(c->type, 128, 9) == 0) {\n                 throw std::runtime_error(std::string(c->name) + \" has no multi-contributor fixup geometry\");",
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "binary_sha256": "ce9c91b2e521d150422953ca0132460ee8435d0ff584301cd8d0c86c6e704dda"
+    },
+    "checked-build": {
+      "status": "PASS_OP_BUILD_LINK",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 6.9540000000015425,
+          "exit": 0,
+          "log": "checked-build-0.log"
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 11.295999999998457,
+          "exit": 0,
+          "log": "checked-build-1.log"
+        },
+        {
+          "argv": [
+            "cp",
+            "/build/ninfer_pr_check",
+            "/lab/results/bf16-store-q6-t16/bin/checked"
+          ],
+          "seconds": 2.172000000002299,
+          "exit": 0,
+          "log": "checked-build-2.log"
+        }
+      ],
+      "source": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+      "diff": "diff --git a/src/ops/linear/gguf/ggml_bridge_mmq.cuh b/src/ops/linear/gguf/ggml_bridge_mmq.cuh\nindex 51a08f53..ba20d757 100644\n--- a/src/ops/linear/gguf/ggml_bridge_mmq.cuh\n+++ b/src/ops/linear/gguf/ggml_bridge_mmq.cuh\n@@ -17,6 +17,7 @@ struct MatrixLaunch {\n     std::size_t shared      = 0;\n     int row_tiles           = 0;\n     int column_tiles        = 0;\n+    int k_step              = 0;\n     bool stream_k           = false;\n     int blocks              = 0;\n     bool fixup              = false;\n@@ -40,6 +41,7 @@ MatrixLaunch select_matrix_launch(int rows, int columns) {\n             best.threads      = config.nthreads;\n             best.shared       = shared;\n             best.stream_k     = config.stream_k;\n+            best.k_step       = config.K_vram / ggml_cuda_type_traits<type>::qk;\n         }\n         if (tiles == 1) { break; }\n     }\n@@ -76,6 +78,12 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro\n                                    cudaFuncAttributeMaxDynamicSharedMemorySize,\n                                    static_cast<int>(launch.shared)),\n               \"matrix shared memory\");\n+        if constexpr (!std::is_same_v<Dst, float>) {\n+            check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8>,\n+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,\n+                                       static_cast<int>(launch.shared)),\n+                  \"matrix partial shared memory\");\n+        }\n     });\n     constexpr int qk        = ggml_cuda_type_traits<type>::qk;\n     const uint3 blocks_fd   = init_fastdiv_values(k / qk);\n@@ -96,11 +104,25 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro\n                          (!std::is_same_v<Dst, float> && partial == nullptr))) {\n         throw std::invalid_argument(\"gguf matrix product: missing FP32 stream-k storage\");\n     }\n-    mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>\n-        <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n-        weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,\n-        blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,\n-        one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);\n+    bool partials_only = false;\n+    if constexpr (!std::is_same_v<Dst, float>) {\n+        const std::int64_t work = std::int64_t(launch.row_tiles) * launch.column_tiles * (k / qk);\n+        const std::int64_t segment = (work + launch.blocks - 1) / launch.blocks + launch.k_step - 1;\n+        partials_only = launch.fixup && segment < k / qk;\n+    }\n+    if (partials_only) {\n+        mul_mat_q<type, J, false, GGML_PREC_Q8>\n+            <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n+            weight, activation, nullptr, nullptr, partial, fixup, nullptr,\n+            blocks_fd, rows, columns, stride_row_blocks, columns, rows, one_fd, one_fd, 0, 0, 0,\n+            one_fd, one_fd, 0, 0, 0, ntx_fd);\n+    } else {\n+        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>\n+            <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n+            weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,\n+            blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,\n+            one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);\n+    }\n     check(cudaGetLastError(), \"matrix product launch\");\n     if (!launch.fixup) { return; }\n     const dim3 fixup_blocks(launch.blocks, launch.I / WARP_SIZE, 1);\ndiff --git a/tests/ops/linear/test_gguf_mmq_store.cu b/tests/ops/linear/test_gguf_mmq_store.cu\nindex dd234083..00f6ed2d 100644\n--- a/tests/ops/linear/test_gguf_mmq_store.cu\n+++ b/tests/ops/linear/test_gguf_mmq_store.cu\n@@ -300,6 +300,8 @@ int main() {\n             }\n             run_direct_case(c, 512, 9, split_rows, 7, false, true);\n             run_direct_case(c, 512, 9, split_rows, 7, true, true);\n+            run_direct_case(c, 256, 9, split_rows, 7, false, true, true);\n+            run_direct_case(c, 256, 9, split_rows, 7, true, true, true);\n             const int tail_k = padded_tail_k(c);\n             if (tail_k != 0) {\n                 run_direct_case(c, tail_k, 9, nofix_rows, 7, false, false, true);\n@@ -311,6 +313,10 @@ int main() {\n \n         const TypeCase& q4 = kCases[3];\n         const TypeCase& q6 = kCases[5];\n+        const bool q6_t16_fixup = gguf::matrix_fixup_bytes(q6.type, 5120, 16) != 0;\n+        for (const bool accumulate : {false, true}) {\n+            run_direct_case(q6, 17408, 16, 5120, 7, accumulate, q6_t16_fixup);\n+        }\n         for (const TypeCase* c : {&q4, &q6}) {\n             if (gguf::matrix_fixup_bytes(c->type, 128, 9) == 0) {\n                 throw std::runtime_error(std::string(c->name) + \" has no multi-contributor fixup geometry\");",
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "binary_sha256": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+    },
+    "checked-gates": {
+      "status": "PASS",
+      "mode": "tests",
+      "runs": [
+        {
+          "arm": "checked",
+          "label": "checked-gates-checked-store",
+          "exit": "0"
+        },
+        {
+          "arm": "checked",
+          "label": "checked-gates-checked-oracle",
+          "exit": "0"
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "checked": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+      },
+      "release": {
+        "reservation_id": "7c0e12ddb3184a43adfd36dce8a8fea4",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "checked-profile": {
+      "status": "PASS",
+      "mode": "profile",
+      "runs": [],
+      "profiles": [
+        {
+          "arm": "checked",
+          "label": "checked-profile-checked",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)0>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 2752,
+              "registers": 24,
+              "grid": 16,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30, float, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 134080,
+              "registers": 122,
+              "grid": 82,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q_stream_k_fixup<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const int *, const int *, T5 *, float *, uint3, int, int, int, uint3, int, uint3, int, uint3, float *, int)",
+              "nanoseconds": 3840,
+              "registers": 39,
+              "grid": 82,
+              "block": 128
+            }
+          ]
+        }
+      ],
+      "binary_sha256": {
+        "checked": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+      },
+      "release": {
+        "reservation_id": "afd88e37bc4e45ec9f9cfba85beafc20",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "confirm-control-checked": {
+      "status": "PASS",
+      "mode": "confirm",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b0-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 0,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 1,
+          "median_us": 145.408
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 2,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b0-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 3,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 0,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b1-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 1,
+          "median_us": 147.456
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b1-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 2,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 3,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b2-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 2,
+          "position": 0,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b2-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 2,
+          "position": 1,
+          "median_us": 145.408
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b2-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 2,
+          "position": 2,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b2-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 2,
+          "position": 3,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b3-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 3,
+          "position": 0,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b3-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 3,
+          "position": 1,
+          "median_us": 147.456
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b3-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 3,
+          "position": 2,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b3-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 3,
+          "position": 3,
+          "median_us": 144.384
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b4-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 4,
+          "position": 0,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b4-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 4,
+          "position": 1,
+          "median_us": 145.408
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b4-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 4,
+          "position": 2,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b4-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 4,
+          "position": 3,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b5-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 5,
+          "position": 0,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b5-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 5,
+          "position": 1,
+          "median_us": 148.48
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b5-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 5,
+          "position": 2,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b5-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 5,
+          "position": 3,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b6-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 6,
+          "position": 0,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b6-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 6,
+          "position": 1,
+          "median_us": 145.408
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b6-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 6,
+          "position": 2,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b6-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 6,
+          "position": 3,
+          "median_us": 148.48
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b7-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 7,
+          "position": 0,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b7-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 7,
+          "position": 1,
+          "median_us": 147.456
+        },
+        {
+          "arm": "control",
+          "label": "confirm-control-checked-q6_k-t16-b7-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 7,
+          "position": 2,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "confirm-control-checked-q6_k-t16-b7-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 7,
+          "position": 3,
+          "median_us": 145.408
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "control": "71aa610e66bc9f92a7429c398ddd830d7e272974518d34555054ecd3d2a5adc6",
+        "checked": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+      },
+      "protocol": {
+        "points": [
+          [
+            "q6_k",
+            5120,
+            17408,
+            16
+          ]
+        ],
+        "orders": [
+          "ABBA",
+          "BAAB",
+          "ABBA",
+          "BAAB",
+          "ABBA",
+          "BAAB",
+          "ABBA",
+          "BAAB"
+        ],
+        "warmup": 50,
+        "repeat": 500,
+        "flush_mib": 256,
+        "execution": "eager",
+        "scope": "public Linear Op"
+      },
+      "release": {
+        "reservation_id": "d83fecad448040bc8d603cf7da69c5ed",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "control-build": {
+      "status": "PASS_OP_BUILD_LINK",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 4.577999999997701,
+          "exit": 0,
+          "log": "control-build-0.log"
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 267.75,
+          "exit": 0,
+          "log": "control-build-1.log"
+        },
+        {
+          "argv": [
+            "cp",
+            "/build/ninfer_pr_check",
+            "/lab/results/bf16-store-q6-t16/bin/control"
+          ],
+          "seconds": 1.639999999999418,
+          "exit": 0,
+          "log": "control-build-2.log"
+        }
+      ],
+      "source": "032eb711af147047eb654a3cd0c8b96e3acb8e1e",
+      "diff": "",
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "binary_sha256": "71aa610e66bc9f92a7429c398ddd830d7e272974518d34555054ecd3d2a5adc6"
+    },
+    "control-profile": {
+      "status": "PASS",
+      "mode": "profile",
+      "runs": [],
+      "profiles": [
+        {
+          "arm": "control",
+          "label": "control-profile-control",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)0>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 2720,
+              "registers": 24,
+              "grid": 16,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30>(const char *, const int *, const int *, const int *, float *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3)",
+              "nanoseconds": 132287,
+              "registers": 122,
+              "grid": 82,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q_stream_k_fixup<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30>(const int *, const int *, float *, float *, uint3, int, int, int, uint3, int, uint3, int, uint3)",
+              "nanoseconds": 3808,
+              "registers": 39,
+              "grid": 82,
+              "block": 128
+            },
+            {
+              "name": "ninfer::ops::gguf::detail::<unnamed>::store_plane_kernel(const float *, long, int, ninfer::ops::gguf::detail::VecStore)",
+              "nanoseconds": 1472,
+              "registers": 19,
+              "grid": 20,
+              "block": 256
+            }
+          ]
+        },
+        {
+          "arm": "before",
+          "label": "control-profile-before",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)0>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 2944,
+              "registers": 24,
+              "grid": 16,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 137439,
+              "registers": 128,
+              "grid": 82,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q_stream_k_fixup<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const int *, const int *, T5 *, float *, uint3, int, int, int, uint3, int, uint3, int, uint3, float *, int)",
+              "nanoseconds": 3968,
+              "registers": 39,
+              "grid": 82,
+              "block": 128
+            }
+          ]
+        }
+      ],
+      "binary_sha256": {
+        "control": "71aa610e66bc9f92a7429c398ddd830d7e272974518d34555054ecd3d2a5adc6",
+        "before": "623271a89063f8b4d7533ba8c502cefc7f2f81d8fd2981323a991091ea15b6c8"
+      },
+      "release": {
+        "reservation_id": "6e643d2e614b481abbbaf699a0ec15a9",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "exact-gates": {
+      "status": "FAILED",
+      "mode": "tests",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "exact-gates-control-oracle",
+          "exit": "0"
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "control": "71aa610e66bc9f92a7429c398ddd830d7e272974518d34555054ecd3d2a5adc6",
+        "fixed": "7f099f55be2a8974728013b5cd98fb666a0304835ecee90a5c9f7b2276034bac"
+      },
+      "error": "exact-gates-fixed-store failed: GGUF MMQ BF16 store: gguf matrix activation: K must be whole 512-value groups",
+      "release": {
+        "reservation_id": "465b5a0cc6d648fe910aa7d7391a307c",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "fixed-build": {
+      "status": "PASS_OP_BUILD_LINK",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 5.359000000000378,
+          "exit": 0,
+          "log": "fixed-build-0.log"
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 10.375,
+          "exit": 0,
+          "log": "fixed-build-1.log"
+        },
+        {
+          "argv": [
+            "cp",
+            "/build/ninfer_pr_check",
+            "/lab/results/bf16-store-q6-t16/bin/fixed"
+          ],
+          "seconds": 1.9059999999990396,
+          "exit": 0,
+          "log": "fixed-build-2.log"
+        }
+      ],
+      "source": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+      "diff": "diff --git a/src/ops/linear/gguf/ggml_bridge_mmq.cuh b/src/ops/linear/gguf/ggml_bridge_mmq.cuh\nindex 51a08f53..ba20d757 100644\n--- a/src/ops/linear/gguf/ggml_bridge_mmq.cuh\n+++ b/src/ops/linear/gguf/ggml_bridge_mmq.cuh\n@@ -17,6 +17,7 @@ struct MatrixLaunch {\n     std::size_t shared      = 0;\n     int row_tiles           = 0;\n     int column_tiles        = 0;\n+    int k_step              = 0;\n     bool stream_k           = false;\n     int blocks              = 0;\n     bool fixup              = false;\n@@ -40,6 +41,7 @@ MatrixLaunch select_matrix_launch(int rows, int columns) {\n             best.threads      = config.nthreads;\n             best.shared       = shared;\n             best.stream_k     = config.stream_k;\n+            best.k_step       = config.K_vram / ggml_cuda_type_traits<type>::qk;\n         }\n         if (tiles == 1) { break; }\n     }\n@@ -76,6 +78,12 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro\n                                    cudaFuncAttributeMaxDynamicSharedMemorySize,\n                                    static_cast<int>(launch.shared)),\n               \"matrix shared memory\");\n+        if constexpr (!std::is_same_v<Dst, float>) {\n+            check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8>,\n+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,\n+                                       static_cast<int>(launch.shared)),\n+                  \"matrix partial shared memory\");\n+        }\n     });\n     constexpr int qk        = ggml_cuda_type_traits<type>::qk;\n     const uint3 blocks_fd   = init_fastdiv_values(k / qk);\n@@ -96,11 +104,25 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro\n                          (!std::is_same_v<Dst, float> && partial == nullptr))) {\n         throw std::invalid_argument(\"gguf matrix product: missing FP32 stream-k storage\");\n     }\n-    mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>\n-        <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n-        weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,\n-        blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,\n-        one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);\n+    bool partials_only = false;\n+    if constexpr (!std::is_same_v<Dst, float>) {\n+        const std::int64_t work = std::int64_t(launch.row_tiles) * launch.column_tiles * (k / qk);\n+        const std::int64_t segment = (work + launch.blocks - 1) / launch.blocks + launch.k_step - 1;\n+        partials_only = launch.fixup && segment < k / qk;\n+    }\n+    if (partials_only) {\n+        mul_mat_q<type, J, false, GGML_PREC_Q8>\n+            <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n+            weight, activation, nullptr, nullptr, partial, fixup, nullptr,\n+            blocks_fd, rows, columns, stride_row_blocks, columns, rows, one_fd, one_fd, 0, 0, 0,\n+            one_fd, one_fd, 0, 0, 0, ntx_fd);\n+    } else {\n+        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>\n+            <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(\n+            weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,\n+            blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,\n+            one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);\n+    }\n     check(cudaGetLastError(), \"matrix product launch\");\n     if (!launch.fixup) { return; }\n     const dim3 fixup_blocks(launch.blocks, launch.I / WARP_SIZE, 1);\ndiff --git a/tests/ops/linear/test_gguf_mmq_store.cu b/tests/ops/linear/test_gguf_mmq_store.cu\nindex dd234083..e5e57369 100644\n--- a/tests/ops/linear/test_gguf_mmq_store.cu\n+++ b/tests/ops/linear/test_gguf_mmq_store.cu\n@@ -300,6 +300,8 @@ int main() {\n             }\n             run_direct_case(c, 512, 9, split_rows, 7, false, true);\n             run_direct_case(c, 512, 9, split_rows, 7, true, true);\n+            run_direct_case(c, 256, 9, split_rows, 7, false, true);\n+            run_direct_case(c, 256, 9, split_rows, 7, true, true);\n             const int tail_k = padded_tail_k(c);\n             if (tail_k != 0) {\n                 run_direct_case(c, tail_k, 9, nofix_rows, 7, false, false, true);\n@@ -311,6 +313,10 @@ int main() {\n \n         const TypeCase& q4 = kCases[3];\n         const TypeCase& q6 = kCases[5];\n+        const bool q6_t16_fixup = gguf::matrix_fixup_bytes(q6.type, 5120, 16) != 0;\n+        for (const bool accumulate : {false, true}) {\n+            run_direct_case(q6, 17408, 16, 5120, 7, accumulate, q6_t16_fixup);\n+        }\n         for (const TypeCase* c : {&q4, &q6}) {\n             if (gguf::matrix_fixup_bytes(c->type, 128, 9) == 0) {\n                 throw std::runtime_error(std::string(c->name) + \" has no multi-contributor fixup geometry\");",
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "binary_sha256": "7f099f55be2a8974728013b5cd98fb666a0304835ecee90a5c9f7b2276034bac"
+    },
+    "guard-proof": {
+      "property": "guard implies no full output tile inside any aligned CTA segment",
+      "tiles": [
+        1,
+        164
+      ],
+      "k_blocks": [
+        1,
+        80
+      ],
+      "steps": [
+        1,
+        2,
+        4,
+        8
+      ],
+      "ctas": 82,
+      "guard_true_cases": 21543,
+      "pass": true
+    },
+    "original-profile": {
+      "status": "PASS",
+      "mode": "profile",
+      "runs": [],
+      "profiles": [
+        {
+          "arm": "before",
+          "label": "original-profile-before",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)0>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 2688,
+              "registers": 24,
+              "grid": 16,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 138198,
+              "registers": 128,
+              "grid": 82,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q_stream_k_fixup<(ggml_type)14, (int)16, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0>(const int *, const int *, T5 *, float *, uint3, int, int, int, uint3, int, uint3, int, uint3, float *, int)",
+              "nanoseconds": 3777,
+              "registers": 39,
+              "grid": 82,
+              "block": 128
+            }
+          ]
+        }
+      ],
+      "binary_sha256": {
+        "before": "623271a89063f8b4d7533ba8c502cefc7f2f81d8fd2981323a991091ea15b6c8"
+      },
+      "release": {
+        "reservation_id": "077687cdd7d84d8a8207d02fe13c72c8",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "pilot-control-checked": {
+      "status": "PASS",
+      "mode": "pilot",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "pilot-control-checked-q6_k-t16-b0-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 0,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "pilot-control-checked-q6_k-t16-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 1,
+          "median_us": 145.408
+        },
+        {
+          "arm": "checked",
+          "label": "pilot-control-checked-q6_k-t16-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 2,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "pilot-control-checked-q6_k-t16-b0-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 0,
+          "position": 3,
+          "median_us": 148.48
+        },
+        {
+          "arm": "checked",
+          "label": "pilot-control-checked-q6_k-t16-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 0,
+          "median_us": 145.408
+        },
+        {
+          "arm": "control",
+          "label": "pilot-control-checked-q6_k-t16-b1-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 1,
+          "median_us": 148.48
+        },
+        {
+          "arm": "control",
+          "label": "pilot-control-checked-q6_k-t16-b1-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 2,
+          "median_us": 147.456
+        },
+        {
+          "arm": "checked",
+          "label": "pilot-control-checked-q6_k-t16-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 16,
+          "block": 1,
+          "position": 3,
+          "median_us": 144.384
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "control": "71aa610e66bc9f92a7429c398ddd830d7e272974518d34555054ecd3d2a5adc6",
+        "checked": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+      },
+      "protocol": {
+        "points": [
+          [
+            "q6_k",
+            5120,
+            17408,
+            16
+          ]
+        ],
+        "orders": [
+          "ABBA",
+          "BAAB"
+        ],
+        "warmup": 50,
+        "repeat": 500,
+        "flush_mib": 256,
+        "execution": "eager",
+        "scope": "public Linear Op"
+      },
+      "release": {
+        "reservation_id": "9625839276764766811010375795beb1",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "published-source": {
+      "published_source": "1e0412299f15f237f2ce5b7b04d8b81de3e1da22",
+      "published_tree": "d56276c8258c85bf35f39e5626c425db12f73a2e",
+      "tested_source_base": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+      "tested_diff_sha256": "254b504c9ec995ca0db602f7058f66b71701e3e6e7d9809c8842d65fd13dc7a7",
+      "tested_binary_sha256": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+    },
+    "sass-comparison": {
+      "control-float": {
+        "symbol": "_Z9mul_mat_qIL9ggml_type14ELi16ELb0EL9ggml_prec30EEvPKcPKiS5_S5_PfS6_PKf5uint3iiiiiS9_S9_iiiS9_S9_iiiS9_",
+        "registers": 122,
+        "slots": 2592,
+        "bytes": 41472,
+        "opcodes": {
+          "IMAD.MOV.U32": 73,
+          "S2R": 2,
+          "S2UR": 2,
+          "ULDC": 1,
+          "IADD3": 130,
+          "UMOV": 2,
+          "SHF.R.S32.HI": 99,
+          "LEA.HI": 5,
+          "IMAD": 351,
+          "ISETP.GT.AND": 5,
+          "IMAD.WIDE.U32": 16,
+          "ISETP.NE.U32.AND": 7,
+          "STS": 85,
+          "BAR.SYNC.DEFER_BLOCKING": 13,
+          "BRA": 25,
+          "MOV": 2,
+          "CALL.REL.NOINC": 4,
+          "I2F.U32.RP": 2,
+          "MUFU.RCP": 3,
+          "F2I.FTZ.U32.TRUNC.NTZ": 2,
+          "IMAD.MOV": 11,
+          "IMAD.HI.U32": 27,
+          "ISETP.GE.U32.AND": 8,
+          "LOP3.LUT": 482,
+          "UIADD3": 1,
+          "IMAD.IADD": 13,
+          "SHF.R.U32.HI": 52,
+          "ULDC.64": 1,
+          "ISETP.LE.OR": 1,
+          "IMNMX.U32": 2,
+          "IMAD.SHL.U32": 69,
+          "LEA": 22,
+          "SHF.L.U64.HI": 3,
+          "ISETP.NE.AND.EX": 3,
+          "IMAD.WIDE": 63,
+          "LDG.E.CONSTANT": 17,
+          "ISETP.GE.AND": 8,
+          "BSSY": 9,
+          "BSYNC": 9,
+          "LEA.HI.X.SX32": 20,
+          "IMAD.X": 14,
+          "LDG.E.U16.CONSTANT": 138,
+          "LEA.HI.X": 17,
+          "IADD3.X": 7,
+          "PRMT": 212,
+          "HADD2.F32": 2,
+          "LDS": 84,
+          "LDSM.16.M88.2": 32,
+          "LDS.128": 20,
+          "IMMA.16816.S8.S8": 64,
+          "IMAD.U32": 16,
+          "I2FP.F32.S32": 128,
+          "FFMA": 160,
+          "STG.E": 16,
+          "PLOP3.LUT": 1,
+          "EXIT": 3,
+          "LDS.64": 2,
+          "USHF.L.U32": 1,
+          "I2F.U64.RP": 1,
+          "F2I.U64.TRUNC": 1,
+          "ISETP.GE.U32.AND.EX": 2,
+          "SEL": 5,
+          "RET.REL.NODEC": 1,
+          "NOP": 15
+        }
+      },
+      "before-bf16": {
+        "symbol": "_Z9mul_mat_qIL9ggml_type14ELi16ELb0EL9ggml_prec30E13__nv_bfloat16Lb0EEvPKcPKiS6_S6_PT3_PfPKf5uint3iiiiiSC_SC_iiiSC_SC_iiiSC_S9_i",
+        "registers": 128,
+        "slots": 2640,
+        "bytes": 42240,
+        "opcodes": {
+          "IMAD.MOV.U32": 75,
+          "S2R": 2,
+          "S2UR": 2,
+          "ULDC": 1,
+          "IADD3": 133,
+          "UMOV": 2,
+          "SHF.R.S32.HI": 99,
+          "LEA.HI": 5,
+          "IMAD": 361,
+          "ISETP.GT.AND": 8,
+          "IMAD.WIDE.U32": 18,
+          "ISETP.NE.U32.AND": 8,
+          "STS": 85,
+          "BAR.SYNC.DEFER_BLOCKING": 13,
+          "BRA": 29,
+          "MOV": 2,
+          "CALL.REL.NOINC": 4,
+          "I2F.U32.RP": 2,
+          "MUFU.RCP": 3,
+          "F2I.FTZ.U32.TRUNC.NTZ": 2,
+          "IMAD.MOV": 11,
+          "IMAD.HI.U32": 27,
+          "ISETP.GE.U32.AND": 8,
+          "LOP3.LUT": 477,
+          "UIADD3": 1,
+          "IMAD.IADD": 15,
+          "SHF.R.U32.HI": 52,
+          "IMAD.SHL.U32": 60,
+          "ULDC.64": 1,
+          "IMNMX.U32": 2,
+          "ISETP.LE.OR": 1,
+          "LEA": 22,
+          "SHF.L.U64.HI": 4,
+          "ISETP.NE.AND.EX": 4,
+          "IMAD.WIDE": 72,
+          "LDG.E.CONSTANT": 17,
+          "ISETP.GE.AND": 9,
+          "BSSY": 9,
+          "BSYNC": 9,
+          "ISETP.NE.AND": 1,
+          "PLOP3.LUT": 2,
+          "CS2R": 1,
+          "LEA.HI.X.SX32": 21,
+          "IADD3.X": 8,
+          "IMAD.X": 12,
+          "LDG.E.U16.CONSTANT": 138,
+          "LEA.HI.X": 16,
+          "PRMT": 212,
+          "HADD2.F32": 2,
+          "LDS": 92,
+          "LDSM.16.M88.2": 32,
+          "LDS.128": 20,
+          "IMMA.16816.S8.S8": 64,
+          "IMAD.U32": 16,
+          "I2FP.F32.S32": 128,
+          "FFMA": 160,
+          "STG.E": 16,
+          "F2FP.BF16.PACK_AB": 8,
+          "STG.E.U16": 8,
+          "EXIT": 3,
+          "LDS.64": 2,
+          "USHF.L.U32": 1,
+          "I2F.U64.RP": 1,
+          "F2I.U64.TRUNC": 1,
+          "ISETP.GE.U32.AND.EX": 2,
+          "SEL": 5,
+          "RET.REL.NODEC": 1,
+          "NOP": 12
+        }
+      },
+      "before-float": {
+        "symbol": "_Z9mul_mat_qIL9ggml_type14ELi16ELb0EL9ggml_prec30EfLb0EEvPKcPKiS5_S5_PT3_PfPKf5uint3iiiiiSB_SB_iiiSB_SB_iiiSB_S8_i",
+        "registers": 122,
+        "slots": 2592,
+        "bytes": 41472,
+        "opcodes": {
+          "IMAD.MOV.U32": 73,
+          "S2R": 2,
+          "S2UR": 2,
+          "ULDC": 1,
+          "IADD3": 130,
+          "UMOV": 2,
+          "SHF.R.S32.HI": 99,
+          "LEA.HI": 5,
+          "IMAD": 351,
+          "ISETP.GT.AND": 5,
+          "IMAD.WIDE.U32": 16,
+          "ISETP.NE.U32.AND": 7,
+          "STS": 85,
+          "BAR.SYNC.DEFER_BLOCKING": 13,
+          "BRA": 25,
+          "MOV": 2,
+          "CALL.REL.NOINC": 4,
+          "I2F.U32.RP": 2,
+          "MUFU.RCP": 3,
+          "F2I.FTZ.U32.TRUNC.NTZ": 2,
+          "IMAD.MOV": 11,
+          "IMAD.HI.U32": 27,
+          "ISETP.GE.U32.AND": 8,
+          "LOP3.LUT": 482,
+          "UIADD3": 1,
+          "IMAD.IADD": 13,
+          "SHF.R.U32.HI": 52,
+          "ULDC.64": 1,
+          "ISETP.LE.OR": 1,
+          "IMNMX.U32": 2,
+          "IMAD.SHL.U32": 69,
+          "LEA": 22,
+          "SHF.L.U64.HI": 3,
+          "ISETP.NE.AND.EX": 3,
+          "IMAD.WIDE": 63,
+          "LDG.E.CONSTANT": 17,
+          "ISETP.GE.AND": 8,
+          "BSSY": 9,
+          "BSYNC": 9,
+          "LEA.HI.X.SX32": 20,
+          "IMAD.X": 14,
+          "LDG.E.U16.CONSTANT": 138,
+          "LEA.HI.X": 17,
+          "IADD3.X": 7,
+          "PRMT": 212,
+          "HADD2.F32": 2,
+          "LDS": 84,
+          "LDSM.16.M88.2": 32,
+          "LDS.128": 20,
+          "IMMA.16816.S8.S8": 64,
+          "IMAD.U32": 16,
+          "I2FP.F32.S32": 128,
+          "FFMA": 160,
+          "STG.E": 16,
+          "PLOP3.LUT": 1,
+          "EXIT": 3,
+          "LDS.64": 2,
+          "USHF.L.U32": 1,
+          "I2F.U64.RP": 1,
+          "F2I.U64.TRUNC": 1,
+          "ISETP.GE.U32.AND.EX": 2,
+          "SEL": 5,
+          "RET.REL.NODEC": 1,
+          "NOP": 15
+        }
+      }
+    },
+    "secondary-control-checked": {
+      "status": "PASS",
+      "mode": "guards",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t128-b0-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 0,
+          "position": 0,
+          "median_us": 288.768
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t128-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 0,
+          "position": 1,
+          "median_us": 280.576
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t128-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 0,
+          "position": 2,
+          "median_us": 280.576
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t128-b0-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 0,
+          "position": 3,
+          "median_us": 287.744
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t128-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 1,
+          "position": 0,
+          "median_us": 280.576
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t128-b1-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 1,
+          "position": 1,
+          "median_us": 286.72
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t128-b1-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 1,
+          "position": 2,
+          "median_us": 288.768
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t128-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "block": 1,
+          "position": 3,
+          "median_us": 279.552
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t512-b0-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 0,
+          "position": 0,
+          "median_us": 1051.65
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t512-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 0,
+          "position": 1,
+          "median_us": 1037.31
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t512-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 0,
+          "position": 2,
+          "median_us": 1037.31
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t512-b0-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 0,
+          "position": 3,
+          "median_us": 1057.79
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t512-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 1,
+          "position": 0,
+          "median_us": 1037.31
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t512-b1-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 1,
+          "position": 1,
+          "median_us": 1056.77
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t512-b1-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 1,
+          "position": 2,
+          "median_us": 1058.82
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t512-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "block": 1,
+          "position": 3,
+          "median_us": 1037.31
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t1024-b0-p0-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 0,
+          "position": 0,
+          "median_us": 2138.11
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t1024-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 0,
+          "position": 1,
+          "median_us": 2094.08
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t1024-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 0,
+          "position": 2,
+          "median_us": 2094.08
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t1024-b0-p3-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 0,
+          "position": 3,
+          "median_us": 2138.11
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t1024-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 1,
+          "position": 0,
+          "median_us": 2095.1
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t1024-b1-p1-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 1,
+          "position": 1,
+          "median_us": 2138.11
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q6_k-t1024-b1-p2-control",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 1,
+          "position": 2,
+          "median_us": 2138.11
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q6_k-t1024-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "block": 1,
+          "position": 3,
+          "median_us": 2094.08
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t16-b0-p0-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 0,
+          "position": 0,
+          "median_us": 111.616
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t16-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 0,
+          "position": 1,
+          "median_us": 104.448
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t16-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 0,
+          "position": 2,
+          "median_us": 105.472
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t16-b0-p3-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 0,
+          "position": 3,
+          "median_us": 111.616
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t16-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 1,
+          "position": 0,
+          "median_us": 105.472
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t16-b1-p1-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 1,
+          "position": 1,
+          "median_us": 111.616
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t16-b1-p2-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 1,
+          "position": 2,
+          "median_us": 111.616
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t16-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "block": 1,
+          "position": 3,
+          "median_us": 106.496
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t128-b0-p0-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 0,
+          "position": 0,
+          "median_us": 262.144
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t128-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 0,
+          "position": 1,
+          "median_us": 245.76
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t128-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 0,
+          "position": 2,
+          "median_us": 251.904
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t128-b0-p3-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 0,
+          "position": 3,
+          "median_us": 261.12
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t128-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 1,
+          "position": 0,
+          "median_us": 245.76
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t128-b1-p1-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 1,
+          "position": 1,
+          "median_us": 267.264
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t128-b1-p2-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 1,
+          "position": 2,
+          "median_us": 268.288
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t128-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "block": 1,
+          "position": 3,
+          "median_us": 248.832
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t512-b0-p0-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 0,
+          "position": 0,
+          "median_us": 948.224
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t512-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 0,
+          "position": 1,
+          "median_us": 911.36
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t512-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 0,
+          "position": 2,
+          "median_us": 911.36
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t512-b0-p3-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 0,
+          "position": 3,
+          "median_us": 948.224
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t512-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 1,
+          "position": 0,
+          "median_us": 902.144
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t512-b1-p1-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 1,
+          "position": 1,
+          "median_us": 942.08
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t512-b1-p2-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 1,
+          "position": 2,
+          "median_us": 949.248
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t512-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "block": 1,
+          "position": 3,
+          "median_us": 904.192
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t1024-b0-p0-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 0,
+          "position": 0,
+          "median_us": 1902.59
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t1024-b0-p1-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 0,
+          "position": 1,
+          "median_us": 1838.08
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t1024-b0-p2-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 0,
+          "position": 2,
+          "median_us": 1827.84
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t1024-b0-p3-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 0,
+          "position": 3,
+          "median_us": 1902.59
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t1024-b1-p0-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 1,
+          "position": 0,
+          "median_us": 1838.08
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t1024-b1-p1-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 1,
+          "position": 1,
+          "median_us": 1905.66
+        },
+        {
+          "arm": "control",
+          "label": "secondary-control-checked-q4_k-t1024-b1-p2-control",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 1,
+          "position": 2,
+          "median_us": 1914.88
+        },
+        {
+          "arm": "checked",
+          "label": "secondary-control-checked-q4_k-t1024-b1-p3-checked",
+          "exit": "0",
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "block": 1,
+          "position": 3,
+          "median_us": 1826.82
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "control": "71aa610e66bc9f92a7429c398ddd830d7e272974518d34555054ecd3d2a5adc6",
+        "checked": "4b0cb1e5904aeef1a37816c5ea930bbf07c979f102b5dce42f63370eb6eb4735"
+      },
+      "protocol": {
+        "points": [
+          [
+            "q6_k",
+            5120,
+            17408,
+            128
+          ],
+          [
+            "q6_k",
+            5120,
+            17408,
+            512
+          ],
+          [
+            "q6_k",
+            5120,
+            17408,
+            1024
+          ],
+          [
+            "q4_k",
+            17408,
+            5120,
+            16
+          ],
+          [
+            "q4_k",
+            17408,
+            5120,
+            128
+          ],
+          [
+            "q4_k",
+            17408,
+            5120,
+            512
+          ],
+          [
+            "q4_k",
+            17408,
+            5120,
+            1024
+          ]
+        ],
+        "orders": [
+          "ABBA",
+          "BAAB"
+        ],
+        "warmup": 50,
+        "repeat": 500,
+        "flush_mib": 256,
+        "execution": "eager",
+        "scope": "public Linear Op"
+      },
+      "release": {
+        "reservation_id": "23fd078b1467494eaf81af7a27a30aca",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "statistics": {
+      "scope": "public Linear Op, synthetic packed weights, RTX3090, cold-cache eager",
+      "source_base": "bfd1941a50e845c11b4006965e5a34d7d6e33fb3",
+      "working_diff_sha256": "254b504c9ec995ca0db602f7058f66b71701e3e6e7d9809c8842d65fd13dc7a7",
+      "primary": {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 16,
+        "reference": "control",
+        "candidate": "checked",
+        "blocks": 8,
+        "pairs": 16,
+        "reference_us": 147.58361279061728,
+        "candidate_us": 145.3437877665265,
+        "speed_gain_percent": 1.541053153017243,
+        "latency_reduction_percent": 1.5176651267295342,
+        "block_speed_gains_percent": [
+          1.4084507042253502,
+          1.4084507042253502,
+          1.4084507042253502,
+          1.7674197938385432,
+          1.4084507042253502,
+          1.7599541869771866,
+          1.7599541869771866,
+          1.4084507042253502
+        ],
+        "adjacent_pair_ratios": [
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0212765957446808,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0211267605633803,
+          1.0140845070422535,
+          1.0140845070422535,
+          1.0211267605633803,
+          1.0140845070422535,
+          1.0140845070422535
+        ],
+        "speed_gain_t95_percent": [
+          1.3880573232977396,
+          1.6942798553318976
+        ],
+        "exact_block_sign_p_two_sided": 0.0078125
+      },
+      "secondary_screens": [
+        {
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 128,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 287.9987472246633,
+          "candidate_us": 280.31964888724923,
+          "speed_gain_percent": 2.73940780387568,
+          "latency_reduction_percent": 2.666365187840162,
+          "block_speed_gains_percent": [
+            2.7370642152978686,
+            2.7417514459143084
+          ],
+          "adjacent_pair_ratios": [
+            1.0291970802919705,
+            1.0255474452554745,
+            1.0218978102189782,
+            1.0329670329670328
+          ]
+        },
+        {
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 512,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 1056.2538958118344,
+          "candidate_us": 1037.3099999999997,
+          "speed_gain_percent": 1.826252114780948,
+          "latency_reduction_percent": 1.7934983138948823,
+          "block_speed_gains_percent": [
+            1.6779489282350735,
+            1.974771610127024
+          ],
+          "adjacent_pair_ratios": [
+            1.0138242184110826,
+            1.0197433746903048,
+            1.0187600620836588,
+            1.0207363276166237
+          ]
+        },
+        {
+          "qtype": "q6_k",
+          "n": 5120,
+          "k": 17408,
+          "t": 1024,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 2138.1099999999997,
+          "candidate_us": 2094.334953435497,
+          "speed_gain_percent": 2.090164540905723,
+          "latency_reduction_percent": 2.0473711158220644,
+          "block_speed_gains_percent": [
+            2.102593979217593,
+            2.077736615688974
+          ],
+          "adjacent_pair_ratios": [
+            1.0210259397921762,
+            1.0210259397921762,
+            1.0205288530380412,
+            1.0210259397921762
+          ]
+        },
+        {
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 16,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 111.616,
+          "candidate_us": 105.4695144752484,
+          "speed_gain_percent": 5.827736626391746,
+          "latency_reduction_percent": 5.506814009417642,
+          "block_speed_gains_percent": [
+            6.342728653911633,
+            5.315238580282401
+          ],
+          "adjacent_pair_ratios": [
+            1.0686274509803921,
+            1.058252427184466,
+            1.058252427184466,
+            1.0480769230769231
+          ]
+        },
+        {
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 128,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 264.6856781493403,
+          "candidate_us": 248.0509659977505,
+          "speed_gain_percent": 6.706167051065084,
+          "latency_reduction_percent": 6.284704283170246,
+          "block_speed_gains_percent": [
+            5.151845295770641,
+            8.28346430538369
+          ],
+          "adjacent_pair_ratios": [
+            1.0666666666666667,
+            1.0365853658536586,
+            1.0875000000000001,
+            1.0781893004115226
+          ]
+        },
+        {
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 512,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 946.9397345124438,
+          "candidate_us": 907.2544623402979,
+          "speed_gain_percent": 4.374216255688137,
+          "latency_reduction_percent": 4.190897342857656,
+          "block_speed_gains_percent": [
+            4.04494382022471,
+            4.704530744064228
+          ],
+          "adjacent_pair_ratios": [
+            1.0404494382022473,
+            1.0404494382022473,
+            1.0442678774120318,
+            1.0498301245753114
+          ]
+        },
+        {
+          "qtype": "q4_k",
+          "n": 17408,
+          "k": 5120,
+          "t": 1024,
+          "reference": "control",
+          "candidate": "checked",
+          "blocks": 2,
+          "pairs": 4,
+          "reference_us": 1906.4233569580726,
+          "candidate_us": 1832.697082331099,
+          "speed_gain_percent": 4.022829268282349,
+          "latency_reduction_percent": 3.867256155768637,
+          "block_speed_gains_percent": [
+            3.7991785159287472,
+            4.2469619094114055
+          ],
+          "adjacent_pair_ratios": [
+            1.0350964049442897,
+            1.0408952643557423,
+            1.0367666260445683,
+            1.0482039828773497
+          ]
+        }
+      ],
+      "attribution_screen": {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 16,
+        "reference": "before",
+        "candidate": "checked",
+        "blocks": 2,
+        "pairs": 4,
+        "reference_us": 150.2713443350803,
+        "candidate_us": 145.15132115291783,
+        "speed_gain_percent": 3.527369328432528,
+        "latency_reduction_percent": 3.4071853185433736,
+        "block_speed_gains_percent": [
+          3.1684132078833915,
+          3.887574372876811
+        ],
+        "adjacent_pair_ratios": [
+          1.0352112676056338,
+          1.028169014084507,
+          1.0352112676056338,
+          1.0425531914893618
+        ]
+      },
+      "pilot_not_in_confirmation": {
+        "qtype": "q6_k",
+        "n": 5120,
+        "k": 17408,
+        "t": 16,
+        "reference": "control",
+        "candidate": "checked",
+        "blocks": 2,
+        "pairs": 4,
+        "reference_us": 147.96711418419983,
+        "candidate_us": 145.15132115291783,
+        "speed_gain_percent": 1.939901758328208,
+        "latency_reduction_percent": 1.9029857051728258,
+        "block_speed_gains_percent": [
+          1.7599541869771866,
+          2.1201675405972065
+        ],
+        "adjacent_pair_ratios": [
+          1.0140845070422535,
+          1.0211267605633803,
+          1.0211267605633803,
+          1.0212765957446808
+        ]
+      },
+      "statistics": "geometric means of process event medians; primary95%t interval uses8 balanced-block log ratios (df7); sign test uses block signs; no timer/systematic-error interval or whole-model claim; secondary/attribution are exploratory"
+    }
+  },
+  "validation_logs": {
+    "checked-gates-checked-oracle.log": "OK   gguf q8_0 K=1536\nOK   gguf q8_0 K=2560\nOK   gguf q8_0 K=2816\nOK   gguf q8_0 K=2112\nOK   gguf q8_0 K=704\nOK   gguf q2_k K=1536\nOK   gguf q2_k K=2560\nOK   gguf q2_k K=2816\nOK   gguf q3_k K=1536\nOK   gguf q3_k K=2560\nOK   gguf q3_k K=2816\nOK   gguf q4_k K=1536\nOK   gguf q4_k K=2560\nOK   gguf q4_k K=2816\nOK   gguf q5_k K=1536\nOK   gguf q5_k K=2560\nOK   gguf q5_k K=2816\nOK   gguf q6_k K=1536\nOK   gguf q6_k K=2560\nOK   gguf q6_k K=2816\nOK   gguf iq2_xxs K=1536\nOK   gguf iq2_xxs K=2560\nOK   gguf iq2_xxs K=2816\nOK   gguf iq2_xs K=1536\nOK   gguf iq2_xs K=2560\nOK   gguf iq2_xs K=2816\nOK   gguf iq2_s K=1536\nOK   gguf iq2_s K=2560\nOK   gguf iq2_s K=2816\nOK   gguf iq3_xxs K=1536\nOK   gguf iq3_xxs K=2560\nOK   gguf iq3_xxs K=2816\nOK   gguf iq3_s K=1536\nOK   gguf iq3_s K=2560\nOK   gguf iq3_s K=2816\nOK   gguf iq1_s K=1536\nOK   gguf iq1_s K=2560\nOK   gguf iq1_s K=2816\nOK   gguf iq1_m K=1536\nOK   gguf iq1_m K=2560\nOK   gguf iq1_m K=2816\nOK   gguf iq4_nl K=1536\nOK   gguf iq4_nl K=2560\nOK   gguf iq4_nl K=2816\nOK   gguf iq4_nl K=2112\nOK   gguf iq4_nl K=704\nOK   gguf iq4_xs K=1536\nOK   gguf iq4_xs K=2560\nOK   gguf iq4_xs K=2816\nOK   gguf q4_0 K=1536\nOK   gguf q4_0 K=2560\nOK   gguf q4_0 K=2816\nOK   gguf q4_0 K=2112\nOK   gguf q4_0 K=704\nOK   gguf q5_0 K=1536\nOK   gguf q5_0 K=2560\nOK   gguf q5_0 K=2816\nOK   gguf q5_0 K=2112\nOK   gguf q5_0 K=704\nOK   gguf q2_0 K=1536\nOK   gguf q2_0 K=2560\nOK   gguf q2_0 K=2816\nOK   gguf q2_0 K=2112\nOK   gguf q2_0 K=704\nOK GGUF Linear\n",
+    "checked-gates-checked-store.log": "OK GGUF MMQ BF16 q8_0 nonfixup/split=1\nOK GGUF MMQ BF16 q2_k nonfixup/split=1\nOK GGUF MMQ BF16 q3_k nonfixup/split=1\nOK GGUF MMQ BF16 q4_k nonfixup/split=1\nOK GGUF MMQ BF16 q5_k nonfixup/split=1\nOK GGUF MMQ BF16 q6_k nonfixup/split=1\nOK GGUF MMQ BF16 iq2_xxs nonfixup/split=1\nOK GGUF MMQ BF16 iq2_xs nonfixup/split=1\nOK GGUF MMQ BF16 iq2_s nonfixup/split=1\nOK GGUF MMQ BF16 iq3_xxs nonfixup/split=1\nOK GGUF MMQ BF16 iq3_s nonfixup/split=1\nOK GGUF MMQ BF16 iq1_s nonfixup/split=1\nOK GGUF MMQ BF16 iq4_nl nonfixup/split=1\nOK GGUF MMQ BF16 iq4_xs nonfixup/split=1\nOK GGUF MMQ BF16 q4_0 nonfixup/split=1\nOK GGUF MMQ BF16 q5_0 nonfixup/split=1\nOK GGUF MMQ BF16 q2_0 nonfixup/split=1\nOK GGUF MMQ BF16 store, sm=82\n",
+    "exact-gates-control-oracle.log": "OK   gguf q8_0 K=1536\nOK   gguf q8_0 K=2560\nOK   gguf q8_0 K=2816\nOK   gguf q8_0 K=2112\nOK   gguf q8_0 K=704\nOK   gguf q2_k K=1536\nOK   gguf q2_k K=2560\nOK   gguf q2_k K=2816\nOK   gguf q3_k K=1536\nOK   gguf q3_k K=2560\nOK   gguf q3_k K=2816\nOK   gguf q4_k K=1536\nOK   gguf q4_k K=2560\nOK   gguf q4_k K=2816\nOK   gguf q5_k K=1536\nOK   gguf q5_k K=2560\nOK   gguf q5_k K=2816\nOK   gguf q6_k K=1536\nOK   gguf q6_k K=2560\nOK   gguf q6_k K=2816\nOK   gguf iq2_xxs K=1536\nOK   gguf iq2_xxs K=2560\nOK   gguf iq2_xxs K=2816\nOK   gguf iq2_xs K=1536\nOK   gguf iq2_xs K=2560\nOK   gguf iq2_xs K=2816\nOK   gguf iq2_s K=1536\nOK   gguf iq2_s K=2560\nOK   gguf iq2_s K=2816\nOK   gguf iq3_xxs K=1536\nOK   gguf iq3_xxs K=2560\nOK   gguf iq3_xxs K=2816\nOK   gguf iq3_s K=1536\nOK   gguf iq3_s K=2560\nOK   gguf iq3_s K=2816\nOK   gguf iq1_s K=1536\nOK   gguf iq1_s K=2560\nOK   gguf iq1_s K=2816\nOK   gguf iq1_m K=1536\nOK   gguf iq1_m K=2560\nOK   gguf iq1_m K=2816\nOK   gguf iq4_nl K=1536\nOK   gguf iq4_nl K=2560\nOK   gguf iq4_nl K=2816\nOK   gguf iq4_nl K=2112\nOK   gguf iq4_nl K=704\nOK   gguf iq4_xs K=1536\nOK   gguf iq4_xs K=2560\nOK   gguf iq4_xs K=2816\nOK   gguf q4_0 K=1536\nOK   gguf q4_0 K=2560\nOK   gguf q4_0 K=2816\nOK   gguf q4_0 K=2112\nOK   gguf q4_0 K=704\nOK   gguf q5_0 K=1536\nOK   gguf q5_0 K=2560\nOK   gguf q5_0 K=2816\nOK   gguf q5_0 K=2112\nOK   gguf q5_0 K=704\nOK   gguf q2_0 K=1536\nOK   gguf q2_0 K=2560\nOK   gguf q2_0 K=2816\nOK   gguf q2_0 K=2112\nOK   gguf q2_0 K=704\nOK GGUF Linear\n",
+    "exact-gates-fixed-store.log": "GGUF MMQ BF16 store: gguf matrix activation: K must be whole 512-value groups\n",
+    "cuda12-compile.log": "ninja: Entering directory `/build/bf16-store-matrix'\n[1/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[2/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[3/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[4/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[5/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[6/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[7/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[8/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[9/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[10/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[11/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[12/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[13/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[14/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[15/18] Building CUDA object tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[16/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[17/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[18/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n",
+    "cuda13-compile.log": "ninja: Entering directory `/build/bf16-store-matrix'\n[1/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o\n[2/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o\n[3/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o\n[4/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o\n[5/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o\n[6/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o\n[7/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o\n[8/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o\n[9/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o\n[10/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o\n[11/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o\n[12/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o\n[13/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o\n[14/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o\n[15/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o\n[16/18] Building CUDA object tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o\n[17/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o\n[18/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o\n"
+  },
+  "prior_failed_test": "Initial K256 test omitted required activation padding; corrected before all successful GPU timing. Earlier failed receipt retained."
+}
