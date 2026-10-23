@@ -5,11 +5,11 @@
     "tested_base": "26003d67c1cfb97123b4c66311c85a9f5ae2e16f",
     "diff_sha256": "f1c5de5c01f34ba37a460f41f81b51e85fc472ab6c2a80b72cbc13c1d1c1bad9",
     "binary_sha256": "1419c1c3c2cb8d22cce9484316b4cf0bc88f2c6a1df510a8518239cd32fcaa93",
-    "experiments": "ae7c598c2003c339f57e82e4098c5d7065a1cc01",
     "publication_base": "56aa5f5ba5b13cbc5eba52d34e1c92bc34078d01",
     "merged_pr": 127,
     "maintainer_attribution_commit": "0020fc44de94389dd9c91e698772031cca5d29c6",
-    "validated_rebase": "Ops/Core/vendor/build and focused test sources identical to tested base; ProductTests only adds an unrelated serve test"
+    "validated_rebase": "Ops/Core/vendor/build and focused test sources identical to tested base; ProductTests only adds an unrelated serve test",
+    "pull_request": "https://github.com/iamwavecut/ninfer-all/pull/131"
   },
   "records": {
     "layout-build": {
