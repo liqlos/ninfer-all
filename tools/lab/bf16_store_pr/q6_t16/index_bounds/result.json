@@ -1,0 +1,487 @@
+{
+  "publication": {
+    "source": "26003d67c1cfb97123b4c66311c85a9f5ae2e16f",
+    "tree": "628fbf4c0e96f98b7e9ff4aa670ae2e556aa64c1",
+    "tested_base": "1e0412299f15f237f2ce5b7b04d8b81de3e1da22",
+    "diff_sha256": "4a53399254ca5856670ba4a4ce95df19b1584233b50d62a6145dd3fc3760d408",
+    "binary_sha256": "1348208ce7e418bb8304274f3215af7b83a4aeb0a9bb953a38db6415f861e205"
+  },
+  "records": {
+    "bounds-build": {
+      "status": "PASS_OP_BUILD_LINK",
+      "commands": [
+        {
+          "argv": [
+            "cmake",
+            "-S",
+            "/lab/source",
+            "-B",
+            "/build",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CUDA_ARCHITECTURES=86",
+            "-DNINFER_BUILD_APPS=OFF",
+            "-DBUILD_TESTING=ON",
+            "-DNINFER_BUILD_BENCHMARKS=ON",
+            "-DCMAKE_PROJECT_INCLUDE=/lab/results/bf16-store-pr/build-inputs/target.cmake"
+          ],
+          "seconds": 7.110000000000582,
+          "exit": 0,
+          "log": "bounds-build-0.log"
+        },
+        {
+          "argv": [
+            "cmake",
+            "--build",
+            "/build",
+            "--target",
+            "ninfer_pr_check",
+            "-j",
+            "8"
+          ],
+          "seconds": 106.21799999999712,
+          "exit": 0,
+          "log": "bounds-build-1.log"
+        },
+        {
+          "argv": [
+            "cp",
+            "/build/ninfer_pr_check",
+            "/lab/results/bf16-store-q6-t16/bin/bounds"
+          ],
+          "seconds": 1.7660000000032596,
+          "exit": 0,
+          "log": "bounds-build-2.log"
+        }
+      ],
+      "source": "1e0412299f15f237f2ce5b7b04d8b81de3e1da22",
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "binary_sha256": "1348208ce7e418bb8304274f3215af7b83a4aeb0a9bb953a38db6415f861e205",
+      "qualified_diff_sha256": "4a53399254ca5856670ba4a4ce95df19b1584233b50d62a6145dd3fc3760d408",
+      "files": {
+        "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "e47c49cf68170747fe8f6822ba21be7be2a3a2c4e1105a23ceefe5244f547232",
+        "src/ops/linear/gguf/mmq_limits.h": "906aa7156fbf5cf98a7eacd39c244847fc89308832c711c9ad592b2d9520d664",
+        "tests/ops/linear/test_gguf_mmq_limits.cpp": "0bad752c38de64195b6ea575d3cfb43da48ebb4aa7cfd218be0723f4bafcd13a",
+        "tests/ops/linear/test_gguf_mmq_store.cu": "f939ad68514cd0bbf91dbb429805906de8cac84ac8849ff881ef74efcd41a483",
+        "tests/ops/linear/tests.cmake": "32f34d7400422e1b1d3f8b54a9c4581bb5f15e50e1cbd634aa7142403add06a2"
+      },
+      "final_build_output": "[1/1] Building CXX object tests/CMakeFiles/ninfer_linear_gguf_mmq_limits_test.dir/ops/linear/test_gguf_mmq_limits.cpp.o"
+    },
+    "index-bounds-build": {
+      "source_base": "1e0412299f15f237f2ce5b7b04d8b81de3e1da22",
+      "status": "PASS_HOST_UBSAN_AND_OP_BUILD",
+      "host_compile": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=undefined",
+        "-fno-sanitize-recover=all",
+        "-I/lab/source/src",
+        "/lab/source/tests/ops/linear/test_gguf_mmq_limits.cpp",
+        "-o",
+        "/tmp/ninfer-mmq-limits"
+      ],
+      "host_compile_output": "",
+      "host_test": "OK GGUF MMQ index limits"
+    },
+    "bounds-gates": {
+      "status": "PASS",
+      "mode": "tests",
+      "runs": [
+        {
+          "arm": "bounds",
+          "label": "bounds-gates-bounds-store",
+          "exit": "0"
+        },
+        {
+          "arm": "bounds",
+          "label": "bounds-gates-bounds-oracle",
+          "exit": "0"
+        }
+      ],
+      "profiles": [],
+      "binary_sha256": {
+        "bounds": "1348208ce7e418bb8304274f3215af7b83a4aeb0a9bb953a38db6415f861e205"
+      },
+      "release": {
+        "reservation_id": "7b015210bab040548b5420d2e6947817",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "bounds-architecture-compile": {
+      "status": "PASS_AFFECTED_UNITS_COMPILE_ALL_SIX_ARCHITECTURES",
+      "source": "1e0412299f15f237f2ce5b7b04d8b81de3e1da22",
+      "compile_only": true,
+      "non86_GPU_run": false,
+      "working_diff_sha256": "4a53399254ca5856670ba4a4ce95df19b1584233b50d62a6145dd3fc3760d408",
+      "configurations": [
+        {
+          "name": "bounds-cuda12",
+          "architectures": "70;75;80;86;89",
+          "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0\n",
+          "configure": {
+            "argv": [
+              "cmake",
+              "--fresh",
+              "-S",
+              "/lab/source",
+              "-B",
+              "/build/bf16-store-matrix",
+              "-G",
+              "Ninja",
+              "-DCMAKE_BUILD_TYPE=Release",
+              "-DCMAKE_CUDA_ARCHITECTURES=70;75;80;86;89",
+              "-DCMAKE_CUDA_COMPILER=/build/bf16-store-toolchain/root/usr/local/cuda-12.9/bin/nvcc",
+              "-DCUDAToolkit_ROOT=/build/bf16-store-toolchain/root/usr/local/cuda-12.9",
+              "-DNINFER_BUILD_APPS=OFF",
+              "-DBUILD_TESTING=ON",
+              "-DNINFER_BUILD_BENCHMARKS=OFF",
+              "-DNINFER_SM120_NATIVE=OFF",
+              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+            ],
+            "log": "bounds-cuda12-configure.log",
+            "exit": 0,
+            "seconds": 7.813000000001921
+          },
+          "targets": [
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+          ],
+          "compile": {
+            "argv": [
+              "ninja",
+              "-C",
+              "/build/bf16-store-matrix",
+              "-j",
+              "4",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+            ],
+            "log": "bounds-cuda12-compile.log",
+            "exit": 0,
+            "seconds": 675.9379999999983
+          },
+          "objects": [
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "bytes": 5095072,
+              "sha256": "825f6182648133f252a7d79a162eeb8da617237148ea88991118fec890f78b95"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "bytes": 5922920,
+              "sha256": "89532b4ea9103a0c7fe6c81f408c68b1c68785f8c22473eb78a1c297349102d6"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "bytes": 5790592,
+              "sha256": "ef753ca7db35c350cc8077cff5d703deb394cf347d41a373f98927b151890a2c"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "bytes": 4901312,
+              "sha256": "c7d43190b04b85172e7f99075613ab3507d9f15f8ed51d6e4d1c44855b604e78"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "bytes": 5265648,
+              "sha256": "ffd4e8be02d2c5c57bb7fc2398b585a56ec739dd106207c41c2cfc8c40ee3a2e"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "bytes": 5127656,
+              "sha256": "fe49eae99652e7344001962039546df19d0fa3690c1422d59e65b3a519694aa4"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "bytes": 4521192,
+              "sha256": "3f048eb5b4cd67e6150169d785a9d5091bad068e4e9ffcb131a34e19f1c228e3"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "bytes": 4432640,
+              "sha256": "119f73e0f362eb4fc2882ecd8fd8d2401f8ffafc719b0b0ffd8251cb71d14701"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "bytes": 9486432,
+              "sha256": "7a2d8aae3ff7dd2eb300028c04dc9b4d24c2faca17f3befc62194beef3d38459"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "bytes": 5859696,
+              "sha256": "a7ff09464adc2d8360cfa0b1da642a5b8492c3e58bdcd6a55b7f554535013984"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "bytes": 5372472,
+              "sha256": "82bcbfe871d542dbac6a2d82d3110f7acc757b427bca79df991608fe01bb1554"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "bytes": 5533112,
+              "sha256": "b5c0b4bb0903c3f3388191e2420a43fce2b767f6fc1b57f4d72e0dd8332214d7"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "bytes": 6703192,
+              "sha256": "348fac399fb109c4f1c43003ab91344fdf09dcf0725e9c885984666f95524272"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "bytes": 4053176,
+              "sha256": "7bc81a8b6f7d475404264394026ae9a121aaf3ad5124aa531bd9cb8037989e25"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "bytes": 4878136,
+              "sha256": "8d8a42d162f817bbde4b25274ce5c04030a13398c9da665c1ac1da4d8f23243f"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "bytes": 5373888,
+              "sha256": "6131ae34aff7dab1e3fd1a43af839dd4e5d5ec427de6c6c778ed5e018eebdcd4"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "bytes": 4217416,
+              "sha256": "b27ce372df6f5df385fcda958ebe8d1b92a9f1666f71f24573a229a0a30209a3"
+            },
+            {
+              "path": "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o",
+              "bytes": 82464,
+              "sha256": "12b8a629d743fc225b5ec06ce762098a41209c188da7fe9a1a84d30606b0d770"
+            }
+          ]
+        },
+        {
+          "name": "bounds-cuda13",
+          "architectures": "120a",
+          "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_Dec_16_07:23:41_PM_PST_2025\nCuda compilation tools, release 13.1, V13.1.115\nBuild cuda_13.1.r13.1/compiler.37061995_0\n",
+          "configure": {
+            "argv": [
+              "cmake",
+              "--fresh",
+              "-S",
+              "/lab/source",
+              "-B",
+              "/build/bf16-store-matrix",
+              "-G",
+              "Ninja",
+              "-DCMAKE_BUILD_TYPE=Release",
+              "-DCMAKE_CUDA_ARCHITECTURES=120a",
+              "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+              "-DCUDAToolkit_ROOT=/usr/local/cuda",
+              "-DNINFER_BUILD_APPS=OFF",
+              "-DBUILD_TESTING=ON",
+              "-DNINFER_BUILD_BENCHMARKS=OFF",
+              "-DNINFER_SM120_NATIVE=OFF",
+              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+            ],
+            "log": "bounds-cuda13-configure.log",
+            "exit": 0,
+            "seconds": 8.234000000000378
+          },
+          "targets": [
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+            "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+            "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+          ],
+          "compile": {
+            "argv": [
+              "ninja",
+              "-C",
+              "/build/bf16-store-matrix",
+              "-j",
+              "4",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o"
+            ],
+            "log": "bounds-cuda13-compile.log",
+            "exit": 0,
+            "seconds": 160.75
+          },
+          "objects": [
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o",
+              "bytes": 1315880,
+              "sha256": "82cc508c87f3723c01ff8a144ee726b9f5bffe91236779a66d791c52f2a07216"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o",
+              "bytes": 1522480,
+              "sha256": "67a3a1446f7dd42c0ed7f4af9556e111000913f7df9d451b2b6aa6a83ced47a2"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o",
+              "bytes": 1495016,
+              "sha256": "fee66439d08ec7bb8a853939f058f97654767094ba96ae4f2fabd2c761ecd741"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o",
+              "bytes": 1246952,
+              "sha256": "1ae8dd8452cff4a7d155ca61b62eb708d633369a1c95e41e791de44f7c495ae3"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o",
+              "bytes": 1301144,
+              "sha256": "eed20476b2b2c8dd3d629c788407d0e555ffdd1c602e676e429304f9043db6b0"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o",
+              "bytes": 1264344,
+              "sha256": "86675e52496addf8232325b9c684f8024948ec46642c2412463b51f326270bc3"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o",
+              "bytes": 1170008,
+              "sha256": "52fc9eef7016fd313ec0048cdcbbdadfa13fcae7f10458fd1fa36defec5b8cb5"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o",
+              "bytes": 1195560,
+              "sha256": "123c178aa31cb54f3cc126bc5cd8d9d8be598da4e3709973002fde103b96e109"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o",
+              "bytes": 1807368,
+              "sha256": "52b6792a571742c889fd96dd7485f64233094a8cd3132b609fc79cc0e4374557"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o",
+              "bytes": 1501360,
+              "sha256": "50fdb026d187247a43f343042a61afea0d31db4aca15dce6a8cf1ee39051f7a2"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o",
+              "bytes": 1302256,
+              "sha256": "f73685d010c7c557dc3d70af0c931281c8d27285e273bdb2a1f2c5fa60894025"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o",
+              "bytes": 1360552,
+              "sha256": "dc9eef9d8a2119dee5decaf58a62127beae82ca063de6ca11283929d238469eb"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o",
+              "bytes": 1522360,
+              "sha256": "e080ff08ee8d69072befe547b7814e9ad6f4183dd20fbd88313088b5496ea804"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o",
+              "bytes": 1122808,
+              "sha256": "d7f2a187abc1d1dbc392c86e94762a2327a6591a0fe9d445758c5a193f385fe4"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o",
+              "bytes": 1230952,
+              "sha256": "d9169e8e2828b599edc86bfa8a20316dceff1440a5b9c7c047d04075fb8b2d0d"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o",
+              "bytes": 1354528,
+              "sha256": "c9bf824f4f2471c88bbd22659cb3185591db2b79cd562d84b01e884ed7dcac50"
+            },
+            {
+              "path": "src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o",
+              "bytes": 1134136,
+              "sha256": "cd95ecda6769f34f3d6bb30001378ee8b94b5f336b8d67ea174863a481a3f1b9"
+            },
+            {
+              "path": "tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o",
+              "bytes": 79128,
+              "sha256": "5c4b6d8d1785aaf5d4b47c40a923ac81662aec8e9c2d4b8db46bd818caa73ff9"
+            }
+          ]
+        }
+      ],
+      "toolchain_preparation": {
+        "argv": [
+          "bash",
+          "/lab/results/bf16-store-pr/build-inputs/cuda12.sh"
+        ],
+        "log": "bounds-cuda12-toolchain.log",
+        "exit": 0,
+        "seconds": 33.43699999999808
+      }
+    }
+  },
+  "review": "Three independent read-only reviews: checked continuous-work bound, tests/portability, and PR scope/wording. No blockers after final patch. Existing stride/layout/grid limits are not expanded.",
+  "timing": "Unchanged device mathematics; existing timing belongs to pre-validation source 1e041229 and was not repeated.",
+  "pr_body": "## Problem and scope\n\nRelated #107, BF16 store first; cooperative loads remain separate.\n\nGGUF MMQ materializes FP32 output, then launches `store_plane` to add an optional residual and convert to BF16. This moves the final operation into MMQ or stream-K fixup for all 17 existing MMQ block types, without an architecture gate or CMake option.\n\n## Implementation\n\nComplete tiles write BF16 directly. Split tiles keep FP32 partials; fixup preserves the native summation order, adds the residual after the complete sum and rounds to BF16 once. Other epilogues, FP32 output and MoE retain their implementation. Existing FP32 workspace allocation is retained; BF16 arithmetic is not required.\n\nThe initial PR (`bfd1941a`) regressed Q6_K/T16 by 1.59% in the original exploratory screen: all 40 output tiles are split across 82 CTAs, so its mixed FP32/BF16 main kernel never uses its final BF16 writer. Its J16 specialization had 128 registers versus the native FP32 kernel's 122, and a larger instruction footprint; separate profiles localized the extra time to the main kernel, not fixup. Those observations do not establish a particular hardware stall.\n\nFor a provably all-split launch, the revised route reuses the native FP32 main kernel for partials and keeps the fused BF16 fixup. The bound `ceil((output_tiles \u00d7 K_blocks) / CTAs) + blocks_per_iteration - 1 < K_blocks_per_tile` accounts for rounded partition boundaries and guarantees no complete tile is stored by the main kernel. Other geometries retain the direct BF16 main kernel. No separate `store_plane` is reintroduced.\n\nDense MMQ now rejects nonpositive geometry and continuous work indices at or above `2^30`, matching ggml\u2019s stream-K bound. Tile ceilings/products and efficiency arithmetic cannot overflow before that check. This bounds the continuous work index; existing stride/layout and CUDA grid limits are not expanded.\n\n## Verification\n\nBaseline: master `032eb711`. RTX 3090 24 GB / 82 SMs, driver 616.92, Ubuntu 24.04 Docker on WSL2, CUDA 13.1.115, GCC 13.3, Release/sm86.\n\n- Pure CPU index-bound test: `2^30\u22121` accepted; exact/over-limit, signed extremes and nonpositive factors rejected, with UBSan and warnings-as-errors. Public FP32 and BF16 Store/Accumulate calls reject oversized shapes with null operands for all 17 types before launching a kernel; the max-int ceiling case is also checked. PASS.\n- Exact Store/Accumulate parity against native FP32 MMQ followed by `store_plane`: all 17 types, split/no-fixup, multiple contributors, padded K, output strides/guards and input gathers. Includes the real Q6_K N5120/K17408/T16 shape and K256 boundary cases. PASS. K256 uses the required padded activation preparation; the first new test attempt failed that input precondition before timing and was corrected.\n- Existing `ninfer_linear_gguf_test` with its independent FP64 dequantized-weight oracle: PASS on baseline and revised candidate.\n- Separate T16 public-call Nsight capture: native FP32 MMQ (122 registers) \u2192 BF16 fixup, no separate `store_plane`. Prior mixed/full-tile route coverage is retained. Profiles were outside timing.\n- All 18 CUDA MMQ/test translation units compile for sm70/75/80/86/89 with CUDA 12.9.86 and sm120a with CUDA 13.1.115; the new CPU boundary target also compiles through CMake. This is compile-only qualification outside sm86. GPU execution on other architectures, Windows compilation, the full server/model, and inference speed were not checked in this series.\n\n### Paired public Linear Op results\n\nSynthetic packed GGUF weights, unchanged `ninfer_linear_bench`, eager execution, 256 MiB cache flush, 50 warmups and 500 timed iterations per process. Timing series used `1e041229`, before the host-only index validation added in this follow-up; device kernels and valid-input numerical behavior are unchanged. These timings were not rerun for the validation-only revision. Times below are geometric means of process medians; speed gain is control/candidate \u2212 1.\n\n| Type | T | Control \u00b5s | BF16 store `1e041229` \u00b5s | Speed gain |\n|---|---:|---:|---:|---:|\n| q4_k | 16 | 111.616 | 105.470 | +5.83% |\n| q4_k | 128 | 264.686 | 248.051 | +6.71% |\n| q4_k | 512 | 946.940 | 907.254 | +4.37% |\n| q4_k | 1024 | 1906.423 | 1832.697 | +4.02% |\n| q6_k | 16 | 147.584 | 145.344 | +1.54% |\n| q6_k | 128 | 287.999 | 280.320 | +2.74% |\n| q6_k | 512 | 1056.254 | 1037.310 | +1.83% |\n| q6_k | 1024 | 2138.110 | 2094.335 | +2.09% |\n\nPrimary Q6_K/T16: **+1.541%**, 95% CI **[+1.388%; +1.694%]**, 16 adjacent A/B pairs in eight fixed alternating ABBA/BAAB blocks. The independent confirmation excludes the two pilot blocks. CI uses balanced-block log ratios (df=7); all eight blocks favor the candidate (two-sided exact sign p=0.0078125). Event medians are quantized; the interval does not cover timer/systematic errors.\n\nOther rows are exploratory secondary screens: two balanced blocks / four pairs each. Q4_K is N17408/K5120; Q6_K is N5120/K17408. A separate four-pair screen measured +3.53% versus the initial PR at Q6_K/T16. These are Op results, not a whole-model 5% claim; other block types have correctness, not timing coverage.\n\nThe local runner links the registered test/benchmark OBJECT programs and Ops, excluding unrelated softmax-attention sources; full application/test bundles were not built. Runner size: 168,166,752 \u2192 176,620,288 bytes (+5.03%); index validation and its API tests add 41,368 bytes over `1e041229`.\n\nReproduce with ordinary bundles on each revision, or link those same OBJECT programs for a focused run:\n\n```sh\ncmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86 \\\n  -DBUILD_TESTING=ON -DNINFER_BUILD_BENCHMARKS=ON -DNINFER_BUILD_APPS=OFF\ncmake --build build -j --target ninfer_tests ninfer_benches\nbuild/tests/ninfer_tests ninfer_linear_gguf_test\nbuild/tests/ninfer_tests ninfer_linear_gguf_mmq_store_test\nbuild/tests/ninfer_tests ninfer_linear_gguf_mmq_limits_test\nbuild/bench/ninfer_benches ninfer_linear_bench --qtype q6_k --n 5120 --k 17408 \\\n  --t 16 --warmup 50 --repeat 500 --flush-mib 256 --execution eager --csv-out q6-t16.csv\n```\n\nThe new store test exists only on the candidate. Use the table's other T values and Q4_K geometry for secondary points. Benchmark records and extra documentation remain outside this PR's diff.\n",
+  "logs": {
+    "bounds-cuda12-compile.log": "ninja: Entering directory `/build/bf16-store-matrix'\n[1/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[2/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[3/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[4/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[5/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[6/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[7/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[8/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[9/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[10/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[11/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[12/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[13/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[14/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[15/18] Building CUDA object tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[16/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[17/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n[18/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o\nnvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).\n",
+    "bounds-cuda13-compile.log": "ninja: Entering directory `/build/bf16-store-matrix'\n[1/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xxs.cu.o\n[2/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq1_s.cu.o\n[3/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_xs.cu.o\n[4/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq2_s.cu.o\n[5/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_xxs.cu.o\n[6/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq3_s.cu.o\n[7/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_nl.cu.o\n[8/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_iq4_xs.cu.o\n[9/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_k.cu.o\n[10/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_k.cu.o\n[11/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q3_k.cu.o\n[12/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_k.cu.o\n[13/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q8_0.cu.o\n[14/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q4_0.cu.o\n[15/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q6_k.cu.o\n[16/18] Building CUDA object tests/CMakeFiles/ninfer_linear_gguf_mmq_store_test.dir/ops/linear/test_gguf_mmq_store.cu.o\n[17/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q5_0.cu.o\n[18/18] Building CUDA object src/ops/CMakeFiles/ninfer_ggml_quants.dir/linear/gguf/ggml_mmq_q2_0.cu.o\n",
+    "bounds-final-build.log": "[1/1] Building CXX object tests/CMakeFiles/ninfer_linear_gguf_mmq_limits_test.dir/ops/linear/test_gguf_mmq_limits.cpp.o\n",
+    "bounds-gates-bounds-oracle.log": "OK   gguf q8_0 K=1536\nOK   gguf q8_0 K=2560\nOK   gguf q8_0 K=2816\nOK   gguf q8_0 K=2112\nOK   gguf q8_0 K=704\nOK   gguf q2_k K=1536\nOK   gguf q2_k K=2560\nOK   gguf q2_k K=2816\nOK   gguf q3_k K=1536\nOK   gguf q3_k K=2560\nOK   gguf q3_k K=2816\nOK   gguf q4_k K=1536\nOK   gguf q4_k K=2560\nOK   gguf q4_k K=2816\nOK   gguf q5_k K=1536\nOK   gguf q5_k K=2560\nOK   gguf q5_k K=2816\nOK   gguf q6_k K=1536\nOK   gguf q6_k K=2560\nOK   gguf q6_k K=2816\nOK   gguf iq2_xxs K=1536\nOK   gguf iq2_xxs K=2560\nOK   gguf iq2_xxs K=2816\nOK   gguf iq2_xs K=1536\nOK   gguf iq2_xs K=2560\nOK   gguf iq2_xs K=2816\nOK   gguf iq2_s K=1536\nOK   gguf iq2_s K=2560\nOK   gguf iq2_s K=2816\nOK   gguf iq3_xxs K=1536\nOK   gguf iq3_xxs K=2560\nOK   gguf iq3_xxs K=2816\nOK   gguf iq3_s K=1536\nOK   gguf iq3_s K=2560\nOK   gguf iq3_s K=2816\nOK   gguf iq1_s K=1536\nOK   gguf iq1_s K=2560\nOK   gguf iq1_s K=2816\nOK   gguf iq1_m K=1536\nOK   gguf iq1_m K=2560\nOK   gguf iq1_m K=2816\nOK   gguf iq4_nl K=1536\nOK   gguf iq4_nl K=2560\nOK   gguf iq4_nl K=2816\nOK   gguf iq4_nl K=2112\nOK   gguf iq4_nl K=704\nOK   gguf iq4_xs K=1536\nOK   gguf iq4_xs K=2560\nOK   gguf iq4_xs K=2816\nOK   gguf q4_0 K=1536\nOK   gguf q4_0 K=2560\nOK   gguf q4_0 K=2816\nOK   gguf q4_0 K=2112\nOK   gguf q4_0 K=704\nOK   gguf q5_0 K=1536\nOK   gguf q5_0 K=2560\nOK   gguf q5_0 K=2816\nOK   gguf q5_0 K=2112\nOK   gguf q5_0 K=704\nOK   gguf q2_0 K=1536\nOK   gguf q2_0 K=2560\nOK   gguf q2_0 K=2816\nOK   gguf q2_0 K=2112\nOK   gguf q2_0 K=704\nOK GGUF Linear\n",
+    "bounds-gates-bounds-store.log": "OK GGUF MMQ BF16 q8_0 nonfixup/split=1\nOK GGUF MMQ BF16 q2_k nonfixup/split=1\nOK GGUF MMQ BF16 q3_k nonfixup/split=1\nOK GGUF MMQ BF16 q4_k nonfixup/split=1\nOK GGUF MMQ BF16 q5_k nonfixup/split=1\nOK GGUF MMQ BF16 q6_k nonfixup/split=1\nOK GGUF MMQ BF16 iq2_xxs nonfixup/split=1\nOK GGUF MMQ BF16 iq2_xs nonfixup/split=1\nOK GGUF MMQ BF16 iq2_s nonfixup/split=1\nOK GGUF MMQ BF16 iq3_xxs nonfixup/split=1\nOK GGUF MMQ BF16 iq3_s nonfixup/split=1\nOK GGUF MMQ BF16 iq1_s nonfixup/split=1\nOK GGUF MMQ BF16 iq4_nl nonfixup/split=1\nOK GGUF MMQ BF16 iq4_xs nonfixup/split=1\nOK GGUF MMQ BF16 q4_0 nonfixup/split=1\nOK GGUF MMQ BF16 q5_0 nonfixup/split=1\nOK GGUF MMQ BF16 q2_0 nonfixup/split=1\nOK GGUF MMQ BF16 store, sm=82\n"
+  }
+}
