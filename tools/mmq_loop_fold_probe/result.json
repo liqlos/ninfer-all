@@ -1,5 +1,5 @@
 {
-  "status": "SOURCE_ONLY_READY_FOR_SERIAL_COMPILE_GATE",
+  "status": "PASS_BOUNDED_MANUAL_SASS_REVIEW_GPU_QUALIFICATION_PENDING",
   "date": "2026-10-21",
   "switch": "NINFER_LAB_MMQ_K128_LOOP_FOLD",
   "default": 0,
@@ -105,7 +105,7 @@
         "static_barriers": 4
       }
     ],
-    "qualification": "existing native evidence, no new candidate compile"
+    "qualification": "Historical saved-native parser check; actual candidate compile/review below."
   },
   "syntax_check": "Python 3.11 AST and in-memory compile PASS; no code comment tokens",
   "default_gate_check": "explicit enable required before compiler detection or output creation",
@@ -132,14 +132,90 @@
       "Check all four dynamic publish/retire barriers and plain/Store/Accumulate final conversion boundary."
     ]
   },
-  "compile_command": "PYTHON=/home/neroued/miniconda3/envs/py311/bin/python bash /lab/source/tools/mmq_loop_fold_probe/compile.sh --source-root /src --output-dir /build/mmq-loop-fold --enable-candidate",
-  "command_environment_note": "Use the already selected Python 3.11 and CUDA 13.1.115 environment; adjust PYTHON to its existing interpreter, do not install or reconfigure.",
+  "compile_command": "PYTHON=/usr/bin/python3 bash /lab/source/tools/mmq_loop_fold_probe/compile.sh --source-root /src --output-dir /build/mmq-loop-fold --enable-candidate",
+  "command_environment_note": "Windows source checks use selected Python3.11. Native existing CPU builder has Python3.12.3 and no Python3.11; its exact version is accepted and recorded. CUDA13.1.115 remains pinned. No environment install or reconfiguration.",
   "next_FFN_comparator": "confirmed folded16",
-  "CUDA_compile_run": false,
+  "CUDA_compile_run": true,
   "GPU_run": false,
   "host_or_GPU_harness_created": false,
   "numerics_qualified": false,
   "performance_claim": false,
-  "manual_review_is_still_required": true,
-  "shell_syntax_check": "bash -n PASS"
+  "manual_review_is_still_required": false,
+  "shell_syntax_check": "bash -n PASS",
+  "reviewed_on": "2026-10-23",
+  "actual_compile": {
+    "receipt": "results/mmq-loop-fold/compile-r1.json",
+    "receipt_sha256": "894b5f97cd69cb23ce1f226a4e23b2ab37b2557ff19894504f35f8b0dee460eb",
+    "seconds": 18.187999999994645,
+    "OFF_ON_registers": [
+      221,
+      218
+    ],
+    "stack_local_spill_bytes": 0,
+    "resident_CTA_model_OFF_ON": [
+      1,
+      1
+    ],
+    "hot_K256_bytes_OFF_ON": [
+      47344,
+      25760
+    ],
+    "phase_K128_bytes": 22720,
+    "toolchain": "CUDA13.1.115/SM86; existing native Python3.12.3 driver",
+    "GPU_run": false
+  },
+  "manual_review": {
+    "status": "PASS_BOUNDED_CONTROL_ADDRESS_OPERAND_EPILOGUE_REVIEW",
+    "arms_modes": "OFF and ON; plain, Store, Accumulate independently",
+    "export_manifest": "results/mmq-loop-fold/review/export.json",
+    "export_and_source_hashes_verified_against_compile_manifest": true,
+    "phase_control_PC": {
+      "initial_zero": "0x19b0",
+      "increment": "0x1b90",
+      "exit_latch_ge2": "0x1ba0",
+      "restore_one": "0x7240",
+      "retire_barrier": "0x7250",
+      "exit": "0x7260 -> 0x7280",
+      "backedge": "0x7270 -> 0x19c0"
+    },
+    "phase_count": "exactly0 then1, CTA-uniform",
+    "Y_phase_offset_bytes": "144*ncols_y;184320 atT1280",
+    "A_DM_phase_offsets_bytes": [
+      128,
+      16
+    ],
+    "barriers": "publish0 -> retire0 -> publish1 -> retire1; no shared stores inside reader intervals",
+    "preload": "Full source/PTX A/DM preload and full X shared preload preserved. Both OFF/ON SASS interleave independent LDSM and math; literal all-register-loads-before-first-MMA is false for both.",
+    "hot_modes_difference": "plain=Store; Accumulate only renames address-carry P1/P2 at0x1a00/0x1a10. Full kernels/epilogues are not identical.",
+    "per_thread_accumulator_slots": 64,
+    "ordered_FFMA_events_per_K256": 1024,
+    "per_slot_recurrence": "k32=0..7: scale=FP32(dA*dB); sum=FFMA(scale,FP32(IMMA_output),sum); sum=FFMA(mA,sB,sum). Phase outputs return to incoming accumulator registers; roots zero.",
+    "canonical_ordered_updates_sha256": "f34576e10285b7ec126409cc581408620c35548e610ed56ad2db7534b28b9bb7",
+    "actual_FFMA_event_sha256": {
+      "OFF_plain": "8742d1331873778601425cac21a6072bc74fd21725301d6e2a725075648898e0",
+      "OFF_Store": "158c423f3bc6dc2b3ae48774fc4d70953bfc6364e3c7246f135f4ecc6f425e65",
+      "OFF_Accumulate": "638a64c037520d9168afd06fe261c961801c58f93fca4a284b051fdb59bf3243",
+      "ON_each_mode": "e7470e4d98adbd3039f415f57d0f10b69208b8a781ab0259e26d5069bab24ab5"
+    },
+    "event_digest_fields": "phase,PC,slot,update,destination,prior-register; SHA256 compact JSON",
+    "epilogues": {
+      "plain": "64 FP32 stores",
+      "Store": "64 BF16 RN conversions/stores, no FADD",
+      "Accumulate": "64 LDG.U16 -> exact BF16 expand -> FP32 FADD -> BF16 RN -> STG.U16, same address-register versions",
+      "ON_first_Accumulate_PC": [
+        "0x7330",
+        "0x73b0",
+        "0x73c0",
+        "0x73d0",
+        "0x7400"
+      ]
+    },
+    "performance_tradeoff": "OFF prefetches half1 Y duringhalf0 math; ON loads Y within eachphase and loses that overlap. Smaller footprint does not imply speedup or isolate I-cache cost.",
+    "limits": [
+      "Manually source-labeled fragment/address families, not a complete SASS machine verifier.",
+      "First full-tile no-fixup scope only; tails/fixup and exceptional-value GPU behavior not qualified.",
+      "Exported operator/API/canary/independent-oracle equality and timing have not run."
+    ]
+  },
+  "next_step": "Prepare closed no-fixup operator harness; actual equality/API/canary/independent-oracle gates before fixed balanced exploratory screen. Default-OFF. Whole-FFN comparator folded16. Static review alone does not authorize production/public-PR integration."
 }

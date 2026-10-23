@@ -30,8 +30,8 @@ def main():
         parser.error("source-only default; compile gate requires explicit --enable-candidate")
     if os.name != "posix":
         parser.error("use the existing Linux CUDA environment; no Windows configure or install")
-    if sys.version_info[:2] != (3, 11):
-        parser.error("select the existing Python 3.11 interpreter")
+    if sys.version_info[:2] != (3, 11) and sys.version_info[:3] != (3, 12, 3):
+        parser.error("select Python 3.11 or the existing pinned builder Python 3.12.3")
     if os.environ.get("NVCC_PREPEND_FLAGS") or os.environ.get("NVCC_APPEND_FLAGS"):
         parser.error("ambient NVCC flags must be empty")
     source, out = args.source_root.resolve(), args.output_dir.resolve()
