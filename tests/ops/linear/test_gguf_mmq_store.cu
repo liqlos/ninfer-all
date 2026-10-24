@@ -131,8 +131,12 @@ void check_rejected_geometry(const TypeCase& c) {
     }, "index range exceeded");
     for (const bool accumulate : {false, true}) {
         reject([&] {
+            gguf::VectorOutput destination;
+            destination.bf16 = nullptr;
+            destination.column_stride = 128;
+            destination.epilogue = accumulate ? gguf::Epilogue::Accumulate : gguf::Epilogue::Store;
             gguf::matrix_product_bf16(c.type, nullptr, row_bytes, 128, k, nullptr, 65536,
-                                      nullptr, 128, nullptr, nullptr, nullptr, accumulate);
+                                      destination, nullptr, nullptr, nullptr);
         }, "index range exceeded");
     }
     for (const int invalid_k : {0, -256}) {
@@ -226,10 +230,12 @@ void run_direct_case(const TypeCase& c, int k, int columns, int rows, int paddin
     gguf::store_plane(static_cast<const float*>(native_plane.p), rows, rows, columns,
                       destination, nullptr);
 
+    gguf::VectorOutput bf16_destination;
+    bf16_destination.bf16 = static_cast<__nv_bfloat16*>(bf16_output.p) + padding;
+    bf16_destination.column_stride = output_rows;
+    bf16_destination.epilogue = accumulate ? gguf::Epilogue::Accumulate : gguf::Epilogue::Store;
     gguf::matrix_product_bf16(c.type, weight.p, row_bytes, rows, k, activation.p, columns,
-                              static_cast<__nv_bfloat16*>(bf16_output.p) + padding,
-                              output_rows, static_cast<float*>(partial.p), fixup.p, nullptr,
-                              accumulate, tail);
+                              bf16_destination, static_cast<float*>(partial.p), fixup.p, nullptr, tail);
     check(cudaDeviceSynchronize(), "GGUF MMQ BF16 store synchronization");
 
     std::vector<__nv_bfloat16> expected(initial.size());
@@ -237,6 +243,92 @@ void run_direct_case(const TypeCase& c, int k, int columns, int rows, int paddin
     native_output.copy_to_host(expected.data(), native_output.bytes);
     bf16_output.copy_to_host(actual.data(), bf16_output.bytes);
     compare_outputs(c, k, columns, rows, padding, accumulate, initial, expected, actual);
+}
+
+void run_gate_product_case(const TypeCase& c, int k, int columns, int rows, int padding,
+                           bool require_fixup, gguf::GateActivation activation_type,
+                           bool tail = false) {
+    const gguf::BlockShape block = gguf::block_shape(c.type);
+    const std::size_t fixup_bytes = gguf::matrix_fixup_bytes(c.type, rows, columns);
+    if ((fixup_bytes != 0) != require_fixup) {
+        throw std::runtime_error(std::string(c.name) + " did not select gate fixup geometry");
+    }
+    const int output_rows = rows + 2 * padding;
+    const int gate_padding = padding + 3;
+    const int gate_stride = rows + 2 * gate_padding + 5;
+    const std::int64_t row_bytes = std::int64_t(k / block.elements) * block.bytes;
+    const auto host_weight = make_weight(c, rows, k, 0xD510u + static_cast<unsigned>(c.qtype));
+    DeviceBuffer weight(host_weight.size() + (tail ? 4096 : 0));
+    weight.copy_from_host(host_weight.data(), host_weight.size());
+    if (tail) {
+        check(cudaMemset(static_cast<char*>(weight.p) + host_weight.size(), 0, 4096),
+              "gate matrix weight tail");
+    }
+    std::mt19937 rng(0xE721u + static_cast<unsigned>(c.qtype) +
+                     static_cast<unsigned>(k + columns + rows));
+    std::uniform_real_distribution<float> sample(-0.25f, 0.25f);
+    std::vector<__nv_bfloat16> host_input(std::size_t(k) * columns);
+    std::vector<__nv_bfloat16> initial(std::size_t(output_rows) * columns);
+    std::vector<float> gate(std::size_t(gate_stride) * columns, 913.25f);
+    for (auto& value : host_input) { value = __float2bfloat16(sample(rng)); }
+    for (auto& value : initial) { value = __float2bfloat16(sample(rng)); }
+    for (int column = 0; column < columns; ++column) {
+        for (int row = 0; row < rows; ++row) {
+            gate[std::size_t(column) * gate_stride + gate_padding + row] = sample(rng) * 2.0f;
+        }
+    }
+    DeviceBuffer input(host_input.size() * sizeof(__nv_bfloat16));
+    input.copy_from_host(host_input.data(), input.bytes);
+    DeviceBuffer gate_device(gate.size() * sizeof(float));
+    gate_device.copy_from_host(gate.data(), gate_device.bytes);
+    const int activation_k = tail ? gguf::matrix_padded_k(k) : k;
+    DeviceBuffer quantized(gguf::matrix_activation_bytes(activation_k, columns));
+    if (tail) {
+        gguf::quantize_matrix_activation_padded(c.type,
+            static_cast<const __nv_bfloat16*>(input.p), k, columns, nullptr, quantized.p, nullptr);
+    } else {
+        gguf::quantize_matrix_activation(c.type, static_cast<const __nv_bfloat16*>(input.p), k,
+                                         columns, nullptr, quantized.p, nullptr);
+    }
+    DeviceBuffer native_plane(std::size_t(rows) * columns * sizeof(float));
+    DeviceBuffer partial(std::size_t(rows) * columns * sizeof(float));
+    DeviceBuffer fixup(std::max<std::size_t>(fixup_bytes, 1));
+    DeviceBuffer expected_device(initial.size() * sizeof(__nv_bfloat16));
+    DeviceBuffer actual_device(initial.size() * sizeof(__nv_bfloat16));
+    expected_device.copy_from_host(initial.data(), expected_device.bytes);
+    actual_device.copy_from_host(initial.data(), actual_device.bytes);
+    gguf::matrix_product(c.type, weight.p, row_bytes, rows, k, quantized.p, columns,
+                         static_cast<float*>(native_plane.p), rows, fixup.p, nullptr, tail);
+    gguf::VectorOutput reference;
+    reference.bf16 = static_cast<__nv_bfloat16*>(expected_device.p) + padding;
+    reference.column_stride = output_rows;
+    reference.epilogue = gguf::Epilogue::GateProduct;
+    reference.gate = static_cast<const float*>(gate_device.p) + gate_padding;
+    reference.gate_column_stride = gate_stride;
+    reference.activation = activation_type;
+    gguf::store_plane(static_cast<const float*>(native_plane.p), rows, rows, columns,
+                      reference, nullptr);
+    gguf::VectorOutput direct = reference;
+    direct.bf16 = static_cast<__nv_bfloat16*>(actual_device.p) + padding;
+    gguf::matrix_product_bf16(c.type, weight.p, row_bytes, rows, k, quantized.p, columns,
+                              direct, static_cast<float*>(partial.p), fixup.p, nullptr, tail);
+    check(cudaDeviceSynchronize(), "GGUF MMQ BF16 gate synchronization");
+    std::vector<__nv_bfloat16> expected(initial.size());
+    std::vector<__nv_bfloat16> actual(initial.size());
+    expected_device.copy_to_host(expected.data(), expected_device.bytes);
+    actual_device.copy_to_host(actual.data(), actual_device.bytes);
+    for (int column = 0; column < columns; ++column) {
+        for (int row = 0; row < output_rows; ++row) {
+            const std::size_t at = std::size_t(column) * output_rows + row;
+            if (std::memcmp(&expected[at], &actual[at], sizeof(std::uint16_t)) != 0) {
+                throw std::runtime_error(std::string(c.name) + " gate product differs from FP32 plane route");
+            }
+            if ((row < padding || row >= padding + rows) &&
+                std::memcmp(&actual[at], &initial[at], sizeof(std::uint16_t)) != 0) {
+                throw std::runtime_error(std::string(c.name) + " gate product modified output guards");
+            }
+        }
+    }
 }
 
 void run_public_gather_case(const TypeCase& c, bool accumulate) {
@@ -339,6 +431,11 @@ int main() {
             }
             run_direct_case(c, 512, 9, split_rows, 7, false, true);
             run_direct_case(c, 512, 9, split_rows, 7, true, true);
+            for (const gguf::GateActivation activation : {gguf::GateActivation::Silu,
+                                                          gguf::GateActivation::GeluTanh}) {
+                run_gate_product_case(c, 512, 9, nofix_rows, 7, false, activation);
+                run_gate_product_case(c, 512, 9, split_rows, 7, true, activation);
+            }
             run_direct_case(c, 256, 9, split_rows, 7, false, true, true);
             run_direct_case(c, 256, 9, split_rows, 7, true, true, true);
             const int tail_k = padded_tail_k(c);
@@ -350,12 +447,29 @@ int main() {
                       << (split_rows != 0) << '\n';
         }
 
+        const TypeCase& q8 = kCases[0];
+        const int q8_tail_k = padded_tail_k(q8);
+        if (q8_tail_k != 0) {
+            const int nofix_rows = rows_for_fixup(q8, 9, false);
+            const int split_rows = rows_for_fixup(q8, 9, true);
+            run_gate_product_case(q8, q8_tail_k, 9, nofix_rows, 7, false,
+                                  gguf::GateActivation::Silu, true);
+            run_gate_product_case(q8, q8_tail_k, 9, split_rows, 7, true,
+                                  gguf::GateActivation::GeluTanh, true);
+        }
         const TypeCase& q4 = kCases[3];
         const TypeCase& q6 = kCases[5];
         const bool q6_t16_fixup = gguf::matrix_fixup_bytes(q6.type, 5120, 16) != 0;
         for (const bool accumulate : {false, true}) {
             run_direct_case(q6, 17408, 16, 5120, 7, accumulate, q6_t16_fixup);
         }
+        for (const gguf::GateActivation activation : {gguf::GateActivation::Silu,
+                                                      gguf::GateActivation::GeluTanh}) {
+            run_gate_product_case(q6, 17408, 16, 5120, 7, q6_t16_fixup, activation);
+        }
+        const bool q4_t128_fixup = gguf::matrix_fixup_bytes(q4.type, 17408, 128) != 0;
+        run_gate_product_case(q4, 5120, 128, 17408, 7, q4_t128_fixup,
+                              gguf::GateActivation::Silu);
         for (const TypeCase* c : {&q4, &q6}) {
             if (gguf::matrix_fixup_bytes(c->type, 128, 9) == 0) {
                 throw std::runtime_error(std::string(c->name) + " has no multi-contributor fixup geometry");

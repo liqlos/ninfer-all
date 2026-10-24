@@ -135,6 +135,19 @@ __device__ __forceinline__ float vec_gate(float x, int activation) {
     return activation == 0 ? vec_silu(x) : ops::gelu_tanh(x);
 }
 
+struct MatrixGateEpilogue {
+    const float* gate = nullptr;
+    std::int64_t column_stride = 0;
+    int activation = 0;
+    __device__ __forceinline__ float operator()(float value, int row, int column) const {
+        return value * vec_gate(gate[std::int64_t(column) * column_stride + row], activation);
+    }
+
+    __device__ __forceinline__ MatrixGateEpilogue offset(int row, int column) const {
+        return {gate + std::int64_t(column) * column_stride + row, column_stride, activation};
+    }
+};
+
 __device__ __forceinline__ void vec_store(const VecStore& out, int row, int column, float value) {
     const std::int64_t at = column * out.column_stride + row;
     if (out.epilogue == Epilogue::GateProduct) {
@@ -148,10 +161,11 @@ __device__ __forceinline__ void vec_store(const VecStore& out, int row, int colu
     out.bf16[at] = __float2bfloat16(value);
 }
 
-template <ggml_type type, typename Dst = float, bool accumulate = false>
+template <ggml_type type, typename Dst = float, bool accumulate = false,
+          typename OutputEpilogue = ggml_cuda_mmq_identity>
 void matrix_product_impl(const void* weight, std::int64_t row_bytes, int rows, int k,
                          const void* activation, int columns, Dst* out,
                          std::int64_t out_column_stride, void* fixup, cudaStream_t stream,
-                         bool tail, float* partial = nullptr);
+                         bool tail, float* partial = nullptr, OutputEpilogue epilogue = {});
 
 } // namespace ninfer::ops::gguf::detail

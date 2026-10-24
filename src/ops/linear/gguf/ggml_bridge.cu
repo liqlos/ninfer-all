@@ -883,18 +883,31 @@ void matrix_product(GgmlType type, const void* weight, std::int64_t row_bytes, i
 }
 
 void matrix_product_bf16(GgmlType type, const void* weight, std::int64_t row_bytes, int rows, int k,
-                         const void* activation, int columns, __nv_bfloat16* out,
-                         std::int64_t out_column_stride, float* partial, void* fixup,
-                         cudaStream_t stream, bool accumulate, bool tail) {
+                         const void* activation, int columns, const VectorOutput& out,
+                         float* partial, void* fixup, cudaStream_t stream, bool tail) {
+    if (out.epilogue != Epilogue::Store && out.epilogue != Epilogue::Accumulate &&
+        out.epilogue != Epilogue::GateProduct) {
+        throw std::invalid_argument("gguf matrix product: unsupported BF16 epilogue");
+    }
+    if (out.epilogue == Epilogue::GateProduct && out.gate == nullptr) {
+        throw std::invalid_argument("gguf matrix product: gate product needs a gate plane");
+    }
 #define NINFER_GGUF_MATRIX_CASE(NAME)                                                              \
     case GgmlType::NAME:                                                                           \
-        if (accumulate) {                                                                         \
+        if (out.epilogue == Epilogue::GateProduct) {                                                \
+            const detail::MatrixGateEpilogue epilogue{                                             \
+                out.gate, out.gate_column_stride, static_cast<int>(out.activation)};                 \
+            detail::matrix_product_impl<GGML_TYPE_##NAME, __nv_bfloat16, false,                     \
+                                        detail::MatrixGateEpilogue>(                                 \
+                weight, row_bytes, rows, k, activation, columns, out.bf16, out.column_stride,       \
+                fixup, stream, tail, partial, epilogue);                                            \
+        } else if (out.epilogue == Epilogue::Accumulate) {                                          \
             detail::matrix_product_impl<GGML_TYPE_##NAME, __nv_bfloat16, true>(                     \
-                weight, row_bytes, rows, k, activation, columns, out, out_column_stride,           \
+                weight, row_bytes, rows, k, activation, columns, out.bf16, out.column_stride,       \
                 fixup, stream, tail, partial);                                                     \
         } else {                                                                                  \
             detail::matrix_product_impl<GGML_TYPE_##NAME, __nv_bfloat16, false>(                    \
-                weight, row_bytes, rows, k, activation, columns, out, out_column_stride,           \
+                weight, row_bytes, rows, k, activation, columns, out.bf16, out.column_stride,       \
                 fixup, stream, tail, partial);                                                     \
         }                                                                                         \
         return

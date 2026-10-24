@@ -70,18 +70,21 @@ std::size_t matrix_fixup_bytes_impl(int rows, int columns) {
     return launch.fixup ? std::size_t(launch.blocks) * launch.J * launch.I * sizeof(float) : 0;
 }
 
-template <ggml_type type, int J, typename Dst, bool accumulate>
+template <ggml_type type, int J, typename Dst, bool accumulate,
+          typename OutputEpilogue = ggml_cuda_mmq_identity>
 void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_row_blocks, int rows,
                    int k, const int* activation, int columns, Dst* out,
-                   std::int64_t out_column_stride, float* fixup, cudaStream_t stream, float* partial) {
+                   std::int64_t out_column_stride, float* fixup, cudaStream_t stream, float* partial,
+                   OutputEpilogue epilogue) {
     constexpr int qk = ggml_cuda_type_traits<type>::qk;
     const std::int64_t work = matrix_work_blocks(launch.row_tiles, launch.column_tiles, k / qk);
     static std::once_flag raised[16];
     int device = 0;
     check(cudaGetDevice(&device), "device");
     std::call_once(raised[device & 15], [&] {
-        check(cudaFuncSetAttribute(mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>,
-                                   cudaFuncAttributeMaxDynamicSharedMemorySize,
+        check(cudaFuncSetAttribute(
+                  mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate, OutputEpilogue>,
+                  cudaFuncAttributeMaxDynamicSharedMemorySize,
                                    static_cast<int>(launch.shared)),
               "matrix shared memory");
         if constexpr (!std::is_same_v<Dst, float>) {
@@ -97,11 +100,11 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro
     const dim3 block_dims(WARP_SIZE, launch.threads / WARP_SIZE, 1);
     const int stride        = static_cast<int>(out_column_stride);
     if (!launch.stream_k) {
-        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>
+        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate, OutputEpilogue>
             <<<dim3(launch.row_tiles, launch.column_tiles, 1), block_dims, launch.shared, stream>>>(
                 weight, activation, nullptr, nullptr, out, nullptr, nullptr, blocks_fd, rows,
                 columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0, one_fd,
-                one_fd, 0, 0, 0, ntx_fd, partial, rows);
+                one_fd, 0, 0, 0, ntx_fd, partial, rows, epilogue);
         check(cudaGetLastError(), "matrix product launch");
         return;
     }
@@ -121,28 +124,28 @@ void launch_matrix(const MatrixLaunch& launch, const char* weight, int stride_ro
             blocks_fd, rows, columns, stride_row_blocks, columns, rows, one_fd, one_fd, 0, 0, 0,
             one_fd, one_fd, 0, 0, 0, ntx_fd);
     } else {
-        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate>
+        mul_mat_q<type, J, false, GGML_PREC_Q8, Dst, accumulate, OutputEpilogue>
             <<<dim3(launch.blocks, 1, 1), block_dims, launch.shared, stream>>>(
             weight, activation, nullptr, nullptr, out, launch.fixup ? fixup : nullptr, nullptr,
             blocks_fd, rows, columns, stride_row_blocks, columns, stride, one_fd, one_fd, 0, 0, 0,
-            one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows);
+            one_fd, one_fd, 0, 0, 0, ntx_fd, partial, rows, epilogue);
     }
     check(cudaGetLastError(), "matrix product launch");
     if (!launch.fixup) { return; }
     const dim3 fixup_blocks(launch.blocks, launch.I / WARP_SIZE, 1);
     const dim3 fixup_dims(block_dims.x, block_dims.y / 2, 1);
-    mul_mat_q_stream_k_fixup<type, J, false, GGML_PREC_Q8, Dst, accumulate>
+    mul_mat_q_stream_k_fixup<type, J, false, GGML_PREC_Q8, Dst, accumulate, OutputEpilogue>
         <<<fixup_blocks, fixup_dims, 0, stream>>>(
         nullptr, nullptr, out, fixup, blocks_fd, rows, columns, stride, one_fd, 0, one_fd, 0,
-        ntx_fd, partial, rows);
+        ntx_fd, partial, rows, epilogue);
     check(cudaGetLastError(), "matrix fixup launch");
 }
 
-template <ggml_type type, typename Dst, bool accumulate>
+template <ggml_type type, typename Dst, bool accumulate, typename OutputEpilogue>
 void matrix_product_impl(const void* weight, std::int64_t row_bytes, int rows, int k,
                          const void* activation, int columns, Dst* out,
                          std::int64_t out_column_stride, void* fixup, cudaStream_t stream,
-                         bool tail, float* partial) {
+                         bool tail, float* partial, OutputEpilogue epilogue) {
     constexpr int qk = ggml_cuda_type_traits<type>::qk;
     constexpr int block_bytes = ggml_cuda_type_traits<type>::bs;
     // A row that is not a whole number of 256-value steps is read past its end (into the next row,
@@ -159,20 +162,20 @@ void matrix_product_impl(const void* weight, std::int64_t row_bytes, int rows, i
     const int stride_row      = static_cast<int>(row_bytes / block_bytes);
     switch (launch.J) {
     case 16:
-        launch_matrix<type, 16, Dst, accumulate>(launch, x, stride_row, rows, k, y, columns, out,
-                                                  out_column_stride, f, stream, partial);
+        launch_matrix<type, 16, Dst, accumulate, OutputEpilogue>(launch, x, stride_row, rows, k, y, columns, out,
+                                                  out_column_stride, f, stream, partial, epilogue);
         return;
     case 32:
-        launch_matrix<type, 32, Dst, accumulate>(launch, x, stride_row, rows, k, y, columns, out,
-                                                  out_column_stride, f, stream, partial);
+        launch_matrix<type, 32, Dst, accumulate, OutputEpilogue>(launch, x, stride_row, rows, k, y, columns, out,
+                                                  out_column_stride, f, stream, partial, epilogue);
         return;
     case 64:
-        launch_matrix<type, 64, Dst, accumulate>(launch, x, stride_row, rows, k, y, columns, out,
-                                                  out_column_stride, f, stream, partial);
+        launch_matrix<type, 64, Dst, accumulate, OutputEpilogue>(launch, x, stride_row, rows, k, y, columns, out,
+                                                  out_column_stride, f, stream, partial, epilogue);
         return;
     case 128:
-        launch_matrix<type, 128, Dst, accumulate>(launch, x, stride_row, rows, k, y, columns, out,
-                                                  out_column_stride, f, stream, partial);
+        launch_matrix<type, 128, Dst, accumulate, OutputEpilogue>(launch, x, stride_row, rows, k, y, columns, out,
+                                                  out_column_stride, f, stream, partial, epilogue);
         return;
     default:
         break;
@@ -329,13 +332,17 @@ void moe_matrix_product_impl(const void* const* experts, std::int64_t row_bytes,
     template std::size_t ninfer::ops::gguf::detail::matrix_fixup_bytes_impl<TYPE>(int, int);       \
     template void ninfer::ops::gguf::detail::matrix_product_impl<TYPE>(                            \
         const void*, std::int64_t, int, int, const void*, int, float*, std::int64_t, void*,        \
-        cudaStream_t, bool, float*);                                                              \
+        cudaStream_t, bool, float*, ggml_cuda_mmq_identity);                                      \
     template void ninfer::ops::gguf::detail::matrix_product_impl<TYPE, __nv_bfloat16, false>(    \
         const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t, void*, \
-        cudaStream_t, bool, float*);                                                              \
+        cudaStream_t, bool, float*, ggml_cuda_mmq_identity);                                      \
     template void ninfer::ops::gguf::detail::matrix_product_impl<TYPE, __nv_bfloat16, true>(     \
         const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t, void*, \
-        cudaStream_t, bool, float*);                                                              \
+        cudaStream_t, bool, float*, ggml_cuda_mmq_identity);                                      \
+    template void ninfer::ops::gguf::detail::matrix_product_impl<TYPE, __nv_bfloat16, false,      \
+        ninfer::ops::gguf::detail::MatrixGateEpilogue>(                                            \
+        const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t, void*, \
+        cudaStream_t, bool, float*, ninfer::ops::gguf::detail::MatrixGateEpilogue);                \
     template bool ninfer::ops::gguf::detail::moe_matrix_fits_impl<TYPE>(int, int, bool);           \
     template void ninfer::ops::gguf::detail::moe_matrix_product_impl<TYPE>(                        \
         const void* const*, std::int64_t, int, int, const ninfer::ops::gguf::MoeRouting&, int,     \
