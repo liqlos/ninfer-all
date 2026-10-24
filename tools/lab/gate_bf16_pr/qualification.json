@@ -1,0 +1,3048 @@
+{
+  "status": "REJECTED",
+  "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+  "source_commit": "e09f39fbd09ce537995de6acfa77838b01407e94",
+  "initial_source_commit": "62424931f3f8174c834b20d50fc1e097f13452dc",
+  "issue": "https://github.com/iamwavecut/ninfer-all/issues/133",
+  "scope": "dense MMQ BF16 GateProduct final write-back; no quantization/KV/workspace changes",
+  "environment": {
+    "gpu": "RTX 3090",
+    "cuda": "13.1.115",
+    "gcc": "13.3",
+    "platform": "Ubuntu24.04 WSL2"
+  },
+  "initial": {
+    "candidate-initial-build": {
+      "status": "PASS_BUILD",
+      "arm": "candidate",
+      "commands": [
+        {
+          "label": "candidate-configure",
+          "exit": 0,
+          "seconds": 4.843000000000757
+        },
+        {
+          "label": "candidate-compile",
+          "exit": 0,
+          "seconds": 301.7039999999979
+        },
+        {
+          "label": "candidate-export",
+          "exit": 0,
+          "seconds": 1.5460000000020955
+        },
+        {
+          "label": "candidate-cli-export",
+          "exit": 0,
+          "seconds": 5.375
+        },
+        {
+          "label": "candidate-decode-export",
+          "exit": 0,
+          "seconds": 5.515999999995984
+        }
+      ],
+      "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+      "source_files": {
+        "src/ops/linear/gguf/ggml_bridge.cu": "ccbfea697a1db22c51152169c07d5a5135ce0d81c864bf349960dabda887272c",
+        "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+        "src/ops/linear/gguf/ggml_bridge_internal.cuh": "f38b53df79eaee019625d11f7aeb9ea6cfd8ce416e7a20c0c1646e1c4ffa9d57",
+        "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "906be3a8530ae5d042421dfaf1ff537c4f677372e0216a0e940a2d09b5adb053",
+        "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+        "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+        "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+      },
+      "binaries": {
+        "candidate": {
+          "sha256": "2d78b993e111fc8b12441da3f31af2eac2a60bc8666dc7e2805a4ae33f87b8ef",
+          "bytes": 186814560
+        },
+        "candidate-cli": {
+          "sha256": "16e4bc085f4f0e056592ac7976a06326ca167d8c97f8e7fa3fbeca300ab7f236",
+          "bytes": 772594152
+        },
+        "candidate-decode": {
+          "sha256": "4d937b0a199ad8908553d06e193e4653b7fd183cade758dd8b9085188e434095",
+          "bytes": 771829464
+        }
+      }
+    },
+    "gates": {
+      "status": "PASS",
+      "mode": "gates",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "gates-control-oracle",
+          "exit": "0"
+        },
+        {
+          "arm": "control",
+          "label": "gates-control-store",
+          "exit": "0"
+        },
+        {
+          "arm": "candidate",
+          "label": "gates-candidate-oracle",
+          "exit": "0"
+        },
+        {
+          "arm": "candidate",
+          "label": "gates-candidate-store",
+          "exit": "0"
+        }
+      ],
+      "builds": {
+        "control": {
+          "status": "PASS_BUILD",
+          "arm": "control",
+          "commands": [
+            {
+              "label": "control-configure",
+              "exit": 0,
+              "seconds": 4.9689999999973224
+            },
+            {
+              "label": "control-compile",
+              "exit": 0,
+              "seconds": 262.07800000000134
+            },
+            {
+              "label": "control-export",
+              "exit": 0,
+              "seconds": 1.5780000000013388
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "binaries": {
+            "control": {
+              "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+              "bytes": 176885384
+            }
+          }
+        },
+        "candidate": {
+          "status": "PASS_BUILD",
+          "arm": "candidate",
+          "commands": [
+            {
+              "label": "candidate-configure",
+              "exit": 0,
+              "seconds": 4.843000000000757
+            },
+            {
+              "label": "candidate-compile",
+              "exit": 0,
+              "seconds": 301.7039999999979
+            },
+            {
+              "label": "candidate-export",
+              "exit": 0,
+              "seconds": 1.5460000000020955
+            },
+            {
+              "label": "candidate-cli-export",
+              "exit": 0,
+              "seconds": 5.375
+            },
+            {
+              "label": "candidate-decode-export",
+              "exit": 0,
+              "seconds": 5.515999999995984
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "source_files": {
+            "src/ops/linear/gguf/ggml_bridge.cu": "ccbfea697a1db22c51152169c07d5a5135ce0d81c864bf349960dabda887272c",
+            "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+            "src/ops/linear/gguf/ggml_bridge_internal.cuh": "f38b53df79eaee019625d11f7aeb9ea6cfd8ce416e7a20c0c1646e1c4ffa9d57",
+            "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "906be3a8530ae5d042421dfaf1ff537c4f677372e0216a0e940a2d09b5adb053",
+            "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+            "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+            "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+          },
+          "binaries": {
+            "candidate": {
+              "sha256": "2d78b993e111fc8b12441da3f31af2eac2a60bc8666dc7e2805a4ae33f87b8ef",
+              "bytes": 186814560
+            },
+            "candidate-cli": {
+              "sha256": "16e4bc085f4f0e056592ac7976a06326ca167d8c97f8e7fa3fbeca300ab7f236",
+              "bytes": 772594152
+            },
+            "candidate-decode": {
+              "sha256": "4d937b0a199ad8908553d06e193e4653b7fd183cade758dd8b9085188e434095",
+              "bytes": 771829464
+            }
+          }
+        }
+      },
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "admission_before": {
+        "runtime": {
+          "kind": "wsl_docker",
+          "backend": "ninfer",
+          "distribution": "Ubuntu-24.04",
+          "available": true,
+          "error": null
+        },
+        "backend_load": null,
+        "backend_load_error": null,
+        "backend_recovery": {
+          "state": "idle",
+          "attempt": 0,
+          "retry_after_monotonic": 0.0
+        },
+        "context_grants": {
+          "backend": "ninfer",
+          "physical_kv_tokens": 0,
+          "page_tokens": 0,
+          "committed_grant_tokens": 0,
+          "reserved_request_tokens": 0,
+          "available_guaranteed_tokens": 0
+        },
+        "models": [
+          {
+            "id": "qwen3.8-27b",
+            "name": "qwen3.8-27b",
+            "replicas": 0,
+            "ready_replicas": 0,
+            "backend": "ninfer",
+            "backend_parameters": [
+              "--max-model-len=65536",
+              "--max-num-seqs=1"
+            ],
+            "max_context_tokens": 65536,
+            "container": null
+          }
+        ],
+        "instances": [],
+        "leases": [],
+        "windows_gpu": {
+          "available": true,
+          "external_busy": true,
+          "external_activity": true,
+          "external_memory_bytes": 412598272,
+          "external_reserve_fraction": 0.3,
+          "external_memory_with_margin_bytes": 536377753,
+          "additional_margin_bytes": 123779481,
+          "memory_threshold_mb": 64,
+          "process_memory": [
+            {
+              "pid": 14116,
+              "name": "pid_14116_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 79859712,
+              "process": "ChatGPT"
+            },
+            {
+              "pid": 9364,
+              "name": "pid_9364_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 85164032,
+              "process": "explorer"
+            },
+            {
+              "pid": 1180,
+              "name": "pid_1180_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 247574528,
+              "process": "dwm"
+            }
+          ],
+          "active_engines": [],
+          "collector_duration_ms": 703.0,
+          "sampled_monotonic": 37897.046,
+          "sample_revision": 5398
+        },
+        "managed_container_names": [
+          "gpu-broker-ninfer"
+        ],
+        "admission": {
+          "draining": false,
+          "drain_owner_kind": null,
+          "photo_gpu_reservation": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "runtime_maintenance": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "active_batches": []
+        },
+        "capacity_estimate": [
+          {
+            "gpu": "NVIDIA GeForce RTX 3090",
+            "total_bytes": 25769803776,
+            "driver_used_bytes": 481296384,
+            "external_process_bytes": 412598272,
+            "external_reserve_bytes": 123779482,
+            "target_llm_budget_bytes": 25233426022,
+            "available_llm_budget_bytes": 25164727910,
+            "llm_and_system_used_bytes": 68698112,
+            "external_reserve_satisfied": true,
+            "measurement": "measured",
+            "sample_age_seconds": 6.0789999999979045
+          }
+        ],
+        "runtime_gpu_observation_error": null,
+        "external_growth_pressure": {
+          "active": false,
+          "affected_lease_ids": []
+        },
+        "budget_revision": 831,
+        "model_state": "idle",
+        "requires_profile_change": false,
+        "agents": [],
+        "queue": [],
+        "inference": {
+          "active_requests": 0,
+          "active_sequences": 0,
+          "reserved_tokens": 0
+        }
+      },
+      "reservation": {
+        "reservation_id": "664c170d444d46ffaa49bcbc4ad5c19e",
+        "owner": "ninfer-gate-bf16-pr",
+        "state": "active",
+        "expires_at": 1792805841.112487,
+        "model_unloaded": true
+      },
+      "release": {
+        "reservation_id": "664c170d444d46ffaa49bcbc4ad5c19e",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "screen": {
+      "status": "PASS",
+      "mode": "screen",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "screen-b0-p0-control",
+          "exit": "0",
+          "block": 0,
+          "position": 0,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "212.992",
+              "p95_us": "217.088",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "523.264",
+              "min_us": "519.168",
+              "p95_us": "526.336",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "202.6458",
+              "modeled_min_payload_spec_pct": "21.6480",
+              "useful_tflops": "87.2103",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1887.232",
+              "min_us": "1870.848",
+              "p95_us": "1890.304",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "65.3543",
+              "modeled_min_payload_spec_pct": "6.9816",
+              "useful_tflops": "96.7216",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3808.256",
+              "min_us": "3764.224",
+              "p95_us": "3952.640",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.4447",
+              "modeled_min_payload_spec_pct": "4.1069",
+              "useful_tflops": "95.8634",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "screen-b0-p1-candidate",
+          "exit": "0",
+          "block": 0,
+          "position": 1,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "551.936",
+              "min_us": "546.816",
+              "p95_us": "556.032",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "192.1187",
+              "modeled_min_payload_spec_pct": "20.5234",
+              "useful_tflops": "82.6799",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2117.632",
+              "min_us": "2100.224",
+              "p95_us": "2120.704",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "58.2437",
+              "modeled_min_payload_spec_pct": "6.2220",
+              "useful_tflops": "86.1982",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4233.216",
+              "min_us": "4198.400",
+              "p95_us": "4328.448",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "34.5854",
+              "modeled_min_payload_spec_pct": "3.6946",
+              "useful_tflops": "86.2399",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "screen-b0-p2-candidate",
+          "exit": "0",
+          "block": 0,
+          "position": 2,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "209.920",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "546.816",
+              "min_us": "539.648",
+              "p95_us": "549.888",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "193.9176",
+              "modeled_min_payload_spec_pct": "20.7156",
+              "useful_tflops": "83.4541",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2103.296",
+              "min_us": "2083.840",
+              "p95_us": "2106.368",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "58.6407",
+              "modeled_min_payload_spec_pct": "6.2644",
+              "useful_tflops": "86.7857",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4233.216",
+              "min_us": "4221.952",
+              "p95_us": "4429.824",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "34.5854",
+              "modeled_min_payload_spec_pct": "3.6946",
+              "useful_tflops": "86.2399",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "control",
+          "label": "screen-b0-p3-control",
+          "exit": "0",
+          "block": 0,
+          "position": 3,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "522.240",
+              "min_us": "518.144",
+              "p95_us": "524.288",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "203.0431",
+              "modeled_min_payload_spec_pct": "21.6904",
+              "useful_tflops": "87.3813",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1901.568",
+              "min_us": "1886.208",
+              "p95_us": "1904.640",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "64.8616",
+              "modeled_min_payload_spec_pct": "6.9289",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3800.064",
+              "min_us": "3790.848",
+              "p95_us": "3984.384",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.5276",
+              "modeled_min_payload_spec_pct": "4.1158",
+              "useful_tflops": "96.0700",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "screen-b1-p0-candidate",
+          "exit": "0",
+          "block": 1,
+          "position": 0,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "547.840",
+              "min_us": "525.312",
+              "p95_us": "550.912",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "193.5551",
+              "modeled_min_payload_spec_pct": "20.6768",
+              "useful_tflops": "83.2981",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2117.632",
+              "min_us": "2100.224",
+              "p95_us": "2121.728",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "58.2437",
+              "modeled_min_payload_spec_pct": "6.2220",
+              "useful_tflops": "86.1982",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4234.240",
+              "min_us": "4221.952",
+              "p95_us": "4393.984",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "34.5770",
+              "modeled_min_payload_spec_pct": "3.6937",
+              "useful_tflops": "86.2191",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "control",
+          "label": "screen-b1-p1-control",
+          "exit": "0",
+          "block": 1,
+          "position": 1,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "522.240",
+              "min_us": "519.168",
+              "p95_us": "524.288",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "203.0431",
+              "modeled_min_payload_spec_pct": "21.6904",
+              "useful_tflops": "87.3813",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1901.568",
+              "min_us": "1885.184",
+              "p95_us": "1914.880",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "64.8616",
+              "modeled_min_payload_spec_pct": "6.9289",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3803.136",
+              "min_us": "3794.944",
+              "p95_us": "3986.432",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.4965",
+              "modeled_min_payload_spec_pct": "4.1125",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "control",
+          "label": "screen-b1-p2-control",
+          "exit": "0",
+          "block": 1,
+          "position": 2,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "212.992",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "522.240",
+              "min_us": "519.168",
+              "p95_us": "524.288",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "203.0431",
+              "modeled_min_payload_spec_pct": "21.6904",
+              "useful_tflops": "87.3813",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1901.568",
+              "min_us": "1886.208",
+              "p95_us": "1903.616",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "64.8616",
+              "modeled_min_payload_spec_pct": "6.9289",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3826.688",
+              "min_us": "3763.200",
+              "p95_us": "3986.432",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.2596",
+              "modeled_min_payload_spec_pct": "4.0871",
+              "useful_tflops": "95.4016",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "screen-b1-p3-candidate",
+          "exit": "0",
+          "block": 1,
+          "position": 3,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "215.040",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "546.816",
+              "min_us": "536.576",
+              "p95_us": "550.912",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "193.9176",
+              "modeled_min_payload_spec_pct": "20.7156",
+              "useful_tflops": "83.4541",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2116.608",
+              "min_us": "2101.248",
+              "p95_us": "2119.680",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "58.2719",
+              "modeled_min_payload_spec_pct": "6.2250",
+              "useful_tflops": "86.2399",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4264.960",
+              "min_us": "4222.976",
+              "p95_us": "4457.472",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "34.3280",
+              "modeled_min_payload_spec_pct": "3.6671",
+              "useful_tflops": "85.5980",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        }
+      ],
+      "builds": {
+        "control": {
+          "status": "PASS_BUILD",
+          "arm": "control",
+          "commands": [
+            {
+              "label": "control-configure",
+              "exit": 0,
+              "seconds": 4.9689999999973224
+            },
+            {
+              "label": "control-compile",
+              "exit": 0,
+              "seconds": 262.07800000000134
+            },
+            {
+              "label": "control-export",
+              "exit": 0,
+              "seconds": 1.5780000000013388
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "binaries": {
+            "control": {
+              "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+              "bytes": 176885384
+            }
+          }
+        },
+        "candidate": {
+          "status": "PASS_BUILD",
+          "arm": "candidate",
+          "commands": [
+            {
+              "label": "candidate-configure",
+              "exit": 0,
+              "seconds": 4.843000000000757
+            },
+            {
+              "label": "candidate-compile",
+              "exit": 0,
+              "seconds": 301.7039999999979
+            },
+            {
+              "label": "candidate-export",
+              "exit": 0,
+              "seconds": 1.5460000000020955
+            },
+            {
+              "label": "candidate-cli-export",
+              "exit": 0,
+              "seconds": 5.375
+            },
+            {
+              "label": "candidate-decode-export",
+              "exit": 0,
+              "seconds": 5.515999999995984
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "source_files": {
+            "src/ops/linear/gguf/ggml_bridge.cu": "ccbfea697a1db22c51152169c07d5a5135ce0d81c864bf349960dabda887272c",
+            "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+            "src/ops/linear/gguf/ggml_bridge_internal.cuh": "f38b53df79eaee019625d11f7aeb9ea6cfd8ce416e7a20c0c1646e1c4ffa9d57",
+            "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "906be3a8530ae5d042421dfaf1ff537c4f677372e0216a0e940a2d09b5adb053",
+            "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+            "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+            "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+          },
+          "binaries": {
+            "candidate": {
+              "sha256": "2d78b993e111fc8b12441da3f31af2eac2a60bc8666dc7e2805a4ae33f87b8ef",
+              "bytes": 186814560
+            },
+            "candidate-cli": {
+              "sha256": "16e4bc085f4f0e056592ac7976a06326ca167d8c97f8e7fa3fbeca300ab7f236",
+              "bytes": 772594152
+            },
+            "candidate-decode": {
+              "sha256": "4d937b0a199ad8908553d06e193e4653b7fd183cade758dd8b9085188e434095",
+              "bytes": 771829464
+            }
+          }
+        }
+      },
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "admission_before": {
+        "runtime": {
+          "kind": "wsl_docker",
+          "backend": "ninfer",
+          "distribution": "Ubuntu-24.04",
+          "available": true,
+          "error": null
+        },
+        "backend_load": null,
+        "backend_load_error": null,
+        "backend_recovery": {
+          "state": "idle",
+          "attempt": 0,
+          "retry_after_monotonic": 0.0
+        },
+        "context_grants": {
+          "backend": "ninfer",
+          "physical_kv_tokens": 0,
+          "page_tokens": 0,
+          "committed_grant_tokens": 0,
+          "reserved_request_tokens": 0,
+          "available_guaranteed_tokens": 0
+        },
+        "models": [
+          {
+            "id": "qwen3.8-27b",
+            "name": "qwen3.8-27b",
+            "replicas": 0,
+            "ready_replicas": 0,
+            "backend": "ninfer",
+            "backend_parameters": [
+              "--max-model-len=65536",
+              "--max-num-seqs=1"
+            ],
+            "max_context_tokens": 65536,
+            "container": null
+          }
+        ],
+        "instances": [],
+        "leases": [],
+        "windows_gpu": {
+          "available": true,
+          "external_busy": true,
+          "external_activity": true,
+          "external_memory_bytes": 412598272,
+          "external_reserve_fraction": 0.3,
+          "external_memory_with_margin_bytes": 536377753,
+          "additional_margin_bytes": 123779481,
+          "memory_threshold_mb": 64,
+          "process_memory": [
+            {
+              "pid": 14116,
+              "name": "pid_14116_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 79859712,
+              "process": "ChatGPT"
+            },
+            {
+              "pid": 9364,
+              "name": "pid_9364_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 85164032,
+              "process": "explorer"
+            },
+            {
+              "pid": 1180,
+              "name": "pid_1180_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 247574528,
+              "process": "dwm"
+            }
+          ],
+          "active_engines": [],
+          "collector_duration_ms": 688.0,
+          "sampled_monotonic": 38011.5,
+          "sample_revision": 5418
+        },
+        "managed_container_names": [
+          "gpu-broker-ninfer"
+        ],
+        "admission": {
+          "draining": false,
+          "drain_owner_kind": null,
+          "photo_gpu_reservation": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "runtime_maintenance": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "active_batches": []
+        },
+        "capacity_estimate": [
+          {
+            "gpu": "NVIDIA GeForce RTX 3090",
+            "total_bytes": 25769803776,
+            "driver_used_bytes": 481296384,
+            "external_process_bytes": 412598272,
+            "external_reserve_bytes": 123779482,
+            "target_llm_budget_bytes": 25233426022,
+            "available_llm_budget_bytes": 25164727910,
+            "llm_and_system_used_bytes": 68698112,
+            "external_reserve_satisfied": true,
+            "measurement": "measured",
+            "sample_age_seconds": 2.4530000000013388
+          }
+        ],
+        "runtime_gpu_observation_error": null,
+        "external_growth_pressure": {
+          "active": false,
+          "affected_lease_ids": []
+        },
+        "budget_revision": 838,
+        "model_state": "idle",
+        "requires_profile_change": false,
+        "agents": [],
+        "queue": [],
+        "inference": {
+          "active_requests": 0,
+          "active_sequences": 0,
+          "reserved_tokens": 0
+        }
+      },
+      "reservation": {
+        "reservation_id": "213fce7453e04942abb1f218291ce4e4",
+        "owner": "ninfer-gate-bf16-pr",
+        "state": "active",
+        "expires_at": 1792805951.960208,
+        "model_unloaded": true
+      },
+      "protocol": {
+        "orders": [
+          "ABBA",
+          "BAAB"
+        ],
+        "t": [
+          16,
+          128,
+          512,
+          1024
+        ],
+        "warmup": 30,
+        "repeat": 150,
+        "execution": "eager",
+        "flush_mib": 256,
+        "primary": "public linear_swiglu T1024 speed ratio; other T are secondary/regression screens",
+        "scope": "public GGUF_Q4_K linear_swiglu, stacked parent N34816,K5120 -> N17408,includes packing,both projections,activation/final store",
+        "no_profiler_in_timing": true
+      },
+      "release": {
+        "reservation_id": "213fce7453e04942abb1f218291ce4e4",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "screen-statistics": {
+      "input": "screen",
+      "scope": "public GGUF_Q4_K linear_swiglu",
+      "endpoints": {
+        "16": {
+          "blocks": 2,
+          "speedup_percent": 0.0,
+          "block_speedup_percent": [
+            0.0,
+            0.0
+          ]
+        },
+        "128": {
+          "blocks": 2,
+          "speedup_percent": -4.714549461334458,
+          "block_speedup_percent": [
+            -4.845238073178569,
+            -4.583681357545647
+          ]
+        },
+        "512": {
+          "blocks": 2,
+          "speedup_percent": -10.209629118888701,
+          "block_speedup_percent": [
+            -10.237873500580813,
+            -10.18137584987263
+          ]
+        },
+        "1024": {
+          "blocks": 2,
+          "speedup_percent": -10.18214763439437,
+          "block_speedup_percent": [
+            -10.135514113030018,
+            -10.228756956150907
+          ]
+        }
+      },
+      "eligible_for_confirmation": false
+    },
+    "route-profile-r2": {
+      "status": "PASS",
+      "mode": "profile",
+      "runs": [],
+      "builds": {
+        "control": {
+          "status": "PASS_BUILD",
+          "arm": "control",
+          "commands": [
+            {
+              "label": "control-configure",
+              "exit": 0,
+              "seconds": 4.9689999999973224
+            },
+            {
+              "label": "control-compile",
+              "exit": 0,
+              "seconds": 262.07800000000134
+            },
+            {
+              "label": "control-export",
+              "exit": 0,
+              "seconds": 1.5780000000013388
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "binaries": {
+            "control": {
+              "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+              "bytes": 176885384
+            }
+          }
+        },
+        "candidate": {
+          "status": "PASS_BUILD",
+          "arm": "candidate",
+          "commands": [
+            {
+              "label": "candidate-configure",
+              "exit": 0,
+              "seconds": 4.843000000000757
+            },
+            {
+              "label": "candidate-compile",
+              "exit": 0,
+              "seconds": 301.7039999999979
+            },
+            {
+              "label": "candidate-export",
+              "exit": 0,
+              "seconds": 1.5460000000020955
+            },
+            {
+              "label": "candidate-cli-export",
+              "exit": 0,
+              "seconds": 5.375
+            },
+            {
+              "label": "candidate-decode-export",
+              "exit": 0,
+              "seconds": 5.515999999995984
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "source_files": {
+            "src/ops/linear/gguf/ggml_bridge.cu": "ccbfea697a1db22c51152169c07d5a5135ce0d81c864bf349960dabda887272c",
+            "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+            "src/ops/linear/gguf/ggml_bridge_internal.cuh": "f38b53df79eaee019625d11f7aeb9ea6cfd8ce416e7a20c0c1646e1c4ffa9d57",
+            "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "906be3a8530ae5d042421dfaf1ff537c4f677372e0216a0e940a2d09b5adb053",
+            "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+            "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+            "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+          },
+          "binaries": {
+            "candidate": {
+              "sha256": "2d78b993e111fc8b12441da3f31af2eac2a60bc8666dc7e2805a4ae33f87b8ef",
+              "bytes": 186814560
+            },
+            "candidate-cli": {
+              "sha256": "16e4bc085f4f0e056592ac7976a06326ca167d8c97f8e7fa3fbeca300ab7f236",
+              "bytes": 772594152
+            },
+            "candidate-decode": {
+              "sha256": "4d937b0a199ad8908553d06e193e4653b7fd183cade758dd8b9085188e434095",
+              "bytes": 771829464
+            }
+          }
+        }
+      },
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "admission_before": {
+        "runtime": {
+          "kind": "wsl_docker",
+          "backend": "ninfer",
+          "distribution": "Ubuntu-24.04",
+          "available": true,
+          "error": null
+        },
+        "backend_load": null,
+        "backend_load_error": null,
+        "backend_recovery": {
+          "state": "idle",
+          "attempt": 0,
+          "retry_after_monotonic": 0.0
+        },
+        "context_grants": {
+          "backend": "ninfer",
+          "physical_kv_tokens": 0,
+          "page_tokens": 0,
+          "committed_grant_tokens": 0,
+          "reserved_request_tokens": 0,
+          "available_guaranteed_tokens": 0
+        },
+        "models": [
+          {
+            "id": "qwen3.8-27b",
+            "name": "qwen3.8-27b",
+            "replicas": 0,
+            "ready_replicas": 0,
+            "backend": "ninfer",
+            "backend_parameters": [
+              "--max-model-len=65536",
+              "--max-num-seqs=1"
+            ],
+            "max_context_tokens": 65536,
+            "container": null
+          }
+        ],
+        "instances": [],
+        "leases": [],
+        "windows_gpu": {
+          "available": true,
+          "external_busy": true,
+          "external_activity": true,
+          "external_memory_bytes": 412598272,
+          "external_reserve_fraction": 0.3,
+          "external_memory_with_margin_bytes": 536377753,
+          "additional_margin_bytes": 123779481,
+          "memory_threshold_mb": 64,
+          "process_memory": [
+            {
+              "pid": 14116,
+              "name": "pid_14116_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 79859712,
+              "process": "ChatGPT"
+            },
+            {
+              "pid": 9364,
+              "name": "pid_9364_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 85164032,
+              "process": "explorer"
+            },
+            {
+              "pid": 1180,
+              "name": "pid_1180_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 247574528,
+              "process": "dwm"
+            }
+          ],
+          "active_engines": [],
+          "collector_duration_ms": 719.0,
+          "sampled_monotonic": 38133.187,
+          "sample_revision": 5440
+        },
+        "managed_container_names": [
+          "gpu-broker-ninfer"
+        ],
+        "admission": {
+          "draining": false,
+          "drain_owner_kind": null,
+          "photo_gpu_reservation": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "runtime_maintenance": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "active_batches": []
+        },
+        "capacity_estimate": [
+          {
+            "gpu": "NVIDIA GeForce RTX 3090",
+            "total_bytes": 25769803776,
+            "driver_used_bytes": 481296384,
+            "external_process_bytes": 412598272,
+            "external_reserve_bytes": 123779482,
+            "target_llm_budget_bytes": 25233426022,
+            "available_llm_budget_bytes": 25164727910,
+            "llm_and_system_used_bytes": 68698112,
+            "external_reserve_satisfied": true,
+            "measurement": "measured",
+            "sample_age_seconds": 1.7969999999986612
+          }
+        ],
+        "runtime_gpu_observation_error": null,
+        "external_growth_pressure": {
+          "active": false,
+          "affected_lease_ids": []
+        },
+        "budget_revision": 851,
+        "model_state": "idle",
+        "requires_profile_change": false,
+        "agents": [],
+        "queue": [],
+        "inference": {
+          "active_requests": 0,
+          "active_sequences": 0,
+          "reserved_tokens": 0
+        }
+      },
+      "reservation": {
+        "reservation_id": "48c8c0732bb94dc08f9b3adf7b81397e",
+        "owner": "ninfer-gate-bf16-pr",
+        "state": "active",
+        "expires_at": 1792806073.0445206,
+        "model_unloaded": true
+      },
+      "profiles": [
+        {
+          "arm": "control",
+          "label": "route-profile-r2-control",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "ninfer::bench::detail::fill_bf16_uniform_kernel(unsigned short *, unsigned long, unsigned int)",
+              "nanoseconds": 13440,
+              "registers": 16,
+              "grid": 4096,
+              "block": 256
+            },
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)1>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 18464,
+              "registers": 24,
+              "grid": 1024,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, float, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 1678823,
+              "registers": 221,
+              "grid": 1088,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, float, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 1677384,
+              "registers": 221,
+              "grid": 1088,
+              "block": 256
+            },
+            {
+              "name": "ninfer::ops::gguf::detail::<unnamed>::store_plane_kernel(const float *, long, int, ninfer::ops::gguf::detail::VecStore)",
+              "nanoseconds": 210053,
+              "registers": 19,
+              "grid": 68,
+              "block": 256
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "route-profile-r2-candidate",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "ninfer::bench::detail::fill_bf16_uniform_kernel(unsigned short *, unsigned long, unsigned int)",
+              "nanoseconds": 13408,
+              "registers": 16,
+              "grid": 4096,
+              "block": 256
+            },
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)1>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 18688,
+              "registers": 24,
+              "grid": 1024,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, float, (bool)0, ggml_cuda_mmq_identity>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int, T7)",
+              "nanoseconds": 1933736,
+              "registers": 221,
+              "grid": 1088,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0, ninfer::ops::gguf::detail::MatrixGateEpilogue>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int, T7)",
+              "nanoseconds": 3862255,
+              "registers": 246,
+              "grid": 1088,
+              "block": 256
+            }
+          ]
+        }
+      ],
+      "release": {
+        "reservation_id": "48c8c0732bb94dc08f9b3adf7b81397e",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    }
+  },
+  "specialized": {
+    "candidate-build": {
+      "status": "PASS_BUILD",
+      "arm": "candidate",
+      "commands": [
+        {
+          "label": "candidate-configure",
+          "exit": 0,
+          "seconds": 4.827999999994063
+        },
+        {
+          "label": "candidate-compile",
+          "exit": 0,
+          "seconds": 291.93700000000536
+        },
+        {
+          "label": "candidate-export",
+          "exit": 0,
+          "seconds": 1.610000000000582
+        },
+        {
+          "label": "candidate-cli-export",
+          "exit": 0,
+          "seconds": 5.515999999995984
+        },
+        {
+          "label": "candidate-decode-export",
+          "exit": 0,
+          "seconds": 5.6710000000020955
+        }
+      ],
+      "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+      "source_head": "62424931f3f8174c834b20d50fc1e097f13452dc",
+      "source_files": {
+        "src/ops/linear/gguf/ggml_bridge.cu": "f6a35de4c2e64b9212636bdd465938e3dd439632050370cca72d5843cfd9d0e1",
+        "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+        "src/ops/linear/gguf/ggml_bridge_internal.cuh": "8febddc3408fd9567cda9f7d8e8c2f26b68baaba87eaf4cb6de8c7b574591950",
+        "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "105f97e34c88853044645183fb216d8dfbb9459037fbc2198835846d81c64ad7",
+        "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+        "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+        "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+      },
+      "binaries": {
+        "candidate": {
+          "sha256": "f177847d159ab1616082fa931420d3d35a4189843591d5aa45d8edfdd5621b3a",
+          "bytes": 189586048
+        },
+        "candidate-cli": {
+          "sha256": "c2a86ae64a7e01454e021629490af913611de13a58bccac50ef9e13a800d34c5",
+          "bytes": 775357448
+        },
+        "candidate-decode": {
+          "sha256": "87481e5e667cdca550ffc0dc73512e59d62b55c7bc8efaceaecf12f6059b2bfb",
+          "bytes": 774600952
+        }
+      }
+    },
+    "specialized-gates": {
+      "status": "PASS",
+      "mode": "gates",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "specialized-gates-control-oracle",
+          "exit": "0"
+        },
+        {
+          "arm": "control",
+          "label": "specialized-gates-control-store",
+          "exit": "0"
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-gates-candidate-oracle",
+          "exit": "0"
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-gates-candidate-store",
+          "exit": "0"
+        }
+      ],
+      "builds": {
+        "control": {
+          "status": "PASS_BUILD",
+          "arm": "control",
+          "commands": [
+            {
+              "label": "control-configure",
+              "exit": 0,
+              "seconds": 4.9689999999973224
+            },
+            {
+              "label": "control-compile",
+              "exit": 0,
+              "seconds": 262.07800000000134
+            },
+            {
+              "label": "control-export",
+              "exit": 0,
+              "seconds": 1.5780000000013388
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "binaries": {
+            "control": {
+              "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+              "bytes": 176885384
+            }
+          }
+        },
+        "candidate": {
+          "status": "PASS_BUILD",
+          "arm": "candidate",
+          "commands": [
+            {
+              "label": "candidate-configure",
+              "exit": 0,
+              "seconds": 4.827999999994063
+            },
+            {
+              "label": "candidate-compile",
+              "exit": 0,
+              "seconds": 291.93700000000536
+            },
+            {
+              "label": "candidate-export",
+              "exit": 0,
+              "seconds": 1.610000000000582
+            },
+            {
+              "label": "candidate-cli-export",
+              "exit": 0,
+              "seconds": 5.515999999995984
+            },
+            {
+              "label": "candidate-decode-export",
+              "exit": 0,
+              "seconds": 5.6710000000020955
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "source_head": "62424931f3f8174c834b20d50fc1e097f13452dc",
+          "source_files": {
+            "src/ops/linear/gguf/ggml_bridge.cu": "f6a35de4c2e64b9212636bdd465938e3dd439632050370cca72d5843cfd9d0e1",
+            "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+            "src/ops/linear/gguf/ggml_bridge_internal.cuh": "8febddc3408fd9567cda9f7d8e8c2f26b68baaba87eaf4cb6de8c7b574591950",
+            "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "105f97e34c88853044645183fb216d8dfbb9459037fbc2198835846d81c64ad7",
+            "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+            "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+            "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+          },
+          "binaries": {
+            "candidate": {
+              "sha256": "f177847d159ab1616082fa931420d3d35a4189843591d5aa45d8edfdd5621b3a",
+              "bytes": 189586048
+            },
+            "candidate-cli": {
+              "sha256": "c2a86ae64a7e01454e021629490af913611de13a58bccac50ef9e13a800d34c5",
+              "bytes": 775357448
+            },
+            "candidate-decode": {
+              "sha256": "87481e5e667cdca550ffc0dc73512e59d62b55c7bc8efaceaecf12f6059b2bfb",
+              "bytes": 774600952
+            }
+          }
+        }
+      },
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "admission_before": {
+        "runtime": {
+          "kind": "wsl_docker",
+          "backend": "ninfer",
+          "distribution": "Ubuntu-24.04",
+          "available": true,
+          "error": null
+        },
+        "backend_load": null,
+        "backend_load_error": null,
+        "backend_recovery": {
+          "state": "idle",
+          "attempt": 0,
+          "retry_after_monotonic": 0.0
+        },
+        "context_grants": {
+          "backend": "ninfer",
+          "physical_kv_tokens": 0,
+          "page_tokens": 0,
+          "committed_grant_tokens": 0,
+          "reserved_request_tokens": 0,
+          "available_guaranteed_tokens": 0
+        },
+        "models": [
+          {
+            "id": "qwen3.8-27b",
+            "name": "qwen3.8-27b",
+            "replicas": 0,
+            "ready_replicas": 0,
+            "backend": "ninfer",
+            "backend_parameters": [
+              "--max-model-len=65536",
+              "--max-num-seqs=1"
+            ],
+            "max_context_tokens": 65536,
+            "container": null
+          }
+        ],
+        "instances": [],
+        "leases": [],
+        "windows_gpu": {
+          "available": true,
+          "external_busy": true,
+          "external_activity": true,
+          "external_memory_bytes": 412643328,
+          "external_reserve_fraction": 0.3,
+          "external_memory_with_margin_bytes": 536436326,
+          "additional_margin_bytes": 123792998,
+          "memory_threshold_mb": 64,
+          "process_memory": [
+            {
+              "pid": 14116,
+              "name": "pid_14116_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 79908864,
+              "process": "ChatGPT"
+            },
+            {
+              "pid": 9364,
+              "name": "pid_9364_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 85159936,
+              "process": "explorer"
+            },
+            {
+              "pid": 1180,
+              "name": "pid_1180_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 247574528,
+              "process": "dwm"
+            }
+          ],
+          "active_engines": [],
+          "collector_duration_ms": 703.0,
+          "sampled_monotonic": 38567.562,
+          "sample_revision": 5511
+        },
+        "managed_container_names": [
+          "gpu-broker-ninfer"
+        ],
+        "admission": {
+          "draining": false,
+          "drain_owner_kind": null,
+          "photo_gpu_reservation": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "runtime_maintenance": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "active_batches": []
+        },
+        "capacity_estimate": [
+          {
+            "gpu": "NVIDIA GeForce RTX 3090",
+            "total_bytes": 25769803776,
+            "driver_used_bytes": 481296384,
+            "external_process_bytes": 412643328,
+            "external_reserve_bytes": 123792999,
+            "target_llm_budget_bytes": 25233367449,
+            "available_llm_budget_bytes": 25164714393,
+            "llm_and_system_used_bytes": 68653056,
+            "external_reserve_satisfied": true,
+            "measurement": "measured",
+            "sample_age_seconds": 2.9530000000013388
+          }
+        ],
+        "runtime_gpu_observation_error": null,
+        "external_growth_pressure": {
+          "active": false,
+          "affected_lease_ids": []
+        },
+        "budget_revision": 874,
+        "model_state": "idle",
+        "requires_profile_change": false,
+        "agents": [],
+        "queue": [],
+        "inference": {
+          "active_requests": 0,
+          "active_sequences": 0,
+          "reserved_tokens": 0
+        }
+      },
+      "reservation": {
+        "reservation_id": "365e77d0674b46ebb8f3223d78eff336",
+        "owner": "ninfer-gate-bf16-pr",
+        "state": "active",
+        "expires_at": 1792806508.5084043,
+        "model_unloaded": true
+      },
+      "release": {
+        "reservation_id": "365e77d0674b46ebb8f3223d78eff336",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "specialized-screen": {
+      "status": "PASS",
+      "mode": "screen",
+      "runs": [
+        {
+          "arm": "control",
+          "label": "specialized-screen-b0-p0-control",
+          "exit": "0",
+          "block": 0,
+          "position": 0,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "522.240",
+              "min_us": "516.096",
+              "p95_us": "527.360",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "203.0431",
+              "modeled_min_payload_spec_pct": "21.6904",
+              "useful_tflops": "87.3813",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1901.568",
+              "min_us": "1872.896",
+              "p95_us": "1904.640",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "64.8616",
+              "modeled_min_payload_spec_pct": "6.9289",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3800.064",
+              "min_us": "3766.272",
+              "p95_us": "3952.640",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.5276",
+              "modeled_min_payload_spec_pct": "4.1158",
+              "useful_tflops": "96.0700",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-screen-b0-p1-candidate",
+          "exit": "0",
+          "block": 0,
+          "position": 1,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "212.992",
+              "p95_us": "218.112",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "546.816",
+              "min_us": "540.672",
+              "p95_us": "550.912",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "193.9176",
+              "modeled_min_payload_spec_pct": "20.7156",
+              "useful_tflops": "83.4541",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2067.456",
+              "min_us": "2049.024",
+              "p95_us": "2068.480",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "59.6573",
+              "modeled_min_payload_spec_pct": "6.3730",
+              "useful_tflops": "88.2902",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4143.104",
+              "min_us": "4106.240",
+              "p95_us": "4239.360",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "35.3376",
+              "modeled_min_payload_spec_pct": "3.7750",
+              "useful_tflops": "88.1156",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-screen-b0-p2-candidate",
+          "exit": "0",
+          "block": 0,
+          "position": 2,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "215.040",
+              "min_us": "214.016",
+              "p95_us": "217.088",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "469.6381",
+              "modeled_min_payload_spec_pct": "50.1699",
+              "useful_tflops": "26.5265",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "546.816",
+              "min_us": "539.648",
+              "p95_us": "550.912",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "193.9176",
+              "modeled_min_payload_spec_pct": "20.7156",
+              "useful_tflops": "83.4541",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2065.408",
+              "min_us": "2048.000",
+              "p95_us": "2068.480",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "59.7164",
+              "modeled_min_payload_spec_pct": "6.3793",
+              "useful_tflops": "88.3777",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4145.152",
+              "min_us": "4074.496",
+              "p95_us": "4242.432",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "35.3202",
+              "modeled_min_payload_spec_pct": "3.7731",
+              "useful_tflops": "88.0721",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "control",
+          "label": "specialized-screen-b0-p3-control",
+          "exit": "0",
+          "block": 0,
+          "position": 3,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "212.992",
+              "p95_us": "217.088",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "524.288",
+              "min_us": "517.120",
+              "p95_us": "527.360",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "202.2500",
+              "modeled_min_payload_spec_pct": "21.6057",
+              "useful_tflops": "87.0400",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1901.568",
+              "min_us": "1898.496",
+              "p95_us": "1904.640",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "64.8616",
+              "modeled_min_payload_spec_pct": "6.9289",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3801.088",
+              "min_us": "3764.224",
+              "p95_us": "3949.568",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.5172",
+              "modeled_min_payload_spec_pct": "4.1147",
+              "useful_tflops": "96.0441",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-screen-b1-p0-candidate",
+          "exit": "0",
+          "block": 1,
+          "position": 0,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "217.088",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "545.792",
+              "min_us": "524.288",
+              "p95_us": "549.888",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "194.2814",
+              "modeled_min_payload_spec_pct": "20.7544",
+              "useful_tflops": "83.6107",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2066.432",
+              "min_us": "2049.024",
+              "p95_us": "2068.480",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "59.6868",
+              "modeled_min_payload_spec_pct": "6.3761",
+              "useful_tflops": "88.3340",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4145.152",
+              "min_us": "4139.008",
+              "p95_us": "4276.224",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "35.3202",
+              "modeled_min_payload_spec_pct": "3.7731",
+              "useful_tflops": "88.0721",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "control",
+          "label": "specialized-screen-b1-p1-control",
+          "exit": "0",
+          "block": 1,
+          "position": 1,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "217.088",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "528.384",
+              "min_us": "520.192",
+              "p95_us": "531.456",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "200.6822",
+              "modeled_min_payload_spec_pct": "21.4382",
+              "useful_tflops": "86.3653",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1901.568",
+              "min_us": "1885.184",
+              "p95_us": "1904.640",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "64.8616",
+              "modeled_min_payload_spec_pct": "6.9289",
+              "useful_tflops": "95.9924",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3813.376",
+              "min_us": "3790.848",
+              "p95_us": "3949.568",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.3931",
+              "modeled_min_payload_spec_pct": "4.1014",
+              "useful_tflops": "95.7347",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "control",
+          "label": "specialized-screen-b1-p2-control",
+          "exit": "0",
+          "block": 1,
+          "position": 2,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "217.088",
+              "min_us": "214.016",
+              "p95_us": "262.144",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "465.2075",
+              "modeled_min_payload_spec_pct": "49.6966",
+              "useful_tflops": "26.2762",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "520.192",
+              "min_us": "513.024",
+              "p95_us": "574.464",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "203.8425",
+              "modeled_min_payload_spec_pct": "21.7758",
+              "useful_tflops": "87.7253",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "1885.184",
+              "min_us": "1848.320",
+              "p95_us": "2085.888",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "65.4253",
+              "modeled_min_payload_spec_pct": "6.9892",
+              "useful_tflops": "96.8267",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "3798.016",
+              "min_us": "3680.256",
+              "p95_us": "3892.224",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "38.5484",
+              "modeled_min_payload_spec_pct": "4.1180",
+              "useful_tflops": "96.1218",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-screen-b1-p3-candidate",
+          "exit": "0",
+          "block": 1,
+          "position": 3,
+          "points": [
+            {
+              "t": "16",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "216.064",
+              "min_us": "214.016",
+              "p95_us": "272.384",
+              "weight_bytes": "100270080",
+              "logical_bytes": "100990976",
+              "projection_flops": "5704253440",
+              "modeled_min_payload_gbs": "467.4123",
+              "modeled_min_payload_spec_pct": "49.9321",
+              "useful_tflops": "26.4008",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "7823616"
+            },
+            {
+              "t": "128",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "530.432",
+              "min_us": "516.096",
+              "p95_us": "1341.440",
+              "weight_bytes": "100270080",
+              "logical_bytes": "106037248",
+              "projection_flops": "45634027520",
+              "modeled_min_payload_gbs": "199.9073",
+              "modeled_min_payload_spec_pct": "21.3554",
+              "useful_tflops": "86.0318",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "24711424"
+            },
+            {
+              "t": "512",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "2006.016",
+              "min_us": "1933.312",
+              "p95_us": "2524.160",
+              "weight_bytes": "100270080",
+              "logical_bytes": "123338752",
+              "projection_flops": "182536110080",
+              "modeled_min_payload_gbs": "61.4844",
+              "modeled_min_payload_spec_pct": "6.5682",
+              "useful_tflops": "90.9943",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "82612480"
+            },
+            {
+              "t": "1024",
+              "execution": "eager",
+              "graph_nodes": "0",
+              "median_us": "4145.152",
+              "min_us": "4048.896",
+              "p95_us": "4243.456",
+              "weight_bytes": "100270080",
+              "logical_bytes": "146407424",
+              "projection_flops": "365072220160",
+              "modeled_min_payload_gbs": "35.3202",
+              "modeled_min_payload_spec_pct": "3.7731",
+              "useful_tflops": "88.0721",
+              "workspace_sweep_bytes": "159813888",
+              "workspace_exact_bytes": "159813888"
+            }
+          ]
+        }
+      ],
+      "builds": {
+        "control": {
+          "status": "PASS_BUILD",
+          "arm": "control",
+          "commands": [
+            {
+              "label": "control-configure",
+              "exit": 0,
+              "seconds": 4.9689999999973224
+            },
+            {
+              "label": "control-compile",
+              "exit": 0,
+              "seconds": 262.07800000000134
+            },
+            {
+              "label": "control-export",
+              "exit": 0,
+              "seconds": 1.5780000000013388
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "binaries": {
+            "control": {
+              "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+              "bytes": 176885384
+            }
+          }
+        },
+        "candidate": {
+          "status": "PASS_BUILD",
+          "arm": "candidate",
+          "commands": [
+            {
+              "label": "candidate-configure",
+              "exit": 0,
+              "seconds": 4.827999999994063
+            },
+            {
+              "label": "candidate-compile",
+              "exit": 0,
+              "seconds": 291.93700000000536
+            },
+            {
+              "label": "candidate-export",
+              "exit": 0,
+              "seconds": 1.610000000000582
+            },
+            {
+              "label": "candidate-cli-export",
+              "exit": 0,
+              "seconds": 5.515999999995984
+            },
+            {
+              "label": "candidate-decode-export",
+              "exit": 0,
+              "seconds": 5.6710000000020955
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "source_head": "62424931f3f8174c834b20d50fc1e097f13452dc",
+          "source_files": {
+            "src/ops/linear/gguf/ggml_bridge.cu": "f6a35de4c2e64b9212636bdd465938e3dd439632050370cca72d5843cfd9d0e1",
+            "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+            "src/ops/linear/gguf/ggml_bridge_internal.cuh": "8febddc3408fd9567cda9f7d8e8c2f26b68baaba87eaf4cb6de8c7b574591950",
+            "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "105f97e34c88853044645183fb216d8dfbb9459037fbc2198835846d81c64ad7",
+            "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+            "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+            "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+          },
+          "binaries": {
+            "candidate": {
+              "sha256": "f177847d159ab1616082fa931420d3d35a4189843591d5aa45d8edfdd5621b3a",
+              "bytes": 189586048
+            },
+            "candidate-cli": {
+              "sha256": "c2a86ae64a7e01454e021629490af913611de13a58bccac50ef9e13a800d34c5",
+              "bytes": 775357448
+            },
+            "candidate-decode": {
+              "sha256": "87481e5e667cdca550ffc0dc73512e59d62b55c7bc8efaceaecf12f6059b2bfb",
+              "bytes": 774600952
+            }
+          }
+        }
+      },
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "admission_before": {
+        "runtime": {
+          "kind": "wsl_docker",
+          "backend": "ninfer",
+          "distribution": "Ubuntu-24.04",
+          "available": true,
+          "error": null
+        },
+        "backend_load": null,
+        "backend_load_error": null,
+        "backend_recovery": {
+          "state": "idle",
+          "attempt": 0,
+          "retry_after_monotonic": 0.0
+        },
+        "context_grants": {
+          "backend": "ninfer",
+          "physical_kv_tokens": 0,
+          "page_tokens": 0,
+          "committed_grant_tokens": 0,
+          "reserved_request_tokens": 0,
+          "available_guaranteed_tokens": 0
+        },
+        "models": [
+          {
+            "id": "qwen3.8-27b",
+            "name": "qwen3.8-27b",
+            "replicas": 0,
+            "ready_replicas": 0,
+            "backend": "ninfer",
+            "backend_parameters": [
+              "--max-model-len=65536",
+              "--max-num-seqs=1"
+            ],
+            "max_context_tokens": 65536,
+            "container": null
+          }
+        ],
+        "instances": [],
+        "leases": [],
+        "windows_gpu": {
+          "available": true,
+          "external_busy": true,
+          "external_activity": true,
+          "external_memory_bytes": 412647424,
+          "external_reserve_fraction": 0.3,
+          "external_memory_with_margin_bytes": 536441651,
+          "additional_margin_bytes": 123794227,
+          "memory_threshold_mb": 64,
+          "process_memory": [
+            {
+              "pid": 14116,
+              "name": "pid_14116_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 79908864,
+              "process": "ChatGPT"
+            },
+            {
+              "pid": 9364,
+              "name": "pid_9364_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 85164032,
+              "process": "explorer"
+            },
+            {
+              "pid": 1180,
+              "name": "pid_1180_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 247574528,
+              "process": "dwm"
+            }
+          ],
+          "active_engines": [],
+          "collector_duration_ms": 703.0,
+          "sampled_monotonic": 38675.953,
+          "sample_revision": 5529
+        },
+        "managed_container_names": [
+          "gpu-broker-ninfer"
+        ],
+        "admission": {
+          "draining": false,
+          "drain_owner_kind": null,
+          "photo_gpu_reservation": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "runtime_maintenance": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "active_batches": []
+        },
+        "capacity_estimate": [
+          {
+            "gpu": "NVIDIA GeForce RTX 3090",
+            "total_bytes": 25769803776,
+            "driver_used_bytes": 481296384,
+            "external_process_bytes": 412647424,
+            "external_reserve_bytes": 123794228,
+            "target_llm_budget_bytes": 25233362124,
+            "available_llm_budget_bytes": 25164713164,
+            "llm_and_system_used_bytes": 68648960,
+            "external_reserve_satisfied": true,
+            "measurement": "measured",
+            "sample_age_seconds": 6.546999999998661
+          }
+        ],
+        "runtime_gpu_observation_error": null,
+        "external_growth_pressure": {
+          "active": false,
+          "affected_lease_ids": []
+        },
+        "budget_revision": 885,
+        "model_state": "idle",
+        "requires_profile_change": false,
+        "agents": [],
+        "queue": [],
+        "inference": {
+          "active_requests": 0,
+          "active_sequences": 0,
+          "reserved_tokens": 0
+        }
+      },
+      "reservation": {
+        "reservation_id": "f1ed3c4dff7e4a67899ba3e9b1bcdfcd",
+        "owner": "ninfer-gate-bf16-pr",
+        "state": "active",
+        "expires_at": 1792806620.6597278,
+        "model_unloaded": true
+      },
+      "protocol": {
+        "orders": [
+          "ABBA",
+          "BAAB"
+        ],
+        "t": [
+          16,
+          128,
+          512,
+          1024
+        ],
+        "warmup": 30,
+        "repeat": 150,
+        "execution": "eager",
+        "flush_mib": 256,
+        "primary": "public linear_swiglu T1024 speed ratio; other T are secondary/regression screens",
+        "scope": "public GGUF_Q4_K linear_swiglu, stacked parent N34816,K5120 -> N17408,includes packing,both projections,activation/final store",
+        "no_profiler_in_timing": true
+      },
+      "release": {
+        "reservation_id": "f1ed3c4dff7e4a67899ba3e9b1bcdfcd",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    },
+    "specialized-screen-statistics": {
+      "input": "specialized-screen",
+      "scope": "public GGUF_Q4_K linear_swiglu",
+      "endpoints": {
+        "16": {
+          "blocks": 2,
+          "speedup_percent": 0.23724959135865528,
+          "block_speedup_percent": [
+            0.23781246425448235,
+            0.23668672162357063
+          ]
+        },
+        "128": {
+          "blocks": 2,
+          "speedup_percent": -3.438608167672392,
+          "block_speedup_percent": [
+            -4.307299339797461,
+            -2.5620310821252783
+          ]
+        },
+        "512": {
+          "blocks": 2,
+          "speedup_percent": -7.493356965433126,
+          "block_speedup_percent": [
+            -7.978184935454465,
+            -7.005974621100108
+          ]
+        },
+        "1024": {
+          "blocks": 2,
+          "speedup_percent": -8.239766633571124,
+          "block_speedup_percent": [
+            -8.290089458192645,
+            -8.18941619593959
+          ]
+        }
+      },
+      "eligible_for_confirmation": false
+    },
+    "specialized-profile": {
+      "status": "PASS",
+      "mode": "profile",
+      "runs": [],
+      "builds": {
+        "control": {
+          "status": "PASS_BUILD",
+          "arm": "control",
+          "commands": [
+            {
+              "label": "control-configure",
+              "exit": 0,
+              "seconds": 4.9689999999973224
+            },
+            {
+              "label": "control-compile",
+              "exit": 0,
+              "seconds": 262.07800000000134
+            },
+            {
+              "label": "control-export",
+              "exit": 0,
+              "seconds": 1.5780000000013388
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "binaries": {
+            "control": {
+              "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+              "bytes": 176885384
+            }
+          }
+        },
+        "candidate": {
+          "status": "PASS_BUILD",
+          "arm": "candidate",
+          "commands": [
+            {
+              "label": "candidate-configure",
+              "exit": 0,
+              "seconds": 4.827999999994063
+            },
+            {
+              "label": "candidate-compile",
+              "exit": 0,
+              "seconds": 291.93700000000536
+            },
+            {
+              "label": "candidate-export",
+              "exit": 0,
+              "seconds": 1.610000000000582
+            },
+            {
+              "label": "candidate-cli-export",
+              "exit": 0,
+              "seconds": 5.515999999995984
+            },
+            {
+              "label": "candidate-decode-export",
+              "exit": 0,
+              "seconds": 5.6710000000020955
+            }
+          ],
+          "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+          "source_head": "62424931f3f8174c834b20d50fc1e097f13452dc",
+          "source_files": {
+            "src/ops/linear/gguf/ggml_bridge.cu": "f6a35de4c2e64b9212636bdd465938e3dd439632050370cca72d5843cfd9d0e1",
+            "src/ops/linear/gguf/ggml_bridge.h": "9067379b50e1218c9e6b013ba3ec9e5f875e1d012b6f40ad512bc59c20abd489",
+            "src/ops/linear/gguf/ggml_bridge_internal.cuh": "8febddc3408fd9567cda9f7d8e8c2f26b68baaba87eaf4cb6de8c7b574591950",
+            "src/ops/linear/gguf/ggml_bridge_mmq.cuh": "105f97e34c88853044645183fb216d8dfbb9459037fbc2198835846d81c64ad7",
+            "src/ops/linear/gguf/gguf_linear.cpp": "e68ca0a00e7794efa8e73b6b95ff7435fd52176155376fb8b3e58bf4f759f71c",
+            "tests/ops/linear/test_gguf_mmq_store.cu": "3c9f97aeec804d68bc7b78ecaf8b9e76d852a022fdb773d0a32bdd75e7c4f4b1",
+            "third_party/ggml-quants/src/ggml-cuda/mmq.cuh": "6638d6aa223ef1a8f4e8944bdfa28515dff97a0d087510dc3b3946ea17ab2eec"
+          },
+          "binaries": {
+            "candidate": {
+              "sha256": "f177847d159ab1616082fa931420d3d35a4189843591d5aa45d8edfdd5621b3a",
+              "bytes": 189586048
+            },
+            "candidate-cli": {
+              "sha256": "c2a86ae64a7e01454e021629490af913611de13a58bccac50ef9e13a800d34c5",
+              "bytes": 775357448
+            },
+            "candidate-decode": {
+              "sha256": "87481e5e667cdca550ffc0dc73512e59d62b55c7bc8efaceaecf12f6059b2bfb",
+              "bytes": 774600952
+            }
+          }
+        }
+      },
+      "production_config_sha256": "8659560655d46f2f4129b6811471f75c1e3128d0d7d6c06fe33f8f815003a13d",
+      "admission_before": {
+        "runtime": {
+          "kind": "wsl_docker",
+          "backend": "ninfer",
+          "distribution": "Ubuntu-24.04",
+          "available": true,
+          "error": null
+        },
+        "backend_load": null,
+        "backend_load_error": null,
+        "backend_recovery": {
+          "state": "idle",
+          "attempt": 0,
+          "retry_after_monotonic": 0.0
+        },
+        "context_grants": {
+          "backend": "ninfer",
+          "physical_kv_tokens": 0,
+          "page_tokens": 0,
+          "committed_grant_tokens": 0,
+          "reserved_request_tokens": 0,
+          "available_guaranteed_tokens": 0
+        },
+        "models": [
+          {
+            "id": "qwen3.8-27b",
+            "name": "qwen3.8-27b",
+            "replicas": 0,
+            "ready_replicas": 0,
+            "backend": "ninfer",
+            "backend_parameters": [
+              "--max-model-len=65536",
+              "--max-num-seqs=1"
+            ],
+            "max_context_tokens": 65536,
+            "container": null
+          }
+        ],
+        "instances": [],
+        "leases": [],
+        "windows_gpu": {
+          "available": true,
+          "external_busy": true,
+          "external_activity": true,
+          "external_memory_bytes": 412643328,
+          "external_reserve_fraction": 0.3,
+          "external_memory_with_margin_bytes": 536436326,
+          "additional_margin_bytes": 123792998,
+          "memory_threshold_mb": 64,
+          "process_memory": [
+            {
+              "pid": 14116,
+              "name": "pid_14116_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 79908864,
+              "process": "ChatGPT"
+            },
+            {
+              "pid": 9364,
+              "name": "pid_9364_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 85159936,
+              "process": "explorer"
+            },
+            {
+              "pid": 1180,
+              "name": "pid_1180_luid_0x00000000_0x0000F001_phys_0",
+              "bytes": 247574528,
+              "process": "dwm"
+            }
+          ],
+          "active_engines": [],
+          "collector_duration_ms": 735.0,
+          "sampled_monotonic": 38771.5,
+          "sample_revision": 5545
+        },
+        "managed_container_names": [
+          "gpu-broker-ninfer"
+        ],
+        "admission": {
+          "draining": false,
+          "drain_owner_kind": null,
+          "photo_gpu_reservation": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "runtime_maintenance": {
+            "active": false,
+            "owner": null,
+            "expires_at": null
+          },
+          "active_batches": []
+        },
+        "capacity_estimate": [
+          {
+            "gpu": "NVIDIA GeForce RTX 3090",
+            "total_bytes": 25769803776,
+            "driver_used_bytes": 481296384,
+            "external_process_bytes": 412643328,
+            "external_reserve_bytes": 123792999,
+            "target_llm_budget_bytes": 25233367449,
+            "available_llm_budget_bytes": 25164714393,
+            "llm_and_system_used_bytes": 68653056,
+            "external_reserve_satisfied": true,
+            "measurement": "measured",
+            "sample_age_seconds": 8.10899999999674
+          }
+        ],
+        "runtime_gpu_observation_error": null,
+        "external_growth_pressure": {
+          "active": false,
+          "affected_lease_ids": []
+        },
+        "budget_revision": 892,
+        "model_state": "idle",
+        "requires_profile_change": false,
+        "agents": [],
+        "queue": [],
+        "inference": {
+          "active_requests": 0,
+          "active_sequences": 0,
+          "reserved_tokens": 0
+        }
+      },
+      "reservation": {
+        "reservation_id": "2d93405dcffb4028b1976f64a2ed0c28",
+        "owner": "ninfer-gate-bf16-pr",
+        "state": "active",
+        "expires_at": 1792806718.8891525,
+        "model_unloaded": true
+      },
+      "profiles": [
+        {
+          "arm": "control",
+          "label": "specialized-profile-control",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "ninfer::bench::detail::fill_bf16_uniform_kernel(unsigned short *, unsigned long, unsigned int)",
+              "nanoseconds": 13347,
+              "registers": 16,
+              "grid": 4096,
+              "block": 256
+            },
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)1>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 18499,
+              "registers": 24,
+              "grid": 1024,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, float, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 1674101,
+              "registers": 221,
+              "grid": 1088,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, float, (bool)0>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int)",
+              "nanoseconds": 1672693,
+              "registers": 221,
+              "grid": 1088,
+              "block": 256
+            },
+            {
+              "name": "ninfer::ops::gguf::detail::<unnamed>::store_plane_kernel(const float *, long, int, ninfer::ops::gguf::detail::VecStore)",
+              "nanoseconds": 209675,
+              "registers": 19,
+              "grid": 68,
+              "block": 256
+            }
+          ]
+        },
+        {
+          "arm": "candidate",
+          "label": "specialized-profile-candidate",
+          "exit": "0",
+          "kernels": [
+            {
+              "name": "ninfer::bench::detail::fill_bf16_uniform_kernel(unsigned short *, unsigned long, unsigned int)",
+              "nanoseconds": 13409,
+              "registers": 16,
+              "grid": 4096,
+              "block": 256
+            },
+            {
+              "name": "void ninfer::ops::gguf::detail::<unnamed>::quantize_matrix_kernel<(mmq_q8_1_ds_layout)1>(const __nv_bfloat16 *, const int *, const int *, int, block_q8_1_mmq *, int, int, int)",
+              "nanoseconds": 18497,
+              "registers": 24,
+              "grid": 1024,
+              "block": 128
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, float, (bool)0, ggml_cuda_mmq_identity>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int, T7)",
+              "nanoseconds": 1676308,
+              "registers": 221,
+              "grid": 1088,
+              "block": 256
+            },
+            {
+              "name": "void mul_mat_q<(ggml_type)12, (int)128, (bool)0, (ggml_prec)30, __nv_bfloat16, (bool)0, ninfer::ops::gguf::detail::MatrixGateEpilogue<(ninfer::ops::gguf::GateActivation)0>>(const char *, const int *, const int *, const int *, T5 *, float *, const float *, uint3, int, int, int, int, int, uint3, uint3, int, int, int, uint3, uint3, int, int, int, uint3, float *, int, T7)",
+              "nanoseconds": 2306559,
+              "registers": 229,
+              "grid": 1088,
+              "block": 256
+            }
+          ]
+        }
+      ],
+      "release": {
+        "reservation_id": "2d93405dcffb4028b1976f64a2ed0c28",
+        "state": "released"
+      },
+      "cleanup_errors": [],
+      "production_config_unchanged": true
+    }
+  },
+  "control": {
+    "status": "PASS_BUILD",
+    "arm": "control",
+    "commands": [
+      {
+        "label": "control-configure",
+        "exit": 0,
+        "seconds": 4.9689999999973224
+      },
+      {
+        "label": "control-compile",
+        "exit": 0,
+        "seconds": 262.07800000000134
+      },
+      {
+        "label": "control-export",
+        "exit": 0,
+        "seconds": 1.5780000000013388
+      }
+    ],
+    "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+    "binaries": {
+      "control": {
+        "sha256": "f1c29a0b0dc0e4a4e422e04c792df4fc4c71ecf201a14d3bb0fc8ada61b9a6b2",
+        "bytes": 176885384
+      }
+    }
+  },
+  "control_full": {
+    "status": "PASS_BUILD",
+    "arm": "control",
+    "commands": [
+      {
+        "label": "control-configure",
+        "exit": 0,
+        "seconds": 4.875
+      },
+      {
+        "label": "control-compile",
+        "exit": 0,
+        "seconds": 112.09399999999732
+      },
+      {
+        "label": "control-cli-export",
+        "exit": 0,
+        "seconds": 5.453000000001339
+      },
+      {
+        "label": "control-decode-export",
+        "exit": 0,
+        "seconds": 5.546999999998661
+      }
+    ],
+    "base": "25fda583db2dcd77b81b69496fafe49b999d1f06",
+    "binaries": {
+      "control-cli": {
+        "sha256": "386c5828929a7e923ec1625acc1a0aacdfc5e4bae3395585aaedd307316f0df6",
+        "bytes": 762678424
+      },
+      "control-decode": {
+        "sha256": "353768d9b8670952e47b346e72d0f912e22f2593b46a9dc5cc4bd6aff81b6a4f",
+        "bytes": 761913728
+      }
+    }
+  },
+  "excluded_preparation_attempts": "Initial nsys capture requested cudaProfilerApi but the public Op rig has no Start/Stop markers; no report was produced. Whole-process capture corrected this without changing binaries or timing protocol.",
+  "limits": "Exploratory selection screens only, no CI or full-model performance claim; unchanged production. Profile durations are not uninstrumented timing. Both candidates retained in Git history; experimental active tree keeps its previous defaults.",
+  "restoration": "Restore lab inputs to results/gate-bf16-pr and scripts to scripts; build each source against the pinned baseline, then exported gates before timing. Do not repeat this rejected design without a distinct hypothesis."
+}
