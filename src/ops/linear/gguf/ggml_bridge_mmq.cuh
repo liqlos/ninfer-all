@@ -340,9 +340,17 @@ void moe_matrix_product_impl(const void* const* experts, std::int64_t row_bytes,
         const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t, void*, \
         cudaStream_t, bool, float*, ggml_cuda_mmq_identity);                                      \
     template void ninfer::ops::gguf::detail::matrix_product_impl<TYPE, __nv_bfloat16, false,      \
-        ninfer::ops::gguf::detail::MatrixGateEpilogue>(                                            \
+        ninfer::ops::gguf::detail::MatrixGateEpilogue<                                             \
+            ninfer::ops::gguf::GateActivation::Silu>>(                                             \
         const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t, void*, \
-        cudaStream_t, bool, float*, ninfer::ops::gguf::detail::MatrixGateEpilogue);                \
+        cudaStream_t, bool, float*, ninfer::ops::gguf::detail::MatrixGateEpilogue<                 \
+            ninfer::ops::gguf::GateActivation::Silu>);                                               \
+    template void ninfer::ops::gguf::detail::matrix_product_impl<TYPE, __nv_bfloat16, false,      \
+        ninfer::ops::gguf::detail::MatrixGateEpilogue<                                             \
+            ninfer::ops::gguf::GateActivation::GeluTanh>>(                                          \
+        const void*, std::int64_t, int, int, const void*, int, __nv_bfloat16*, std::int64_t, void*, \
+        cudaStream_t, bool, float*, ninfer::ops::gguf::detail::MatrixGateEpilogue<                 \
+            ninfer::ops::gguf::GateActivation::GeluTanh>);                                          \
     template bool ninfer::ops::gguf::detail::moe_matrix_fits_impl<TYPE>(int, int, bool);           \
     template void ninfer::ops::gguf::detail::moe_matrix_product_impl<TYPE>(                        \
         const void* const*, std::int64_t, int, int, const ninfer::ops::gguf::MoeRouting&, int,     \

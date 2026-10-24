@@ -135,16 +135,21 @@ __device__ __forceinline__ float vec_gate(float x, int activation) {
     return activation == 0 ? vec_silu(x) : ops::gelu_tanh(x);
 }
 
+template <GateActivation activation>
 struct MatrixGateEpilogue {
     const float* gate = nullptr;
     std::int64_t column_stride = 0;
-    int activation = 0;
     __device__ __forceinline__ float operator()(float value, int row, int column) const {
-        return value * vec_gate(gate[std::int64_t(column) * column_stride + row], activation);
+        const float gate_value = gate[std::int64_t(column) * column_stride + row];
+        if constexpr (activation == GateActivation::Silu) {
+            return value * vec_silu(gate_value);
+        } else {
+            return value * ops::gelu_tanh(gate_value);
+        }
     }
 
-    __device__ __forceinline__ MatrixGateEpilogue offset(int row, int column) const {
-        return {gate + std::int64_t(column) * column_stride + row, column_stride, activation};
+    __device__ __forceinline__ MatrixGateEpilogue<activation> offset(int row, int column) const {
+        return {gate + std::int64_t(column) * column_stride + row, column_stride};
     }
 };
 
